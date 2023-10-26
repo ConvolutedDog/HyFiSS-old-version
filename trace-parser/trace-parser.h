@@ -37,9 +37,11 @@ struct trace_command {
   command_type m_type;
 };
 
-struct inst_memadd_info_t {
+class inst_memadd_info_t {
+ public:
   uint64_t addrs[WARP_SIZE];
-  int32_t width;
+  int32_t width = 0;
+  bool empty = true;
 
   void base_stride_decompress(unsigned long long base_address, int stride,
                               const std::bitset<WARP_SIZE> &mask);
@@ -117,7 +119,7 @@ class trace_parser {
   std::vector<std::vector<inst_trace_t> *> get_next_threadblock_traces(
       unsigned trace_version, unsigned enable_lineinfo, std::ifstream *ifs,
       std::string kernel_name,
-      unsigned kernel_id, unsigned total_warps_per_thread_block);
+      unsigned kernel_id, unsigned num_warps_per_thread_block);
 
   void kernel_finalizer(kernel_trace_t *trace_info);
 
