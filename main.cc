@@ -15,7 +15,9 @@
 #include "./ISA-Def/trace_opcode.h"
 #include "./trace-parser/trace-parser.h"
 #include "./trace-driven/trace-driven.h"
+#include "./common/CLI/CLI.hpp"
 
+#define LOG
 #define gpgpu_concurrent_kernel_sm true
 
 trace_kernel_info_t *create_kernel_info(kernel_trace_t* kernel_trace_info,
@@ -29,15 +31,24 @@ trace_kernel_info_t *create_kernel_info(kernel_trace_t* kernel_trace_info,
 }
 
 int main(int argc, const char **argv) {
+  CLI::App app{"Memory Model."};
+  
+  std::string kernelslist_g;
+  bool PRINT_LOG = false;
+
+  app.add_option("--trace", kernelslist_g, "The kernelslist path, which is generated from NVBit, e.g., \"./kernelslist.g\"");
+  app.add_option("--log", PRINT_LOG, "Print the traces processing log or not");
+  CLI11_PARSE(app, argc, argv);
+
   std::cout << "Memory Model." << std::endl;
   
-  if (argc < 2) printf("Error: plearse specify the kernel list argument.\n");
-  else if (argc == 2) {
-    // if (typeid(argv[0]) == typeid(std::string)) ;
-    // else printf("Error: the kernel list argument must be string.\n");
-  } else if (argc > 2) printf("Error: too many arguments.\n");
+  // if (argc < 2) printf("Error: plearse specify the kernel list argument.\n");
+  // else if (argc == 2) {
+  //   // if (typeid(argv[0]) == typeid(std::string)) ;
+  //   // else printf("Error: the kernel list argument must be string.\n");
+  // } else if (argc > 2) printf("Error: too many arguments.\n");
 
-  trace_parser tracer(argv[1]);
+  trace_parser tracer(kernelslist_g.c_str());
 
   // for each kernel:
   //     load file
@@ -45,7 +56,7 @@ int main(int argc, const char **argv) {
   //     check insns
   std::pair<std::vector<trace_command>, int> result = tracer.parse_commandlist_file();
   std::vector<trace_command> commandlist = result.first;
-  int concurrent_kernel_kernel_nums = result.second;
+  unsigned concurrent_kernel_kernel_nums = result.second;
 
   std::vector<unsigned long> busy_streams;
   std::vector<trace_kernel_info_t*> kernels_info;
@@ -80,41 +91,71 @@ int main(int argc, const char **argv) {
   std::cout << "Kernel nums waiting for processing : " << kernels_info.size() << std::endl;
 
   for (auto k : kernels_info) {
+
+    if (PRINT_LOG) std::cout << "kernel_id[" << k->get_trace_info()->kernel_id << "] | kernel_name[" 
+                             << k->get_trace_info()->kernel_name << "]" << std::endl;
+    
     std::vector<std::vector<inst_trace_t> *> threadblock_traces;
     unsigned start_warp = 0;
-    unsigned end_warp = k->get_trace_info()->tb_dim_x * 
-                        k->get_trace_info()->tb_dim_y * 
-                        k->get_trace_info()->tb_dim_z / MAX_WARP_SIZE - 1;
+    unsigned num_threads_per_thread_block = k->get_trace_info()->tb_dim_x * 
+                                            k->get_trace_info()->tb_dim_y * 
+                                            k->get_trace_info()->tb_dim_z;
+    unsigned end_warp = num_threads_per_thread_block / MAX_WARP_SIZE - 1;
 
-    unsigned total_warps_per_thread_block = end_warp - start_warp + 1; // per block
+    unsigned num_warps_per_thread_block = end_warp - start_warp + 1; // per block
 
-    for (int i = 0; i < k->get_trace_info()->grid_dim_x * 
-                        k->get_trace_info()->grid_dim_y * 
-                        k->get_trace_info()->grid_dim_z; i++) {
+    unsigned num_threadblocks_per_kernel = k->get_trace_info()->grid_dim_x * 
+                                           k->get_trace_info()->grid_dim_y * 
+                                           k->get_trace_info()->grid_dim_z;
+
+    for (unsigned i = 0; i < num_threadblocks_per_kernel; i++) {
       threadblock_traces = k->get_next_threadblock_traces(k->get_trace_info()->kernel_name, 
                                                           k->get_trace_info()->kernel_id,
-                                                          total_warps_per_thread_block);
-      for (int i = 0; i < threadblock_traces.size(); i++) {
-        std::vector<inst_trace_t> *traces = threadblock_traces[i];
+                                                          num_warps_per_thread_block);
+      for (unsigned j = 0; j < threadblock_traces.size(); j++) {
+        std::vector<inst_trace_t> *traces = threadblock_traces[j];
         
-        std::cout << "warp = " << std::dec << i << std::endl;
+        if (PRINT_LOG) std::cout << "  warp = " << std::dec << j << std::endl;
+        
         for (const auto &value : *traces) {
-          std::cout << " pc[" 
-                    << std::setw(4) << std::right << std::hex << value.m_pc 
-                    << "] | mask[" 
-                    << std::setw(8) << std::right << std::hex << value.mask 
-                    << "] | dstnum[" 
-                    << std::setw(2) << std::right << value.reg_dsts_num 
-                    << "] | srcnum[" 
-                    << std::setw(2) << std::right << value.reg_srcs_num 
-                    << "] | opcode[" 
-                    << std::setw(21) << std::right << value.opcode << "]" 
-                    << std::endl;
+          if (PRINT_LOG) std::cout << "    pc[" 
+                                   << std::setw(4) << std::right << std::hex << value.m_pc 
+                                   << "] | mask[" 
+                                   << std::setw(8) << std::right << std::hex << value.mask 
+                                   << "] | dstnum[" 
+                                   << std::setw(2) << std::right << value.reg_dsts_num 
+                                   << "] | srcnum[" 
+                                   << std::setw(2) << std::right << value.reg_srcs_num 
+                                   << "] | opcode[" 
+                                   << std::setw(21) << std::right << value.opcode << "]" 
+                                   << std::endl;
+
+          if (!value.memadd_info->empty) {
+                         std::cout << "    pc[" 
+                                   << std::setw(4) << std::right << std::hex << value.m_pc 
+                                   << "] | mask[" 
+                                   << std::setw(8) << std::right << std::hex << value.mask 
+                                   << "] | dstnum[" 
+                                   << std::setw(2) << std::right << value.reg_dsts_num 
+                                   << "] | srcnum[" 
+                                   << std::setw(2) << std::right << value.reg_srcs_num 
+                                   << "] | opcode[" 
+                                   << std::setw(21) << std::right << value.opcode << "]" 
+                                   << std::endl;
+            for (int s = 0; s < WARP_SIZE; s++) {
+              if ((value.mask >> s) & 1)
+                std::cout << std::setw(13) << std::hex << value.memadd_info->addrs[s];
+              else
+                std::cout << std::setw(13) << " ";
+            }
+            std::cout << std::endl;
+          }
+
         }
       }
     }
 
-    for (int i = end_warp; i < end_warp; i++) {
+    for (unsigned i = end_warp; i < end_warp; i++) {
       delete threadblock_traces[i];
     }
     threadblock_traces.clear();
