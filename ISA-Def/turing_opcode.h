@@ -6,7 +6,6 @@
 
 #include <string>
 #include <unordered_map>
-// #include "abstract_hardware_model.h"
 #include "trace_opcode.h"
 
 #define TURING_BINART_VERSION 75
