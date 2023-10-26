@@ -89,13 +89,13 @@ trace_kernel_info_t::trace_kernel_info_t(dim3 gridDim, dim3 blockDim,
 std::vector<std::vector<inst_trace_t> *> 
 trace_kernel_info_t::get_next_threadblock_traces(std::string kernel_name, 
                                                  unsigned kernel_id,
-                                                 unsigned total_warps) {
+                                                 unsigned total_warps_per_thread_block) {
   return m_parser->get_next_threadblock_traces(m_kernel_trace_info->trace_verion,
                                                m_kernel_trace_info->enable_lineinfo,
                                                m_kernel_trace_info->ifs,
                                                kernel_name,
                                                kernel_id,
-                                               total_warps);
+                                               total_warps_per_thread_block);
 }
 
 types_of_operands get_oprnd_type(op_type op, special_ops sp_op){
