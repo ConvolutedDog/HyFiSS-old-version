@@ -89,13 +89,13 @@ trace_kernel_info_t::trace_kernel_info_t(dim3 gridDim, dim3 blockDim,
 std::vector<std::vector<inst_trace_t> *> 
 trace_kernel_info_t::get_next_threadblock_traces(std::string kernel_name, 
                                                  unsigned kernel_id,
-                                                 unsigned total_warps_per_thread_block) {
+                                                 unsigned num_warps_per_thread_block) {
   return m_parser->get_next_threadblock_traces(m_kernel_trace_info->trace_verion,
                                                m_kernel_trace_info->enable_lineinfo,
                                                m_kernel_trace_info->ifs,
                                                kernel_name,
                                                kernel_id,
-                                               total_warps_per_thread_block);
+                                               num_warps_per_thread_block);
 }
 
 types_of_operands get_oprnd_type(op_type op, special_ops sp_op){
@@ -167,7 +167,7 @@ bool trace_warp_inst_t::parse_from_trace_struct(
     const std::unordered_map<unsigned, unsigned> *OpcPowerMap = &OpcodePowerMap;
     std::unordered_map<unsigned, unsigned>::const_iterator it2 =
       OpcPowerMap->find(m_opcode);
-    if(it2 != OpcPowerMap->end())
+    if (it2 != OpcPowerMap->end())
       sp_op = (special_ops) (it2->second);
       oprnd_type = get_oprnd_type(op, sp_op);
   } else {
