@@ -17,6 +17,13 @@ OPTFLAGS = -O3 -g3 -fPIC
 TARGET = memory_model.x
 
 OBJ_PATH = obj
+
+exist_OBJ_PATH = $(shell if [ -d $(OBJ_PATH) ]; then echo "exist"; else echo "noexist"; fi)
+
+ifeq ("$(exist_OBJ_PATH)", "noexist")
+$(shell mkdir $(OBJ_PATH))
+endif
+
 OBJS = $(OBJ_PATH)/common_def.o $(OBJ_PATH)/trace-parser.o $(OBJ_PATH)/trace-driven.o $(OBJ_PATH)/main.o 
 
 all: $(TARGET)
@@ -40,3 +47,4 @@ $(OBJ_PATH)/common_def.o: common/common_def.cc
 
 clean:
 	rm -f $(OBJS) $(TARGET)
+	rm -rf $(OBJ_PATH)
