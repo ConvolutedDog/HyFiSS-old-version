@@ -6,7 +6,8 @@
 
 #include <string>
 #include <unordered_map>
-// #include "abstract_hardware_model.h"
+
+#define SPEC_UNIT_START_ID 100
 
 enum TraceInstrOpcode {
   // Volta (includes common insts for others cards as well)
@@ -290,5 +291,8 @@ enum uarch_op_t {
   SPECIALIZED_UNIT_8_OP
 };
 typedef enum uarch_op_t op_type;
+
+enum uarch_operand_type_t { UN_OP = -1, INT_OP, FP_OP };
+typedef enum uarch_operand_type_t types_of_operands;
 
 #endif
