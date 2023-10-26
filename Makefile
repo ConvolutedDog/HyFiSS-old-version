@@ -11,6 +11,7 @@ ifeq ($(GNUC_CPP0X), 1)
 endif
 
 CXXFLAGS += -I./ISA-Def -I./trace-parser -I./trace-driven -I./common
+CXXFLAGS += -I./common/CLI -I./common/CLI/impl
 
 OPTFLAGS = -O3 -g3 -fPIC
 
