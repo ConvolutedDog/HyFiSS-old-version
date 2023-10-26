@@ -117,7 +117,7 @@ class trace_parser {
   std::vector<std::vector<inst_trace_t> *> get_next_threadblock_traces(
       unsigned trace_version, unsigned enable_lineinfo, std::ifstream *ifs,
       std::string kernel_name,
-      unsigned kernel_id, unsigned total_warps);
+      unsigned kernel_id, unsigned total_warps_per_thread_block);
 
   void kernel_finalizer(kernel_trace_t *trace_info);
 
