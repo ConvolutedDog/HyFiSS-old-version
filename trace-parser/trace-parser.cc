@@ -50,6 +50,7 @@ void inst_memadd_info_t::base_stride_decompress(unsigned long long base_address,
     } else
       addrs[s] = 0;
   }
+  empty = false;
 }
 
 void inst_memadd_info_t::base_delta_decompress(
@@ -70,6 +71,7 @@ void inst_memadd_info_t::base_delta_decompress(
     } else
       addrs[s] = 0;
   }
+  empty = false;
 }
 
 inst_trace_t::inst_trace_t() { memadd_info = NULL; }
@@ -271,6 +273,10 @@ bool inst_trace_t::parse_from_string(std::string trace,
       }
       memadd_info->base_delta_decompress(base_address, deltas, mask_bits);
     }
+  } else { 
+    memadd_info = new inst_memadd_info_t();
+    memadd_info->empty = true;
+    memadd_info->width = -1;
   }
   // Finish Parsing
 
@@ -359,7 +365,7 @@ kernel_trace_t* trace_parser::parse_kernel_info(const std::string &kerneltraces_
         ss.str(line.substr(equal_idx + 1));
         ss >> std::hex >> kernel_info->local_base_addr;
       }
-      std::cout << line << std::endl;
+      std::cout << "    Info: " << line << std::endl;
       continue;
     }
   }
@@ -452,9 +458,9 @@ std::vector<std::vector<inst_trace_t> *> trace_parser::get_next_threadblock_trac
     unsigned trace_version, unsigned enable_lineinfo, std::ifstream *ifs,
     std::string kernel_name,
     unsigned kernel_id,
-    unsigned total_warps_per_thread_block) {
+    unsigned num_warps_per_thread_block) {
   std::vector<std::vector<inst_trace_t> *> threadblock_traces;
-  threadblock_traces.resize(total_warps_per_thread_block);
+  threadblock_traces.resize(num_warps_per_thread_block);
   unsigned block_id_x = 0, block_id_y = 0, block_id_z = 0;
   bool start_of_tb_stream_found = false;
 
@@ -488,7 +494,7 @@ std::vector<std::vector<inst_trace_t> *> trace_parser::get_next_threadblock_trac
         assert(start_of_tb_stream_found);
         sscanf(line.c_str(), "thread block = %d,%d,%d", &block_id_x,
                &block_id_y, &block_id_z);
-        std::cout << line << std::endl;
+        std::cout << "Parsing trace of " << line << "..." << std::endl;
       } else if (string1 == "warp") {
         // the start of new warp stream
         assert(start_of_tb_stream_found);
