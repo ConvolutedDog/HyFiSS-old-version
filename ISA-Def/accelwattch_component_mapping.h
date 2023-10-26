@@ -30,7 +30,6 @@
 #ifndef ACCELWATCH_COMPONENT_MAPPING_H
 #define ACCELWATCH_COMPONENT_MAPPING_H
 
-// #include "abstract_hardware_model.h"
 #include <string>
 #include <unordered_map>
 #include "trace_opcode.h"
