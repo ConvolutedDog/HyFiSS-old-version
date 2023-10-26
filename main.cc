@@ -52,11 +52,10 @@ int main(int argc, const char **argv) {
   kernels_info.reserve(gpgpu_concurrent_kernel_sm ? concurrent_kernel_kernel_nums : 1);
 
   unsigned i = 0;
-    //gulp up as many commands as possible - either cpu_gpu_mem_copy 
-    //or kernel_launch - until the vector "kernels_info" has reached
-    //the concurrent_kernel_kernel_nums or we have read every command 
-    //from commandlist
-  
+  //gulp up as many commands as possible - either cpu_gpu_mem_copy 
+  //or kernel_launch - until the vector "kernels_info" has reached
+  //the concurrent_kernel_kernel_nums or we have read every command 
+  //from commandlist
   while (kernels_info.size() < concurrent_kernel_kernel_nums && i < commandlist.size()) {
     trace_kernel_info_t *kernel_info = NULL;
     if (commandlist[i].m_type == command_type::cpu_gpu_mem_copy) {
@@ -87,14 +86,14 @@ int main(int argc, const char **argv) {
                         k->get_trace_info()->tb_dim_y * 
                         k->get_trace_info()->tb_dim_z / MAX_WARP_SIZE - 1;
 
-    unsigned total_warps = end_warp - start_warp + 1; // per block
+    unsigned total_warps_per_thread_block = end_warp - start_warp + 1; // per block
 
     for (int i = 0; i < k->get_trace_info()->grid_dim_x * 
-         k->get_trace_info()->grid_dim_y * k->get_trace_info()->grid_dim_z; 
-         i++) {
+                        k->get_trace_info()->grid_dim_y * 
+                        k->get_trace_info()->grid_dim_z; i++) {
       threadblock_traces = k->get_next_threadblock_traces(k->get_trace_info()->kernel_name, 
                                                           k->get_trace_info()->kernel_id,
-                                                          total_warps);
+                                                          total_warps_per_thread_block);
       for (int i = 0; i < threadblock_traces.size(); i++) {
         std::vector<inst_trace_t> *traces = threadblock_traces[i];
         
