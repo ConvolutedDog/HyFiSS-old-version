@@ -452,9 +452,9 @@ std::vector<std::vector<inst_trace_t> *> trace_parser::get_next_threadblock_trac
     unsigned trace_version, unsigned enable_lineinfo, std::ifstream *ifs,
     std::string kernel_name,
     unsigned kernel_id,
-    unsigned total_warps) {
+    unsigned total_warps_per_thread_block) {
   std::vector<std::vector<inst_trace_t> *> threadblock_traces;
-  threadblock_traces.resize(total_warps);
+  threadblock_traces.resize(total_warps_per_thread_block);
   unsigned block_id_x = 0, block_id_y = 0, block_id_z = 0;
   bool start_of_tb_stream_found = false;
 
