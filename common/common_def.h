@@ -1,0 +1,1 @@
+extern int kernel_info_m_next_uid;
