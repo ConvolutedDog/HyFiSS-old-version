@@ -6,7 +6,6 @@
 
 #include <string>
 #include <unordered_map>
-// #include "abstract_hardware_model.h"
 #include "trace_opcode.h"
 
 #define PASCAL_TITANX_BINART_VERSION 61
