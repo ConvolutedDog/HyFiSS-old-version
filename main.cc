@@ -16,6 +16,7 @@
 #include "./trace-parser/trace-parser.h"
 #include "./trace-driven/trace-driven.h"
 #include "./common/CLI/CLI.hpp"
+#include "./common/common_def.h"
 
 #define LOG
 #define gpgpu_concurrent_kernel_sm true
@@ -90,6 +91,8 @@ int main(int argc, const char **argv) {
 
   std::cout << "Kernel nums waiting for processing : " << kernels_info.size() << std::endl;
 
+  OPEN_MEMORY_TRACE_FILE();
+
   for (auto k : kernels_info) {
 
     if (PRINT_LOG) std::cout << "kernel_id[" << k->get_trace_info()->kernel_id << "] | kernel_name[" 
@@ -131,24 +134,31 @@ int main(int argc, const char **argv) {
                                    << std::endl;
 
           if (!value.memadd_info->empty) {
-                         std::cout << "    pc[" 
-                                   << std::setw(4) << std::right << std::hex << value.m_pc 
-                                   << "] | mask[" 
-                                   << std::setw(8) << std::right << std::hex << value.mask 
-                                   << "] | dstnum[" 
-                                   << std::setw(2) << std::right << value.reg_dsts_num 
-                                   << "] | srcnum[" 
-                                   << std::setw(2) << std::right << value.reg_srcs_num 
-                                   << "] | opcode[" 
-                                   << std::setw(21) << std::right << value.opcode << "]" 
-                                   << std::endl;
+            //              std::cout << "    pc[" 
+            //                        << std::setw(4) << std::right << std::hex << value.m_pc 
+            //                        << "] | mask[" 
+            //                        << std::setw(8) << std::right << std::hex << value.mask 
+            //                        << "] | dstnum[" 
+            //                        << std::setw(2) << std::right << value.reg_dsts_num 
+            //                        << "] | srcnum[" 
+            //                        << std::setw(2) << std::right << value.reg_srcs_num 
+            //                        << "] | opcode[" 
+            //                        << std::setw(21) << std::right << value.opcode << "]" 
+            //                        << std::endl;
+            // for (int s = 0; s < WARP_SIZE; s++) {
+            //   if ((value.mask >> s) & 1)
+            //     std::cout << std::setw(13) << std::hex << value.memadd_info->addrs[s];
+            //   else
+            //     std::cout << std::setw(13) << " ";
+            // }
+            // std::cout << std::endl;
+
             for (int s = 0; s < WARP_SIZE; s++) {
-              if ((value.mask >> s) & 1)
-                std::cout << std::setw(13) << std::hex << value.memadd_info->addrs[s];
-              else
-                std::cout << std::setw(13) << " ";
+              if ((value.mask >> s) & 1) {
+                PRINT_2_MEMORY_TRACE_FILE_0x();
+                PRINT_2_MEMORY_TRACE_FILE(value.memadd_info->addrs[s]);
+              }
             }
-            std::cout << std::endl;
           }
 
         }
@@ -160,6 +170,8 @@ int main(int argc, const char **argv) {
     }
     threadblock_traces.clear();
   }
+  
+  CLOSE_MEMORY_TRACE_FILE();
 
   fflush(stdout);
 
