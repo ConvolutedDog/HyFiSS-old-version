@@ -33,11 +33,13 @@ trace_kernel_info_t *create_kernel_info(kernel_trace_t* kernel_trace_info,
 
 int main(int argc, const char **argv) {
   CLI::App app{"Memory Model."};
-  
+
+  std::string configs;
   std::string kernelslist_g;
   bool PRINT_LOG = false;
 
-  app.add_option("--trace", kernelslist_g, "The kernelslist path, which is generated from NVBit, e.g., \"./kernelslist.g\"");
+  app.add_option("--configs", configs, "The configs path, which is generated from our NVBit tool, e.g., \"./configs\"");
+  // app.add_option("--trace", kernelslist_g, "The kernelslist path, which is generated from NVBit, e.g., \"./kernelslist.g\"");
   app.add_option("--log", PRINT_LOG, "Print the traces processing log or not");
   CLI11_PARSE(app, argc, argv);
 
@@ -49,7 +51,13 @@ int main(int argc, const char **argv) {
   //   // else printf("Error: the kernel list argument must be string.\n");
   // } else if (argc > 2) printf("Error: too many arguments.\n");
 
-  trace_parser tracer(kernelslist_g.c_str());
+  // trace_parser tracer(kernelslist_g.c_str());
+  trace_parser tracer(configs.c_str());
+  tracer.parse_configs_file();
+  tracer.read_mem_instns();
+
+  exit(1);
+  
 
   // for each kernel:
   //     load file
