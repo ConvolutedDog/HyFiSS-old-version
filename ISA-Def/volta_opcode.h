@@ -10,7 +10,7 @@
 
 #define VOLTA_BINART_VERSION 70
 
-/// Volta SM_70 ISA
+// Volta SM_70 ISA
 // see: https://docs.nvidia.com/cuda/cuda-binary-utilities/index.html
 static const std::unordered_map<std::string, OpcodeChar> Volta_OpcodeMap = {
     
@@ -102,7 +102,7 @@ static const std::unordered_map<std::string, OpcodeChar> Volta_OpcodeMap = {
     {"R2P",         OpcodeChar(OP_R2P,         ALU_OP)},
 
     // Load/Store Instructions
-    {"LD",          OpcodeChar(OP_LD, LOAD_OP)},
+    {"LD",          OpcodeChar(OP_LD,          LOAD_OP)},
     // For now, we ignore constant loads, consider it as ALU_OP, TO DO
     {"LDC",         OpcodeChar(OP_LDC,         ALU_OP)},
     {"LDG",         OpcodeChar(OP_LDG,         LOAD_OP)},
