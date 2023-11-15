@@ -25,7 +25,7 @@ ifeq ("$(exist_OBJ_PATH)", "noexist")
 $(shell mkdir $(OBJ_PATH))
 endif
 
-OBJS = $(OBJ_PATH)/common_def.o $(OBJ_PATH)/trace-parser.o $(OBJ_PATH)/trace-driven.o $(OBJ_PATH)/main.o 
+OBJS = $(OBJ_PATH)/common_def.o $(OBJ_PATH)/option_parser.o $(OBJ_PATH)/trace-parser.o $(OBJ_PATH)/trace-driven.o $(OBJ_PATH)/main.o
 
 all: $(TARGET)
 
@@ -42,6 +42,9 @@ $(OBJ_PATH)/trace-driven.o: trace-driven/trace-driven.cc
 	$(CC) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
 
 $(OBJ_PATH)/common_def.o: common/common_def.cc
+	$(CC) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
+
+$(OBJ_PATH)/option_parser.o: common/option_parser.cc
 	$(CC) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
 
 .PHTONY: clean
