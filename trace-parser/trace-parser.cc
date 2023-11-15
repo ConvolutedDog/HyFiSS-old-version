@@ -291,6 +291,292 @@ kernel_trace_t::kernel_trace_t() {
   trace_verion = 0;
 }
 
+void app_config::init(std::string config_path) {
+    // named app config options (unordered)
+    option_parser_t app_config_opp = option_parser_create();
+    
+    option_parser_register(
+      app_config_opp, "-app_kernels_id", OPT_CSTR, &app_kernels_id_string,
+      "kernels ID list (default=1)", "1");
+    
+    std::stringstream ss;
+
+    /****************************************************************/
+    // read the "-app_kernels_id" config in the app config file
+    // and register the kernel config options
+    std::ifstream inputFile;
+    inputFile.open(config_path);
+    if (!inputFile.good()) {
+      fprintf(stderr, "\n\nOptionParser ** ERROR: Cannot open config file '%s'\n",
+              config_path.c_str());
+      exit(1);
+    }
+
+    std::string target = "-app_kernels_id";
+    std::string line;
+    size_t commentStart;
+    size_t found;
+    std::string result;
+    int comma_count;
+    while (inputFile.good()) {
+      getline(inputFile, line);
+      commentStart = line.find_first_of("#");
+      if (commentStart != line.npos) continue;
+      found = line.find(target);
+      if (found != std::string::npos) {
+        result = line.substr(found + target.length());
+        comma_count = std::count(result.begin(), result.end(), ',');
+        kernels_num = comma_count + 1;
+      }
+    }
+    inputFile.close();
+
+    /****************************************************************/
+
+    kernel_name.resize(kernels_num);
+    kernel_num_registers.resize(kernels_num);
+    kernel_shared_mem_bytes.resize(kernels_num);
+    kernel_grid_size.resize(kernels_num);
+    kernel_block_size.resize(kernels_num);
+    kernel_cuda_stream_id.resize(kernels_num);
+    
+    for (int j = 0; j < kernels_num; ++j) {
+      ss << "-kernel_" << j + 1 << "_name";
+      option_parser_register(app_config_opp, ss.str().c_str(), OPT_CSTR,
+                            &kernel_name[j],
+                            "kernel name",
+                            "None");
+      ss.str("");
+      ss << "-kernel_" << j + 1 << "_num_registers";
+      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+                            &kernel_num_registers[j],
+                            "number of registers used by kernel",
+                            "0");
+      ss.str("");
+      ss << "-kernel_" << j + 1 << "_shared_mem_bytes";
+      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+                            &kernel_shared_mem_bytes[j],
+                            "number of bytes of shared memory used by kernel",
+                            "0");
+      ss.str("");
+      ss << "-kernel_" << j + 1 << "_grid_size";
+      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+                            &kernel_grid_size[j],
+                            "grid size of kernel",
+                            "0");
+      ss.str("");
+      ss << "-kernel_" << j + 1 << "_block_size";
+      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+                            &kernel_block_size[j],
+                            "block size of kernel",
+                            "0");
+      ss.str("");
+      ss << "-kernel_" << j + 1 << "_cuda_stream_id";
+      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+                            &kernel_cuda_stream_id[j],
+                            "cuda stream id of kernel",
+                            "0");
+      ss.str("");
+    }
+
+    option_parser_cfgfile(app_config_opp, config_path.c_str());
+
+    char *toks = new char[2048];
+    char *tokd = toks;
+    strcpy(toks, app_kernels_id_string.c_str());
+
+    app_kernels_id.resize(kernels_num);
+
+    toks = strtok(toks, ",");
+
+    for (int i = 0; i < kernels_num; i++) {
+      // std::cout << "=> " << " " << toks << std::endl;
+      assert(toks);
+      int ntok = sscanf(toks, "%d", &app_kernels_id[i]);
+      assert(ntok == 1);
+      toks = strtok(NULL, ",");
+    }
+
+    delete[] tokd;
+    delete[] toks;
+
+    fprintf(stdout, ">>>APP config Options<<<:\n");
+    option_parser_print(app_config_opp, stdout);
+    option_parser_destroy(app_config_opp);
+
+    m_valid = true;
+}
+
+void instn_config::init(std::string config_path) {
+  std::ifstream inputFile;
+  // open config file, stream every line into a continuous buffer
+  // get rid of comments in the process
+  inputFile.open(config_path);
+  if (!inputFile.good()) {
+    fprintf(stderr, "\n\nOptionParser ** ERROR: Cannot open config file '%s'\n",
+            config_path.c_str());
+    exit(1);
+  }
+  
+  size_t first_blank_pos; // before it => kernel_id
+  size_t second_blank_pos; // before it => pc, after it => instn_str
+  unsigned kernel_id, pc;
+  std::string kernel_id_str, pc_str, instn_str;
+
+  while (inputFile.good()) {
+    std::string line;
+    getline(inputFile, line);
+    size_t commentStart = line.find_first_of("#");
+    if (commentStart != line.npos) continue;
+    if (!line.empty()) {
+      first_blank_pos = line.find(' ');
+      second_blank_pos = line.find(' ', first_blank_pos + 1);
+      kernel_id_str = line.substr(0, first_blank_pos);
+      pc_str = line.substr(first_blank_pos + 1, second_blank_pos - first_blank_pos - 1);
+      
+      std::istringstream iss_1(kernel_id_str);
+      std::istringstream iss_2(pc_str);
+
+      iss_1 >> kernel_id;
+      iss_2 >> std::hex >> pc;
+
+      instn_str = line.substr(second_blank_pos + 1);
+
+      // std::cout << "|||>>>" << line << "<<<|||" << std::endl;
+      // std::cout << "kernel_id: " << std::hex << kernel_id << std::dec << std::endl;
+      // std::cout << "pc: " << std::hex << pc << std::dec << std::endl;
+      // std::cout << "instn_str: " << instn_str << std::endl << std::endl;
+
+      instn_info_t instn_info;
+      instn_info.kernel_id = kernel_id;
+      instn_info.pc = pc;
+      instn_info.instn_str = instn_str;
+
+      instn_info_vector.push_back(instn_info);
+    }
+  }
+  inputFile.close();
+
+  fprintf(stdout, ">>>INSTN config Options<<<:\n");
+  // traversal instn_info_vector
+  for (unsigned i = 0; i < instn_info_vector.size(); ++i) {
+    std::cout << "-instn " << std::setw(5) << std::right 
+              << std::dec << instn_info_vector[i].kernel_id << std::dec;
+    std::cout << " " << std::setw(8) << std::left 
+              << std::hex << instn_info_vector[i].pc << std::dec;
+    std::cout << " " << std::setw(55) << std::left 
+              << instn_info_vector[i].instn_str << std::endl;
+  }
+}
+
+std::vector<issue_config::block_info_t> issue_config::parse_blocks_info(const std::string& blocks_info_str) {
+    std::vector<block_info_t> result;
+    size_t start = 0;
+    size_t end = blocks_info_str.find(',', start);
+    int total_tuples = std::stoi(blocks_info_str.substr(start, end - start));
+    // std::cout << "  total_tuples: " << total_tuples << std::endl;
+
+    for (int i = 0; i < total_tuples; ++i) {
+        start = end + 1;
+        end = blocks_info_str.find('(', start);
+        size_t comma = blocks_info_str.find(',', end);
+        // std::cout << "    kernel_id_str: " << blocks_info_str.substr(end + 1, comma - end - 1) << std::endl;
+        unsigned kernel_id = std::stoi(blocks_info_str.substr(end + 1, comma - end - 1));
+        // std::cout << "       kernel_id: " << kernel_id << std::endl;
+        end = blocks_info_str.find(')', comma);
+        // std::cout << "    block_id_str: " << blocks_info_str.substr(comma + 1, end - comma - 1) << std::endl;
+        unsigned block_id = std::stoi(blocks_info_str.substr(comma + 1, end - comma - 1));
+        // std::cout << "       block_id: " << block_id << std::endl;
+
+        block_info_t info = block_info_t(kernel_id, block_id);
+        // std::cout << info.kernel_id << " " << info.block_id << std::endl;
+        result.push_back(info);
+    }
+
+    return result;
+}
+
+void issue_config::init(std::string config_path) {
+    // named issue config options (unordered)
+    option_parser_t issue_config_opp = option_parser_create();
+
+    std::stringstream ss;
+
+    /****************************************************************/
+    // read the "-app_kernels_id" config in the app config file
+    // and register the kernel config options
+    std::ifstream inputFile;
+    inputFile.open(config_path);
+    if (!inputFile.good()) {
+      fprintf(stderr, "\n\nOptionParser ** ERROR: Cannot open config file '%s'\n",
+              config_path.c_str());
+      exit(1);
+    }
+
+    std::string target = "-trace_issued_sms_num";
+    std::string line;
+    size_t commentStart;
+    size_t found;
+    std::string result;
+    while (inputFile.good()) {
+      getline(inputFile, line);
+      commentStart = line.find_first_of("#");
+      if (commentStart != line.npos) continue;
+      found = line.find(target);
+      if (found != std::string::npos) {
+        result = line.substr(found + target.length() + 1);
+        // std::cout << ">>>" << std::stoi(result) << "<<<" << std::endl;
+        trace_issued_sms_num = std::stoi(result);
+        break;
+      }
+    }
+    inputFile.close();
+    /****************************************************************/
+    trace_issued_sm_id_blocks_str.resize(trace_issued_sms_num);
+
+    int tmp;
+    option_parser_register(issue_config_opp, "-trace_issued_sms_num", OPT_INT32,
+                           &tmp, "number of SMs that have been issued blocks (default=1)", "1");
+    
+    for (int j = 0; j < trace_issued_sms_num; ++j) {
+      ss << "-trace_issued_sm_id_" << std::to_string(j);
+      option_parser_register(issue_config_opp, ss.str().c_str(), OPT_CSTR,
+                             &trace_issued_sm_id_blocks_str[j],
+                             "issued blocks list on i-th SM (default=None)", "None");
+      ss.str("");
+    }
+
+    option_parser_cfgfile(issue_config_opp, config_path.c_str());
+    
+    fprintf(stdout, ">>>ISSUE config Options<<<:\n");
+    option_parser_print(issue_config_opp, stdout);
+    option_parser_destroy(issue_config_opp);
+
+    /****************************************************************/
+    // parse the issued blocks list on each SM
+    // std::vector<std::vector<block_info_t>> trace_issued_sm_id_blocks;
+    std::string blocks_info_str;
+    trace_issued_sm_id_blocks.resize(trace_issued_sms_num);
+    for (int j = 0; j < trace_issued_sms_num; ++j) {
+      // std::cout << "trace_issued_sm_id_blocks_str[" << j << "]: " 
+      //           << trace_issued_sm_id_blocks_str[j].c_str() << std::endl;
+      blocks_info_str = trace_issued_sm_id_blocks_str[j].c_str();
+      std::vector<block_info_t> result = parse_blocks_info(blocks_info_str);
+      trace_issued_sm_id_blocks[j] = result;
+    }
+
+    // for (int j = 0; j < trace_issued_sms_num; ++j) {
+    //   std::cout << "@@@ trace_issued_sm_id_blocks[" << j << "]: " << std::endl;
+    //   for (unsigned k = 0; k < trace_issued_sm_id_blocks[j].size(); ++k) {
+    //     std::cout << "  kernel_id: " << trace_issued_sm_id_blocks[j][k].kernel_id << " | ";
+    //     std::cout << "  block_id: " << trace_issued_sm_id_blocks[j][k].block_id << std::endl;
+    //   }
+    // }
+    /****************************************************************/
+
+    m_valid = true;
+}
+
 kernel_trace_t* trace_parser::parse_kernel_info(const std::string &kerneltraces_filepath) {
   kernel_trace_t *kernel_info = new kernel_trace_t;
   kernel_info->enable_lineinfo = 0; // default disabled
@@ -382,23 +668,90 @@ void trace_parser::kernel_finalizer(kernel_trace_t *trace_info) {
   delete trace_info;
 }
 
-trace_parser::trace_parser(const char *kernellist_filepath) {
-  kernellist_filename = kernellist_filepath;
+trace_parser::trace_parser(const char *input_configs_filepath) {
+  configs_filepath = input_configs_filepath;
+}
+
+#include <unistd.h>
+#include <limits.h>
+
+void trace_parser::process_configs_file(std::string config_path, int config_type) {
+  std::ifstream fs;
+  
+  char cwd[PATH_MAX];
+  assert(getcwd(cwd, sizeof(cwd)) != nullptr);
+  std::string current_directory(cwd);
+
+  std::string abs_config_path = current_directory + "/" + config_path;
+  fs.open(abs_config_path);
+
+  std::cout << "\nProcessing configs file : " << abs_config_path << std::endl << std::endl;
+  
+  if (!fs.is_open()) {
+    std::cout << "Unable to open file: " << abs_config_path << std::endl;
+    exit(1);
+  }
+  fs.close();
+
+  if (config_type == APP_CONFIG) {
+    app_config appcfg = app_config();
+    appcfg.init(abs_config_path);
+  } else if (config_type == INSTN_CONFIG) {
+    instn_config instncfg = instn_config();
+    instncfg.init(abs_config_path);
+  } else if (config_type == ISSUE_CONFIG) {
+    issue_config issuecfg = issue_config();
+    issuecfg.init(abs_config_path);
+  }
+}
+
+void trace_parser::parse_configs_file() {
+  
+  if (configs_filepath.back() == '/') {
+    app_config_path = configs_filepath + "app.config";
+    instn_config_path = configs_filepath + "instn.config";
+    issue_config_path = configs_filepath + "issue.config";
+    
+  } else {
+    app_config_path = configs_filepath + "/" + "app.config";
+    instn_config_path = configs_filepath + "/" + "instn.config";
+    issue_config_path = configs_filepath + "/" + "issue.config";
+  }
+
+  // process app.config
+  process_configs_file(app_config_path, APP_CONFIG);
+  
+  // process instn.config
+  process_configs_file(instn_config_path, INSTN_CONFIG);
+
+  // process issue.config
+  process_configs_file(issue_config_path, ISSUE_CONFIG);
+}
+
+void trace_parser::read_mem_instns() {
+  if (configs_filepath.back() == '/') {
+    mem_instns_filepath = configs_filepath + "../memory_traces";
+  } else {
+    mem_instns_filepath = configs_filepath + "/" + "../memory_traces";
+  }
+  std::cout << "mem_instns_filepath: " << mem_instns_filepath << std::endl;
+
+  // ??????????????????????????????????????
 }
 
 std::pair<std::vector<trace_command>, int> trace_parser::parse_commandlist_file() {
   std::ifstream fs;
-  fs.open(kernellist_filename);
+  fs.open(configs_filepath);
 
-  std::cout << "Processing kernel list file : " << kernellist_filename
+  std::cout << "Processing kernel list file : " << configs_filepath
             << std::endl;
 
   if (!fs.is_open()) {
-    std::cout << "Unable to open file: " << kernellist_filename << std::endl;
+    std::cout << "Unable to open file: " << configs_filepath << std::endl;
     exit(1);
   }
 
-  std::string directory(kernellist_filename);
+  std::string directory(configs_filepath);
   const size_t last_slash_idx = directory.rfind('/');
   if (std::string::npos != last_slash_idx) {
     directory = directory.substr(0, last_slash_idx);
