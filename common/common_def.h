@@ -5,7 +5,7 @@ extern int kernel_info_m_next_uid;
 
 #define OPEN_MEMORY_TRACE_FILE() \
   std::ofstream outfile; \
-  outfile.open("memor_trace.txt");
+  outfile.open("memory_trace.txt");
 
 #define CLOSE_MEMORY_TRACE_FILE() \
   outfile.close();
