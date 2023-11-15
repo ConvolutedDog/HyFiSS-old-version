@@ -10,6 +10,7 @@
 #define SPEC_UNIT_START_ID 100
 
 enum TraceInstrOpcode {
+  
   // Volta (includes common insts for others cards as well)
   OP_FADD = 1,
   OP_FADD32I,
@@ -139,6 +140,7 @@ enum TraceInstrOpcode {
   OP_SETLMEMBASE,
   OP_VOTE,
   OP_VOTE_VTG,
+  
   // unique insts for pascal
   OP_RRO,
   OP_DMNMX,
@@ -167,6 +169,7 @@ enum TraceInstrOpcode {
   OP_PSET,
   OP_VMNMX,
   OP_ISET,
+  
   // unique insts for turing
   OP_BMMA,
   OP_MOVM,
@@ -204,6 +207,7 @@ enum TraceInstrOpcode {
   OP_SUST,
   OP_BRXU,
   OP_JMXU,
+  
   // unique insts for kepler
   OP_FCMP,
   OP_FSWZ,
@@ -216,6 +220,7 @@ enum TraceInstrOpcode {
   OP_SULDGA,
   OP_SUSTGA,
   OP_ISUB,
+  
   // unique insts for ampere
   OP_HMNMX2,
   OP_DMMA,
@@ -227,7 +232,9 @@ enum TraceInstrOpcode {
   OP_UF2FP,
   OP_SUQUERY,
   SASS_NUM_OPCODES /* The total number of opcodes. */
+
 };
+
 typedef enum TraceInstrOpcode sass_op_type;
 
 struct OpcodeChar {
@@ -259,6 +266,7 @@ enum special_operations_t {
   TENSOR__OP,
   TEX__OP
 };
+
 typedef enum special_operations_t special_ops;  // Required to identify for the power model
 
 // Type of operation
@@ -290,9 +298,11 @@ enum uarch_op_t {
   SPECIALIZED_UNIT_7_OP,
   SPECIALIZED_UNIT_8_OP
 };
+
 typedef enum uarch_op_t op_type;
 
 enum uarch_operand_type_t { UN_OP = -1, INT_OP, FP_OP };
+
 typedef enum uarch_operand_type_t types_of_operands;
 
 #endif
