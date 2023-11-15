@@ -169,7 +169,7 @@ bool trace_warp_inst_t::parse_from_trace_struct(
       OpcPowerMap->find(m_opcode);
     if (it2 != OpcPowerMap->end())
       sp_op = (special_ops) (it2->second);
-      oprnd_type = get_oprnd_type(op, sp_op);
+    oprnd_type = get_oprnd_type(op, sp_op);
   } else {
     std::cout << "ERROR:  undefined instruction : " << trace.opcode
               << " Opcode: " << opcode1 << std::endl;
@@ -199,14 +199,14 @@ bool trace_warp_inst_t::parse_from_trace_struct(
   outcount = trace.reg_dsts_num;
   for (unsigned m = 0; m < trace.reg_dsts_num; ++m) {
     out[m] =
-        trace.reg_dest[m] + 1;  // Increment by one because GPGPU-sim starts
+        trace.reg_dest[m] + 1;  // Increment by one because OptionParser starts
                                 // from R1, while SASS starts from R0
     arch_reg.dst[m] = trace.reg_dest[m] + 1;
   }
 
   incount = trace.reg_srcs_num;
   for (unsigned m = 0; m < trace.reg_srcs_num; ++m) {
-    in[m] = trace.reg_src[m] + 1;  // Increment by one because GPGPU-sim starts
+    in[m] = trace.reg_src[m] + 1;  // Increment by one because OptionParser starts
                                    // from R1, while SASS starts from R0
     arch_reg.src[m] = trace.reg_src[m] + 1;
   }
