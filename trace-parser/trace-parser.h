@@ -8,6 +8,11 @@
 #include <vector>
 #include <bitset>
 #include <map>
+#include <list>
+#include <string.h>
+
+#include "option_parser.h"
+
 
 #ifndef TRACE_PARSER_H
 #define TRACE_PARSER_H
@@ -15,6 +20,10 @@
 #define WARP_SIZE 32
 #define MAX_DST 1
 #define MAX_SRC 4
+
+
+#define MAX_KERNELS_NUM 300
+
 
 enum command_type {
   kernel_launch = 1,
@@ -104,11 +113,19 @@ struct kernel_trace_t {
   std::ifstream *ifs;
 };
 
+// type of the config files
+enum config_type { APP_CONFIG, INSTN_CONFIG, ISSUE_CONFIG, CONFIGS_TYPE_NUM };
+
 class trace_parser {
  public:
-  trace_parser(const char *kernellist_filepath);
+  trace_parser(const char *input_configs_filepath);
   
   std::pair<std::vector<trace_command>, int> parse_commandlist_file();
+
+  void parse_configs_file();
+  void process_configs_file(std::string config_path, int config_type);
+
+  void read_mem_instns();
 
   // kerneltraces_filepath is path to kernel-1.traceg et al.
   kernel_trace_t* parse_kernel_info(const std::string &kerneltraces_filepath);
@@ -124,8 +141,96 @@ class trace_parser {
   void kernel_finalizer(kernel_trace_t *trace_info);
 
  private:
-  // kernellist_filename is path to kernelslist.g
-  std::string kernellist_filename;
+  // configs_filepath is path to kernelslist.g
+  std::string configs_filepath;
+  std::string app_config_path;
+  std::string instn_config_path;
+  std::string issue_config_path;
+
+  std::string mem_instns_filepath;
+};
+
+
+class app_config {
+ public:
+  app_config() {
+    m_valid = false;
+    kernels_num = 1;
+  }
+  void init(std::string config_path);
+
+ private:
+  bool m_valid;
+  std::string app_kernels_id_string;
+  std::vector<int> app_kernels_id;
+  int kernels_num;
+  /*
+    -kernel_2_name vecAdd_2
+    -kernel_2_num_registers 10
+    -kernel_2_shared_mem_bytes 0
+    -kernel_2_grid_size 160
+    -kernel_2_block_size 256
+    -kernel_2_cuda_stream_id 0
+  */
+  std::vector<std::string> kernel_name;
+  std::vector<int> kernel_num_registers;
+  std::vector<int> kernel_shared_mem_bytes;
+  std::vector<int> kernel_grid_size;
+  std::vector<int> kernel_block_size;
+  std::vector<int> kernel_cuda_stream_id;
+};
+
+class instn_config {
+ public:
+  instn_config() {
+    m_valid = false;
+  }
+  void init(std::string config_path);
+
+ private:
+  bool m_valid;
+  
+  struct instn_info_t {
+    unsigned kernel_id;
+    unsigned pc;
+    std::string instn_str;
+  };
+  // instn format:
+  // kernel_id  pc  instn_str
+  //     2      c0  DSETP.GTU.AND P0 P7 R2 R4 P7
+  std::vector<instn_info_t> instn_info_vector;
+};
+
+
+class issue_config {
+ public:
+  issue_config() {
+    m_valid = false;
+    trace_issued_sms_num = 1;
+  }
+  void init(std::string config_path);
+
+ private:
+  bool m_valid;
+  int trace_issued_sms_num;
+  /* -trace_issued_sm_id_0 4,(1,0),(1,80),(2,80),(2,0), */
+  struct block_info_t {
+    block_info_t(unsigned _kernel_id, unsigned _block_id) {
+      kernel_id = _kernel_id;
+      block_id = _block_id;
+    }
+
+    unsigned kernel_id;
+    unsigned block_id;
+  };
+
+  std::vector<block_info_t> parse_blocks_info(const std::string& blocks_info_str);
+  
+  /*
+    trace_issued_sm_id_blocks[0]: SM0 -> block(kernel_id, block_id)
+  */
+  std::vector<std::string> trace_issued_sm_id_blocks_str;
+  std::vector<std::vector<block_info_t>> trace_issued_sm_id_blocks;
 };
 
 /*
