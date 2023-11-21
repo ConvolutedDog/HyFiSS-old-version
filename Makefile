@@ -57,7 +57,7 @@ $(OBJ_PATH)/option_parser.o: common/option_parser.cc
 	$(CC) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
 
 run:
-	
+	$(MPIRUN) -np 2 ./memory_model.x --configs ./traces/vectoradd/configs/ --sort 1 --log 0 > tmp.txt
 
 .PHTONY: clean
 
