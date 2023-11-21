@@ -1,5 +1,10 @@
 
 CC = g++
+MPI_HOME = /usr/local/mpich-3.3.2
+
+MPICXX = $(MPI_HOME)/bin/mpic++
+MPIRUN = $(MPI_HOME)/bin/mpirun
+
 
 CXXFLAGS = -Wall
 
@@ -7,11 +12,11 @@ CXXFLAGS = -Wall
 GNUC_CPP0X := $(shell g++ --version | perl -ne 'if (/g++\s+\(.*\)\s+([0-9.]+)/){ if($$1 >= 4.3) {$$n=1} else {$$n=0;} } END { print $$n; }')
 
 ifeq ($(GNUC_CPP0X), 1)
-	CXXFLAGS += -std=c++0x
+	CXXFLAGS += -std=c++11
 endif
 
-CXXFLAGS += -I./ISA-Def -I./trace-parser -I./trace-driven -I./common
-CXXFLAGS += -I./common/CLI -I./common/CLI/impl
+CXXFLAGS += -I./ISA-Def -I./DEV-Def -I./trace-parser -I./trace-driven -I./common
+CXXFLAGS += -I./common/CLI -I./common/CLI/impl -I/usr/local/mpich-3.3.2/include
 
 OPTFLAGS = -O3 -g3 -fPIC
 
@@ -30,7 +35,7 @@ OBJS = $(OBJ_PATH)/common_def.o $(OBJ_PATH)/option_parser.o $(OBJ_PATH)/trace-pa
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CC) $(CXXFLAGS) $(OPTFLAGS) -o $@ $^
+	$(MPICXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ $^
 
 $(OBJ_PATH)/main.o: main.cc
 	$(CC) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
@@ -46,6 +51,9 @@ $(OBJ_PATH)/common_def.o: common/common_def.cc
 
 $(OBJ_PATH)/option_parser.o: common/option_parser.cc
 	$(CC) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
+
+run:
+	
 
 .PHTONY: clean
 
