@@ -581,6 +581,7 @@ class trace_kernel_info_t : public kernel_info_t{
   std::vector<std::vector<inst_trace_t> *> get_next_threadblock_traces(std::string kernel_name,
                                                                        unsigned kernel_id,
                                                                        unsigned num_warps_per_thread_block);
+  std::vector<mem_instn>& get_one_kernel_one_threadblock_traces(unsigned kernel_id, unsigned block_id);
 
   unsigned long get_cuda_stream_id() {
     return m_kernel_trace_info->cuda_stream_id;
