@@ -20,14 +20,6 @@
 #include "./common/CLI/CLI.hpp"
 #include "./common/common_def.h"
 
-#define USE_MPI
-
-#ifdef USE_MPI
-  #include "mpi.h"
-#endif
-
-
-#define gpgpu_concurrent_kernel_sm true
 
 trace_kernel_info_t *create_kernel_info(kernel_trace_t* kernel_trace_info,
 							                          trace_parser *parser){
@@ -53,61 +45,59 @@ void print_SM_traces(std::vector<mem_instn>* traces) {
 }
 
 
-
-#ifdef USE_MPI
+#ifdef USE_BOOST
 void simple_mpi_test(int argc, char **argv) {
 
-  int rank;
+  boost::mpi::environment env(argc, argv);
+  boost::mpi::communicator world;
 
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-  int world_size;
-  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-
-    if (rank == 0) {
-      // 在进程 0 中，我们发送数据
-      int data = 123;
-      for (int i = 1; i < world_size; i++) {
-        MPI_Send(&data, 1, MPI_INT, i, i, MPI_COMM_WORLD);
-        std::cout << "rank " << 0 << " send data: " << data << " to rank: " << i << std::endl;
-      }
-    } else {
-      // 在进程 1 中，我们接收数据
-      int recv_data;
-      
-      MPI_Recv(&recv_data, 1, MPI_INT, 0, rank, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      std::cout << "rank " << rank << " recv data: " << recv_data << " from rank: " << 0 << std::endl;
+  if (world.rank() == 0) {
+    /* Send data in rank 0. */
+    int data = 123;
+    for (int i = 1; i < world.size(); i++) {
+      world.send(i, i, data);
+      std::cout << "rank " << 0 << " send data: " << data << " to rank: " << i << std::endl;
     }
+  } else {
+    /* Recieve data in rank > 0. */
+    int recv_data;
+    world.recv(0, world.rank(), recv_data);
+    std::cout << "rank " << world.rank() << " recv data: " << recv_data << " from rank: " << 0 << std::endl;
+  }
 
 }
 #endif
 
 
-#ifdef USE_MPI
+#ifdef USE_BOOST
 void print_mpi_test(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr) {
+  boost::mpi::environment env(argc, argv);
+  boost::mpi::communicator world;
 
-  int rank;
+  const int SM_traces_ptr_size = (int)(*SM_traces_ptr).size();
+  /* Every rank process one *(SM_traces_ptr)[i], it will have pass_num passes to complete, 
+   * which also means that every rank should process at most pass_num traces. */
+  const int pass_num = int((SM_traces_ptr_size + world.size() - 1)/world.size());
 
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-  int world_size;
-  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-
-  /* Every mpi rank will output SM_traces[rank] */
-  // if (rank < (int)(*SM_traces_ptr).size())
-  // for (auto mem_ins : (*SM_traces_ptr)[0]) {
-  //   std::cout << "rank-" << rank << ", " << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
-  //   std::cout << std::hex << mem_ins.time_stamp << " ";
-  //   std::cout << std::hex << mem_ins.addr[0] << std::endl;
-  // }
+  for (int pass = 0; pass < pass_num; pass++) {
+    /* During pass,  */
+    int curr_process_idx = world.rank() + pass * world.size();
+    if (curr_process_idx < SM_traces_ptr_size) {
+      for (auto mem_ins : (*SM_traces_ptr)[world.rank()]) {
+        std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_idx << " ";
+        std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
+        std::cout << std::hex << mem_ins.time_stamp << " ";
+        std::cout << std::hex << mem_ins.addr[0] << std::endl;
+      }
+    }
+  }
 }
 #endif
 
 int main(int argc, char **argv) {
-#ifdef USE_MPI
-  MPI_Init(&argc, &argv);
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+#ifdef USE_BOOST
+  boost::mpi::environment env(argc, argv);
+  boost::mpi::communicator world;
 #endif
   
   CLI::App app{"Memory Model."};
@@ -129,8 +119,8 @@ int main(int argc, char **argv) {
 
   std::vector<trace_kernel_info_t*> single_pass_kernels_info;
 
-#ifdef USE_MPI
-  if (rank == 0) {
+#ifdef USE_BOOST
+  if (world.rank() == 0) {
 #endif
 
     std::cout << "Memory Model." << std::endl << std::endl;
@@ -154,7 +144,7 @@ int main(int argc, char **argv) {
                                          cc_config[SM70].max_concurrent_kernels_num);
 
     std::cout << std::endl;
-#ifdef USE_MPI
+#ifdef USE_BOOST
   } /* end rank = 0 */
 #endif
 
@@ -162,8 +152,8 @@ int main(int argc, char **argv) {
    * means: pass_num -> sm_id -> std::vector<mem_instn>. */
   std::vector<std::map<int, std::vector<mem_instn>>> SM_traces_all_passes;
 
-#ifdef USE_MPI
-  if (rank == 0) {
+#ifdef USE_BOOST
+  if (world.rank() == 0) {
 #endif
 
     SM_traces_all_passes.resize(passnum_concurrent_issue_to_sm);
@@ -263,28 +253,29 @@ int main(int argc, char **argv) {
                                                                              cc_config[SM70].max_concurrent_kernels_num) : 1);
     }
 
-#ifdef USE_MPI
+#ifdef USE_BOOST
+    /* Now we need to broadcast the data in SM_traces_all_passes. */
+    boost::mpi::broadcast(world, SM_traces_all_passes, 0);
+#endif
+
+#ifdef USE_BOOST
   } /* end rank = 0 */
 #endif
+
+#ifdef USE_BOOST
+  /* Now we need to recieve the broadcasted data to SM_traces_all_passes for all rank > 0. */
+  if (world.rank() != 0)  boost::mpi::broadcast(world, SM_traces_all_passes, 0);
+#endif
+
+#ifdef USE_BOOST
+  /* Just a simple test for MPI. */
+  /* simple_mpi_test(argc, argv); */
   
-  
-#ifdef USE_MPI
-  /* Now we need to broadcast the data in SM_traces_all_passes. */
-  /* TODO */
+  /* Print the SM_traces of every MPI rank. &SM_traces_all_passes[0] is thr first pass. */
+  print_mpi_test(argc, argv, &SM_traces_all_passes[0]);
 #endif
 
   fflush(stdout);
-  
-#ifdef USE_MPI
-  /* Just a simple test for MPI. */
-  simple_mpi_test(argc, argv);
-  
-  /* Print the SM_traces of every MPI rank. */
-  // print_mpi_test(argc, argv, &SM_traces_all_passes[0]); // error!!!
-
-  MPI_Finalize();
-#endif
 
   return 0;
 }
-
