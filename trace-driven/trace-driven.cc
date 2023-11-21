@@ -86,6 +86,12 @@ trace_kernel_info_t::trace_kernel_info_t(dim3 gridDim, dim3 blockDim,
   }
 }
 
+std::vector<mem_instn>&
+trace_kernel_info_t::get_one_kernel_one_threadblock_traces(unsigned kernel_id,
+                                                           unsigned block_id) {
+  return m_parser->get_one_kernel_one_threadblcok_mem_instns(kernel_id, block_id);
+}
+
 std::vector<std::vector<inst_trace_t> *> 
 trace_kernel_info_t::get_next_threadblock_traces(std::string kernel_name, 
                                                  unsigned kernel_id,
