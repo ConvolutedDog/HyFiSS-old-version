@@ -13,6 +13,13 @@
 
 #include "option_parser.h"
 
+#include "../ISA-Def/ampere_opcode.h"
+#include "../ISA-Def/kepler_opcode.h"
+#include "../ISA-Def/pascal_opcode.h"
+#include "../ISA-Def/trace_opcode.h"
+#include "../ISA-Def/turing_opcode.h"
+#include "../ISA-Def/volta_opcode.h"
+
 
 #ifndef TRACE_PARSER_H
 #define TRACE_PARSER_H
@@ -116,40 +123,6 @@ struct kernel_trace_t {
 // type of the config files
 enum config_type { APP_CONFIG, INSTN_CONFIG, ISSUE_CONFIG, CONFIGS_TYPE_NUM };
 
-class trace_parser {
- public:
-  trace_parser(const char *input_configs_filepath);
-  
-  std::pair<std::vector<trace_command>, int> parse_commandlist_file();
-
-  void parse_configs_file();
-  void process_configs_file(std::string config_path, int config_type);
-
-  void read_mem_instns();
-
-  // kerneltraces_filepath is path to kernel-1.traceg et al.
-  kernel_trace_t* parse_kernel_info(const std::string &kerneltraces_filepath);
-
-  void parse_memcpy_info(const std::string &memcpy_command, size_t &add,
-                         size_t &count);
-
-  std::vector<std::vector<inst_trace_t> *> get_next_threadblock_traces(
-      unsigned trace_version, unsigned enable_lineinfo, std::ifstream *ifs,
-      std::string kernel_name,
-      unsigned kernel_id, unsigned num_warps_per_thread_block);
-
-  void kernel_finalizer(kernel_trace_t *trace_info);
-
- private:
-  // configs_filepath is path to kernelslist.g
-  std::string configs_filepath;
-  std::string app_config_path;
-  std::string instn_config_path;
-  std::string issue_config_path;
-
-  std::string mem_instns_filepath;
-};
-
 
 class app_config {
  public:
@@ -157,7 +130,51 @@ class app_config {
     m_valid = false;
     kernels_num = 1;
   }
-  void init(std::string config_path);
+  void init(std::string config_path, bool PRINT_LOG);
+
+  /* get kernels_num */
+  int get_kernels_num() { return kernels_num; }
+  /* get kernel_grid_size */
+  std::vector<int>* get_kernels_grid_size() { return &kernel_grid_size; }
+  int get_kernel_grid_size(int kernel_id) { return kernel_grid_size[kernel_id]; }
+  /* get kernel_name */
+  std::vector<std::string>* get_kernels_name() { return &kernel_name; }
+  std::string get_kernel_name(int kernel_id) { return kernel_name[kernel_id]; }
+  /* get app_kernels_id */
+  std::vector<int>* get_app_kernels_id() { return &app_kernels_id; }
+  int get_app_kernel_id(int kernel_id) { return app_kernels_id[kernel_id]; }
+  /* get kernel_grid_dim_x, kernel_grid_dim_y, kernel_grid_dim_z */
+  std::vector<int>* get_kernels_grid_dim_x() { return &kernel_grid_dim_x; }
+  int get_kernel_grid_dim_x(int kernel_id) { return kernel_grid_dim_x[kernel_id]; }
+  std::vector<int>* get_kernels_grid_dim_y() { return &kernel_grid_dim_y; }
+  int get_kernel_grid_dim_y(int kernel_id) { return kernel_grid_dim_y[kernel_id]; }
+  std::vector<int>* get_kernels_grid_dim_z() { return &kernel_grid_dim_z; }
+  int get_kernel_grid_dim_z(int kernel_id) { return kernel_grid_dim_z[kernel_id]; }
+  /* get kernel_tb_dim_x,  kernel_tb_dim_y,  kernel_tb_dim_z */
+  std::vector<int>* get_kernels_tb_dim_x() { return &kernel_tb_dim_x; }
+  int get_kernel_tb_dim_x(int kernel_id) { return kernel_tb_dim_x[kernel_id]; }
+  std::vector<int>* get_kernels_tb_dim_y() { return &kernel_tb_dim_y; }
+  int get_kernel_tb_dim_y(int kernel_id) { return kernel_tb_dim_y[kernel_id]; }
+  std::vector<int>* get_kernels_tb_dim_z() { return &kernel_tb_dim_z; }
+  int get_kernel_tb_dim_z(int kernel_id) { return kernel_tb_dim_z[kernel_id]; }
+  /* get kernel_num_registers */
+  std::vector<int>* get_kernels_num_registers() { return &kernel_num_registers; }
+  int get_kernel_num_registers(int kernel_id) { return kernel_num_registers[kernel_id]; }
+  /* get kernel_shared_mem_bytes */
+  std::vector<int>* get_kernels_shared_mem_bytes() { return &kernel_shared_mem_bytes; }
+  int get_kernel_shared_mem_bytes(int kernel_id) { return kernel_shared_mem_bytes[kernel_id]; }
+  /* get kernel_block_size */
+  std::vector<int>* get_kernels_block_size() { return &kernel_block_size; }
+  int get_kernel_block_size(int kernel_id) { return kernel_block_size[kernel_id]; }
+  /* get kernel_cuda_stream_id */
+  std::vector<int>* get_kernels_cuda_stream_id() { return &kernel_cuda_stream_id; }
+  int get_kernel_cuda_stream_id(int kernel_id) { return kernel_cuda_stream_id[kernel_id]; }
+  /* get kernel_shmem_base_addr */
+  std::vector<unsigned long long>* get_kernels_shmem_base_addr() { return &kernel_shmem_base_addr; }
+  unsigned long long get_kernel_shmem_base_addr(int kernel_id) { return kernel_shmem_base_addr[kernel_id]; }
+  /* get kernel_local_base_addr */
+  std::vector<unsigned long long>* get_kernels_local_base_addr() { return &kernel_local_base_addr; }
+  unsigned long long get_kernel_local_base_addr(int kernel_id) { return kernel_local_base_addr[kernel_id]; }
 
  private:
   bool m_valid;
@@ -178,6 +195,15 @@ class app_config {
   std::vector<int> kernel_grid_size;
   std::vector<int> kernel_block_size;
   std::vector<int> kernel_cuda_stream_id;
+
+  std::vector<int> kernel_grid_dim_x;
+  std::vector<int> kernel_grid_dim_y;
+  std::vector<int> kernel_grid_dim_z;
+  std::vector<int> kernel_tb_dim_x;
+  std::vector<int> kernel_tb_dim_y;
+  std::vector<int> kernel_tb_dim_z;
+  std::vector<unsigned long long> kernel_shmem_base_addr;
+  std::vector<unsigned long long> kernel_local_base_addr;
 };
 
 class instn_config {
@@ -185,7 +211,7 @@ class instn_config {
   instn_config() {
     m_valid = false;
   }
-  void init(std::string config_path);
+  void init(std::string config_path, bool PRINT_LOG);
 
  private:
   bool m_valid;
@@ -201,6 +227,18 @@ class instn_config {
   std::vector<instn_info_t> instn_info_vector;
 };
 
+/* -trace_issued_sm_id_0 4,(1,0),(1,80),(2,80),(2,0), */
+struct block_info_t {
+  block_info_t(unsigned _kernel_id, unsigned _block_id, unsigned long long _time_stamp) {
+    kernel_id = _kernel_id;
+    block_id = _block_id;
+    time_stamp = _time_stamp;
+  }
+
+  unsigned kernel_id;
+  unsigned block_id;
+  unsigned long long time_stamp;
+};
 
 class issue_config {
  public:
@@ -208,21 +246,21 @@ class issue_config {
     m_valid = false;
     trace_issued_sms_num = 1;
   }
-  void init(std::string config_path);
+  void init(std::string config_path, bool PRINT_LOG);
+
+  
+  std::vector<std::vector<block_info_t>> get_trace_issued_sm_id_blocks() { return trace_issued_sm_id_blocks; }
+  std::vector<block_info_t> get_trace_issued_one_sm_blocks(int sm_id) { return trace_issued_sm_id_blocks[sm_id]; }
+  block_info_t get_trace_issued_one_sm_one_block(int sm_id, int block_id) { return trace_issued_sm_id_blocks[sm_id][block_id]; }
+
+  int get_trace_issued_sms_num() { return trace_issued_sms_num; }
+
+  int get_sm_id_of_one_block(unsigned kernel_id, unsigned block_id);
 
  private:
   bool m_valid;
   int trace_issued_sms_num;
-  /* -trace_issued_sm_id_0 4,(1,0),(1,80),(2,80),(2,0), */
-  struct block_info_t {
-    block_info_t(unsigned _kernel_id, unsigned _block_id) {
-      kernel_id = _kernel_id;
-      block_id = _block_id;
-    }
-
-    unsigned kernel_id;
-    unsigned block_id;
-  };
+  
 
   std::vector<block_info_t> parse_blocks_info(const std::string& blocks_info_str);
   
@@ -231,6 +269,78 @@ class issue_config {
   */
   std::vector<std::string> trace_issued_sm_id_blocks_str;
   std::vector<std::vector<block_info_t>> trace_issued_sm_id_blocks;
+};
+
+struct mem_instn {
+    mem_instn(unsigned _pc, unsigned long long _addr_start1, 
+              unsigned _time_stamp, int addr_groups, 
+              unsigned long long _addr_start2) {
+      pc = _pc;
+      time_stamp = _time_stamp;
+      for (unsigned i = 0; i < 32; i++)
+        addr.push_back(_addr_start1 + i*8);
+      if (addr_groups == 2) 
+        for (unsigned i = 0; i < 32; i++) 
+          addr.push_back(_addr_start2 + i*8);
+    }
+    unsigned pc;
+    std::vector<unsigned long long> addr;
+    unsigned time_stamp;
+};
+
+
+class trace_parser {
+ public:
+  trace_parser(const char *input_configs_filepath);
+  
+  std::pair<std::vector<trace_command>, int> parse_commandlist_file();
+
+  void parse_configs_file(bool PRINT_LOG);
+  void process_configs_file(std::string config_path, int config_type, bool PRINT_LOG);
+
+  void read_mem_instns(bool PRINT_LOG);
+  void process_mem_instns(std::string mem_instns_filepath, bool PRINT_LOG);
+
+  // kerneltraces_filepath is path to kernel-1.traceg et al.
+  kernel_trace_t* parse_kernel_info(const std::string &kerneltraces_filepath);
+  kernel_trace_t* parse_kernel_info(int kernel_id, bool PRINT_LOG);
+
+  void parse_memcpy_info(const std::string &memcpy_command, size_t &add,
+                         size_t &count);
+
+  std::vector<std::vector<inst_trace_t> *> get_next_threadblock_traces(
+      unsigned trace_version, unsigned enable_lineinfo, std::ifstream *ifs,
+      std::string kernel_name,
+      unsigned kernel_id, unsigned num_warps_per_thread_block);
+
+  void kernel_finalizer(kernel_trace_t *trace_info);
+
+  // get cfg
+  app_config* get_appcfg() { return &appcfg; }
+  instn_config* get_instncfg() { return &instncfg; }
+  issue_config* get_issuecfg() { return &issuecfg; }
+  
+  /* get mme_instns */
+  std::vector<std::vector<std::vector<mem_instn>>>& get_mem_instns() { return mem_instns; }
+  std::vector<std::vector<mem_instn>>& get_one_kernel_mem_instns(int kernel_id) { return mem_instns[kernel_id]; }
+  std::vector<mem_instn>& get_one_kernel_one_threadblcok_mem_instns(int kernel_id, int block_id) { 
+    return mem_instns[kernel_id][block_id]; 
+  }
+
+ private:
+  // configs_filepath is path to kernelslist.g
+  std::string configs_filepath;
+  std::string app_config_path;
+  std::string instn_config_path;
+  std::string issue_config_path;
+
+  std::string mem_instns_dir;
+
+  app_config appcfg;
+  instn_config instncfg; 
+  issue_config issuecfg;
+  /* kernel_id -> block_id -> mem_instn */
+  std::vector<std::vector<std::vector<mem_instn>>> mem_instns;
 };
 
 /*
