@@ -1,6 +1,7 @@
 
 CC = g++
 MPI_HOME = /usr/local/mpich-3.3.2
+BOOST_HOME = /usr/local/boost
 
 MPICXX = $(MPI_HOME)/bin/mpic++
 MPIRUN = $(MPI_HOME)/bin/mpirun
@@ -16,7 +17,10 @@ ifeq ($(GNUC_CPP0X), 1)
 endif
 
 CXXFLAGS += -I./ISA-Def -I./DEV-Def -I./trace-parser -I./trace-driven -I./common
-CXXFLAGS += -I./common/CLI -I./common/CLI/impl -I/usr/local/mpich-3.3.2/include
+CXXFLAGS += -I./common/CLI -I./common/CLI/impl -I$(MPI_HOME)/include
+CXXFLAGS += -I$(BOOST_HOME)/include
+
+LIBRARIES = -L$(BOOST_HOME)/lib -lboost_mpi -lboost_serialization
 
 OPTFLAGS = -O3 -g3 -fPIC
 
@@ -35,10 +39,10 @@ OBJS = $(OBJ_PATH)/common_def.o $(OBJ_PATH)/option_parser.o $(OBJ_PATH)/trace-pa
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(MPICXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ $^
+	$(MPICXX) $(CXXFLAGS) $(OPTFLAGS) $(LIBRARIES) -o $@ $^
 
 $(OBJ_PATH)/main.o: main.cc
-	$(CC) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
+	$(MPICXX) $(CXXFLAGS) $(OPTFLAGS) $(LIBRARIES) -o $@ -c $^
 
 $(OBJ_PATH)/trace-parser.o: trace-parser/trace-parser.cc
 	$(CC) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
