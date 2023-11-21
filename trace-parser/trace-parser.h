@@ -20,6 +20,8 @@
 #include "../ISA-Def/turing_opcode.h"
 #include "../ISA-Def/volta_opcode.h"
 
+#include "../common/common_def.h"
+
 
 #ifndef TRACE_PARSER_H
 #define TRACE_PARSER_H
@@ -272,20 +274,31 @@ class issue_config {
 };
 
 struct mem_instn {
-    mem_instn(unsigned _pc, unsigned long long _addr_start1, 
-              unsigned _time_stamp, int addr_groups, 
-              unsigned long long _addr_start2) {
-      pc = _pc;
-      time_stamp = _time_stamp;
-      for (unsigned i = 0; i < 32; i++)
-        addr.push_back(_addr_start1 + i*8);
-      if (addr_groups == 2) 
-        for (unsigned i = 0; i < 32; i++) 
-          addr.push_back(_addr_start2 + i*8);
-    }
-    unsigned pc;
-    std::vector<unsigned long long> addr;
-    unsigned time_stamp;
+  mem_instn() {}
+  mem_instn(unsigned _pc, unsigned long long _addr_start1, 
+            unsigned _time_stamp, int addr_groups, 
+            unsigned long long _addr_start2) {
+    pc = _pc;
+    time_stamp = _time_stamp;
+    for (unsigned i = 0; i < 32; i++)
+      addr.push_back(_addr_start1 + i*8);
+    if (addr_groups == 2) 
+      for (unsigned i = 0; i < 32; i++) 
+        addr.push_back(_addr_start2 + i*8);
+  }
+  unsigned pc;
+  std::vector<unsigned long long> addr;
+  unsigned time_stamp;
+
+#ifdef USE_BOOST
+  friend class boost::serialization::access;
+  template<class Archive>
+  void serialize(Archive & ar, const unsigned int version) {
+    ar & pc;
+    ar & addr;
+    ar & time_stamp;
+  }
+#endif
 };
 
 
