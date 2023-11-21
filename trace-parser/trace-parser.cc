@@ -291,7 +291,7 @@ kernel_trace_t::kernel_trace_t() {
   trace_verion = 0;
 }
 
-void app_config::init(std::string config_path) {
+void app_config::init(std::string config_path, bool PRINT_LOG) {
     // named app config options (unordered)
     option_parser_t app_config_opp = option_parser_create();
     
@@ -339,43 +339,101 @@ void app_config::init(std::string config_path) {
     kernel_grid_size.resize(kernels_num);
     kernel_block_size.resize(kernels_num);
     kernel_cuda_stream_id.resize(kernels_num);
+
+    kernel_grid_dim_x.resize(kernels_num);
+    kernel_grid_dim_y.resize(kernels_num);
+    kernel_grid_dim_z.resize(kernels_num);
+    kernel_tb_dim_x.resize(kernels_num);
+    kernel_tb_dim_y.resize(kernels_num);
+    kernel_tb_dim_z.resize(kernels_num);
+    kernel_shmem_base_addr.resize(kernels_num);
+    kernel_local_base_addr.resize(kernels_num);
     
     for (int j = 0; j < kernels_num; ++j) {
-      ss << "-kernel_" << j + 1 << "_name";
+      ss.str("");
+      ss << "-kernel_" << j + 1 << "_kernel_name";
       option_parser_register(app_config_opp, ss.str().c_str(), OPT_CSTR,
-                            &kernel_name[j],
-                            "kernel name",
-                            "None");
+                             &kernel_name[j],
+                             "kernel name",
+                             "None");
       ss.str("");
       ss << "-kernel_" << j + 1 << "_num_registers";
       option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-                            &kernel_num_registers[j],
-                            "number of registers used by kernel",
-                            "0");
+                             &kernel_num_registers[j],
+                             "number of registers used by kernel",
+                             "0");
       ss.str("");
       ss << "-kernel_" << j + 1 << "_shared_mem_bytes";
       option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-                            &kernel_shared_mem_bytes[j],
-                            "number of bytes of shared memory used by kernel",
-                            "0");
+                             &kernel_shared_mem_bytes[j],
+                             "number of bytes of shared memory used by kernel",
+                             "0");
       ss.str("");
       ss << "-kernel_" << j + 1 << "_grid_size";
       option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-                            &kernel_grid_size[j],
-                            "grid size of kernel",
-                            "0");
+                             &kernel_grid_size[j],
+                             "grid size of kernel",
+                             "0");
       ss.str("");
       ss << "-kernel_" << j + 1 << "_block_size";
       option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-                            &kernel_block_size[j],
-                            "block size of kernel",
-                            "0");
+                             &kernel_block_size[j],
+                             "block size of kernel",
+                             "0");
       ss.str("");
       ss << "-kernel_" << j + 1 << "_cuda_stream_id";
       option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-                            &kernel_cuda_stream_id[j],
-                            "cuda stream id of kernel",
-                            "0");
+                             &kernel_cuda_stream_id[j],
+                             "cuda stream id of kernel",
+                             "0");
+      ss.str("");
+      ss << "-kernel_" << j + 1 << "_grid_dim_x";
+      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+                             &kernel_grid_dim_x[j],
+                             "grid dim x of kernel",
+                             "0");
+      ss.str("");
+      ss << "-kernel_" << j + 1 << "_grid_dim_y";
+      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+                             &kernel_grid_dim_y[j],
+                             "grid dim y of kernel",
+                             "0");
+      ss.str("");
+      ss << "-kernel_" << j + 1 << "_grid_dim_z";
+      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+                             &kernel_grid_dim_z[j],
+                             "grid dim z of kernel",
+                             "0");
+      ss.str("");
+      ss << "-kernel_" << j + 1 << "_tb_dim_x";
+      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+                             &kernel_tb_dim_x[j],
+                             "tb dim x of kernel",
+                             "0");
+      ss.str("");
+      ss << "-kernel_" << j + 1 << "_tb_dim_y";
+      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+                             &kernel_tb_dim_y[j],
+                             "tb dim y of kernel",
+                             "0");
+      ss.str("");
+      ss << "-kernel_" << j + 1 << "_tb_dim_z";
+      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+                             &kernel_tb_dim_z[j],
+                             "tb dim z of kernel",
+                             "0");
+      ss.str("");
+      ss << "-kernel_" << j + 1 << "_shmem_base_addr";
+      option_parser_register(app_config_opp, ss.str().c_str(), OPT_UINT64,
+                             &kernel_shmem_base_addr[j],
+                             "shmem base addr of kernel",
+                             "0");
+      ss.str("");
+      ss << "-kernel_" << j + 1 << "_local_base_addr";
+      option_parser_register(app_config_opp, ss.str().c_str(), OPT_UINT64,
+                             &kernel_local_base_addr[j],
+                             "local base addr of kernel",
+                             "0");
       ss.str("");
     }
 
@@ -400,14 +458,14 @@ void app_config::init(std::string config_path) {
     delete[] tokd;
     delete[] toks;
 
-    fprintf(stdout, ">>>APP config Options<<<:\n");
-    option_parser_print(app_config_opp, stdout);
+    if (PRINT_LOG) fprintf(stdout, ">>> APP config Options <<<:\n");
+    if (PRINT_LOG) option_parser_print(app_config_opp, stdout);
     option_parser_destroy(app_config_opp);
 
     m_valid = true;
 }
 
-void instn_config::init(std::string config_path) {
+void instn_config::init(std::string config_path, bool PRINT_LOG) {
   std::ifstream inputFile;
   // open config file, stream every line into a continuous buffer
   // get rid of comments in the process
@@ -457,9 +515,9 @@ void instn_config::init(std::string config_path) {
   }
   inputFile.close();
 
-  fprintf(stdout, ">>>INSTN config Options<<<:\n");
+  if (PRINT_LOG) fprintf(stdout, ">>> INSTN config Options <<<:\n");
   // traversal instn_info_vector
-  for (unsigned i = 0; i < instn_info_vector.size(); ++i) {
+  for (unsigned i = 0; i < instn_info_vector.size() && PRINT_LOG; ++i) {
     std::cout << "-instn " << std::setw(5) << std::right 
               << std::dec << instn_info_vector[i].kernel_id << std::dec;
     std::cout << " " << std::setw(8) << std::left 
@@ -469,34 +527,73 @@ void instn_config::init(std::string config_path) {
   }
 }
 
-std::vector<issue_config::block_info_t> issue_config::parse_blocks_info(const std::string& blocks_info_str) {
+int issue_config::get_sm_id_of_one_block(unsigned kernel_id, unsigned block_id) {
+  for (unsigned i = 0; i < trace_issued_sm_id_blocks.size(); i++) {
+    for (unsigned j = 0; j < trace_issued_sm_id_blocks[i].size(); j++) {
+      // std::cout << kernel_id << ", ";
+      // std::cout << block_id << " | ";
+      // std::cout << trace_issued_sm_id_blocks[i][j].kernel_id << ", "
+      //           << trace_issued_sm_id_blocks[i][j].block_id << std::endl;
+
+      if (trace_issued_sm_id_blocks[i][j].kernel_id == kernel_id && 
+          trace_issued_sm_id_blocks[i][j].block_id == block_id) {
+        return i;
+      }
+    }
+  }
+  return -1;
+}
+
+std::vector<block_info_t> issue_config::parse_blocks_info(const std::string& blocks_info_str) {
     std::vector<block_info_t> result;
     size_t start = 0;
     size_t end = blocks_info_str.find(',', start);
     int total_tuples = std::stoi(blocks_info_str.substr(start, end - start));
     // std::cout << "  total_tuples: " << total_tuples << std::endl;
-
+    
+    
     for (int i = 0; i < total_tuples; ++i) {
+        // start = end + 1;//(
+        // end = blocks_info_str.find('(', start);//(
+        // size_t comma = blocks_info_str.find(',', end);//,
+        // // std::cout << "    kernel_id_str: " << blocks_info_str.substr(end + 1, comma - end - 1) << std::endl;
+        // unsigned kernel_id = std::stoi(blocks_info_str.substr(end + 1, comma - end - 1));
+        // // std::cout << "       kernel_id: " << kernel_id << std::endl;
+        // end = blocks_info_str.find(')', comma);
+        // // std::cout << "    block_id_str: " << blocks_info_str.substr(comma + 1, end - comma - 1) << std::endl;
+        // unsigned block_id = std::stoi(blocks_info_str.substr(comma + 1, end - comma - 1));
+        // // std::cout << "       block_id: " << block_id << std::endl;
+
+        // block_info_t info = block_info_t(kernel_id, block_id);
+        // // std::cout << info.kernel_id << " " << info.block_id << std::endl;
+        // result.push_back(info);
+
+        // 4,(1,80,a7140c84716c),(1,0,a7140c847156),(2,80,a7142bc9ecc1),(2,0,a7142bc9ecc5),
         start = end + 1;
         end = blocks_info_str.find('(', start);
         size_t comma = blocks_info_str.find(',', end);
-        // std::cout << "    kernel_id_str: " << blocks_info_str.substr(end + 1, comma - end - 1) << std::endl;
+        
         unsigned kernel_id = std::stoi(blocks_info_str.substr(end + 1, comma - end - 1));
         // std::cout << "       kernel_id: " << kernel_id << std::endl;
-        end = blocks_info_str.find(')', comma);
-        // std::cout << "    block_id_str: " << blocks_info_str.substr(comma + 1, end - comma - 1) << std::endl;
+        end = blocks_info_str.find(',', comma+1);
+        
         unsigned block_id = std::stoi(blocks_info_str.substr(comma + 1, end - comma - 1));
         // std::cout << "       block_id: " << block_id << std::endl;
+        comma = blocks_info_str.find(')', end+1);
+        
+        unsigned long long time_stamp = std::stoull(blocks_info_str.substr(end + 1, comma - end - 1), 0, 16);
+        // std::cout << "       time_stamp: " << std::hex << time_stamp << std::dec << std::endl;
+        end = comma + 1;
 
-        block_info_t info = block_info_t(kernel_id, block_id);
-        // std::cout << info.kernel_id << " " << info.block_id << std::endl;
+        block_info_t info = block_info_t(kernel_id, block_id, time_stamp);
+        // std::cout << info.kernel_id << " " << info.block_id << " " << std::hex << info.time_stamp << std::dec << std::endl;
         result.push_back(info);
     }
 
     return result;
 }
 
-void issue_config::init(std::string config_path) {
+void issue_config::init(std::string config_path, bool PRINT_LOG) {
     // named issue config options (unordered)
     option_parser_t issue_config_opp = option_parser_create();
 
@@ -548,8 +645,8 @@ void issue_config::init(std::string config_path) {
 
     option_parser_cfgfile(issue_config_opp, config_path.c_str());
     
-    fprintf(stdout, ">>>ISSUE config Options<<<:\n");
-    option_parser_print(issue_config_opp, stdout);
+    if (PRINT_LOG) fprintf(stdout, ">>> ISSUE config Options <<<:\n");
+    if (PRINT_LOG) option_parser_print(issue_config_opp, stdout);
     option_parser_destroy(issue_config_opp);
 
     /****************************************************************/
@@ -575,6 +672,38 @@ void issue_config::init(std::string config_path) {
     /****************************************************************/
 
     m_valid = true;
+}
+
+kernel_trace_t* trace_parser::parse_kernel_info(int kernel_id, bool PRINT_LOG) {
+  kernel_trace_t *kernel_info = new kernel_trace_t;
+  
+  kernel_info->kernel_name = get_appcfg()->get_kernel_name(kernel_id).c_str();
+
+  if (PRINT_LOG) std::cout << "    Creating kernel info for kernel: " << kernel_info->kernel_name
+                           << " (kernel_id: " + std::to_string(kernel_id) + ")" << std::endl;
+
+  kernel_info->kernel_id = (unsigned)get_appcfg()->get_app_kernel_id(kernel_id);
+  kernel_info->grid_dim_x = (unsigned)get_appcfg()->get_kernel_grid_dim_x(kernel_id);
+  kernel_info->grid_dim_y = (unsigned)get_appcfg()->get_kernel_grid_dim_y(kernel_id);
+  kernel_info->grid_dim_z = (unsigned)get_appcfg()->get_kernel_grid_dim_z(kernel_id);
+  kernel_info->tb_dim_x = (unsigned)get_appcfg()->get_kernel_tb_dim_x(kernel_id);
+  kernel_info->tb_dim_y = (unsigned)get_appcfg()->get_kernel_tb_dim_y(kernel_id);
+  kernel_info->tb_dim_z = (unsigned)get_appcfg()->get_kernel_tb_dim_z(kernel_id);
+  kernel_info->shmem = (unsigned)get_appcfg()->get_kernel_shmem_base_addr(kernel_id);
+  kernel_info->nregs = (unsigned)get_appcfg()->get_kernel_num_registers(kernel_id);
+  kernel_info->cuda_stream_id = (unsigned)get_appcfg()->get_kernel_cuda_stream_id(kernel_id);
+  /* default disabled */
+  kernel_info->binary_verion = VOLTA_BINART_VERSION;
+  /* default disabled */
+  kernel_info->enable_lineinfo = 0;
+  /* default disabled */
+  kernel_info->nvbit_verion = "1.5.0";
+  kernel_info->trace_verion = 0;
+  kernel_info->shmem_base_addr = get_appcfg()->get_kernel_shmem_base_addr(kernel_id);
+  kernel_info->local_base_addr = get_appcfg()->get_kernel_local_base_addr(kernel_id);
+
+  // do not close the file ifs, the kernel_finalizer will close it
+  return kernel_info;
 }
 
 kernel_trace_t* trace_parser::parse_kernel_info(const std::string &kerneltraces_filepath) {
@@ -675,7 +804,7 @@ trace_parser::trace_parser(const char *input_configs_filepath) {
 #include <unistd.h>
 #include <limits.h>
 
-void trace_parser::process_configs_file(std::string config_path, int config_type) {
+void trace_parser::process_configs_file(std::string config_path, int config_type, bool PRINT_LOG) {
   std::ifstream fs;
   
   char cwd[PATH_MAX];
@@ -685,7 +814,9 @@ void trace_parser::process_configs_file(std::string config_path, int config_type
   std::string abs_config_path = current_directory + "/" + config_path;
   fs.open(abs_config_path);
 
-  std::cout << "\nProcessing configs file : " << abs_config_path << std::endl << std::endl;
+  if (PRINT_LOG) std::cout << std::endl;
+  std::cout << "Processing configs file : " << abs_config_path << std::endl;
+  if (PRINT_LOG) std::cout << std::endl;
   
   if (!fs.is_open()) {
     std::cout << "Unable to open file: " << abs_config_path << std::endl;
@@ -694,18 +825,18 @@ void trace_parser::process_configs_file(std::string config_path, int config_type
   fs.close();
 
   if (config_type == APP_CONFIG) {
-    app_config appcfg = app_config();
-    appcfg.init(abs_config_path);
+    appcfg = app_config();
+    appcfg.init(abs_config_path, PRINT_LOG);
   } else if (config_type == INSTN_CONFIG) {
-    instn_config instncfg = instn_config();
-    instncfg.init(abs_config_path);
+    instncfg = instn_config();
+    instncfg.init(abs_config_path, PRINT_LOG);
   } else if (config_type == ISSUE_CONFIG) {
-    issue_config issuecfg = issue_config();
-    issuecfg.init(abs_config_path);
+    issuecfg = issue_config();
+    issuecfg.init(abs_config_path, PRINT_LOG);
   }
 }
 
-void trace_parser::parse_configs_file() {
+void trace_parser::parse_configs_file(bool PRINT_LOG) {
   
   if (configs_filepath.back() == '/') {
     app_config_path = configs_filepath + "app.config";
@@ -718,25 +849,121 @@ void trace_parser::parse_configs_file() {
     issue_config_path = configs_filepath + "/" + "issue.config";
   }
 
-  // process app.config
-  process_configs_file(app_config_path, APP_CONFIG);
+  /* process app.config */
+  process_configs_file(app_config_path, APP_CONFIG, PRINT_LOG);
   
-  // process instn.config
-  process_configs_file(instn_config_path, INSTN_CONFIG);
+  /* process instn.config */
+  process_configs_file(instn_config_path, INSTN_CONFIG, PRINT_LOG);
 
-  // process issue.config
-  process_configs_file(issue_config_path, ISSUE_CONFIG);
+  /* process issue.config */
+  process_configs_file(issue_config_path, ISSUE_CONFIG, PRINT_LOG);
 }
 
-void trace_parser::read_mem_instns() {
-  if (configs_filepath.back() == '/') {
-    mem_instns_filepath = configs_filepath + "../memory_traces";
-  } else {
-    mem_instns_filepath = configs_filepath + "/" + "../memory_traces";
-  }
-  std::cout << "mem_instns_filepath: " << mem_instns_filepath << std::endl;
+#include <dirent.h>
+#include <regex>
 
-  // ??????????????????????????????????????
+void trace_parser::process_mem_instns(std::string mem_instns_dir, bool PRINT_LOG) {
+  mem_instns.resize(appcfg.get_kernels_num());
+  for (int kid = 0; kid < appcfg.get_kernels_num(); ++kid)
+    mem_instns[kid].resize(appcfg.get_kernel_grid_size(kid));
+  
+  // read all the mem instns from memory_traces dir
+  DIR *dir;
+  struct dirent *entry;
+  
+  if ((dir = opendir(mem_instns_dir.c_str())) == nullptr)
+    std::cerr << "Not exist directory " << mem_instns_dir << ", please check." << std::endl;
+
+  static const std::regex pattern(R"(kernel_(\d+)_block_(\d+)\.mem)");
+  std::smatch match;
+  
+  while ((entry = readdir(dir)) != nullptr) {
+    if (entry->d_type == DT_REG && 
+        entry->d_name[strlen(entry->d_name) - 4] == '.' && 
+        entry->d_name[strlen(entry->d_name) - 3] == 'm' && 
+        entry->d_name[strlen(entry->d_name) - 2] == 'e' && 
+        entry->d_name[strlen(entry->d_name) - 1] == 'm') {
+      auto search = std::string(entry->d_name);
+      std::string mem_instns_filepath = mem_instns_dir + "/" + entry->d_name;
+      if (PRINT_LOG) std::cout << "Reading mem instns file : " 
+                               << mem_instns_filepath << "..." << std::endl;
+      
+      if (std::regex_search(search, match, pattern)) {
+        int kernel_id = std::stoi(match[1]);
+        int block_id = std::stoi(match[2]);
+        // std::cout << "x: " << kernel_id << " y: " << block_id << std::endl;
+        std::ifstream fs;
+        fs.open(mem_instns_filepath);
+        if (!fs.is_open()) {
+          std::cout << "Unable to open file: " << mem_instns_filepath << std::endl;
+          exit(1);
+        }
+        std::string line;
+        while (!fs.eof()) {
+          getline(fs, line);
+          if (line.empty())
+            continue;
+          else {
+            // line: b0 969b38d6 7f60a5750000
+            int addr_groups;
+            unsigned _pc, _time_stamp;
+            unsigned long long _addr_start1, _addr_start2;
+            // get above parameters from line
+            std::stringstream ss;
+            ss.str(line);
+            ss >> std::hex >> _pc >> _time_stamp;
+            ss >> std::hex >> _addr_start1;
+            size_t pos1 = line.find(' ');
+            size_t pos2 = line.find(' ', pos1 + 1);
+            size_t pos3 = line.find(' ', pos2 + 1);
+            size_t pos4 = line.find(' ', pos3 + 1);
+
+            if (pos4 != std::string::npos) {
+              addr_groups = 2;
+              ss >> std::hex >> _addr_start2;
+            } else addr_groups = 1;
+
+            // std::cout << "  " << line << std::endl;
+            // std::cout << "  pc: " << std::hex << _pc << " " << _time_stamp << " " 
+            //           << addr_groups << " " << _addr_start1 << std::endl;
+            mem_instns[kernel_id-1][block_id].push_back(mem_instn(_pc, _addr_start1, _time_stamp, addr_groups, _addr_start2));
+            // auto a = mem_instn(_pc, _addr_start1, _time_stamp, addr_groups, _addr_start2);
+            // mem_instns[kernel_id-1][block_id].push_back(a);
+          }
+        }
+        fs.close();
+      } else {
+        std::cerr << "Wrong name format of memory trace file: "<< entry->d_name << std::endl;
+      }
+    }
+  }
+
+  closedir(dir);
+}
+
+void trace_parser::read_mem_instns(bool PRINT_LOG) {
+  if (configs_filepath.back() == '/') {
+    mem_instns_dir = configs_filepath + "../memory_traces";
+  } else {
+    mem_instns_dir = configs_filepath + "/" + "../memory_traces";
+  }
+
+  if (PRINT_LOG) std::cout << std::endl;
+  std::cout << "Memory traces dir: " << mem_instns_dir << std::endl;
+  if (PRINT_LOG) std::cout << std::endl;
+
+  mem_instns.resize(appcfg.get_kernels_num());
+  for (int kid = 0; kid < appcfg.get_kernels_num(); ++kid)
+    mem_instns[kid].resize(appcfg.get_kernel_grid_size(kid));
+
+  DIR *dir;
+  if ((dir = opendir(mem_instns_dir.c_str())) == nullptr) {
+    std::cerr << "Not exist directory " << mem_instns_dir << ", please check." << std::endl;
+    exit(1);
+  }
+
+  // process mem_instns
+  process_mem_instns(mem_instns_dir, PRINT_LOG);
 }
 
 std::pair<std::vector<trace_command>, int> trace_parser::parse_commandlist_file() {
