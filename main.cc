@@ -70,7 +70,7 @@ void simple_mpi_test(int argc, char **argv) {
 
 
 #ifdef USE_BOOST
-void print_mpi_test(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr) {
+void private_cache_hit_rate_evaluate(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr) {
   boost::mpi::environment env(argc, argv);
   boost::mpi::communicator world;
 
@@ -83,6 +83,7 @@ void print_mpi_test(int argc, char **argv, std::map<int, std::vector<mem_instn>>
     /* During pass,  */
     int curr_process_idx = world.rank() + pass * world.size();
     if (curr_process_idx < SM_traces_ptr_size) {
+      // TODO: implement the private cache hit rate evaluate.
       for (auto mem_ins : (*SM_traces_ptr)[world.rank()]) {
         std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_idx << " ";
         std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
@@ -184,7 +185,6 @@ int main(int argc, char **argv) {
        * what we should do now is traversal these kernels, and find out all the thread blocks belong to the 
        * same SM, with the usage of issue.config. The SM_traces stores all the memory traces that belong to
        * the same SM. */
-      // std::map<int, std::vector<mem_instn>> SM_traces; // old
       std::map<int, std::vector<mem_instn>>* SM_traces = &SM_traces_all_passes[pass];
 
       auto issuecfg = tracer.get_issuecfg();
@@ -271,8 +271,11 @@ int main(int argc, char **argv) {
   /* Just a simple test for MPI. */
   /* simple_mpi_test(argc, argv); */
   
+  /* Set a barrier here to ensure all processes have received the data before proceeding. */
+  world.barrier();
+
   /* Print the SM_traces of every MPI rank. &SM_traces_all_passes[0] is thr first pass. */
-  print_mpi_test(argc, argv, &SM_traces_all_passes[0]);
+  private_cache_hit_rate_evaluate(argc, argv, &SM_traces_all_passes[0]);
 #endif
 
   fflush(stdout);
