@@ -70,7 +70,7 @@ void simple_mpi_test(int argc, char **argv) {
 
 
 #ifdef USE_BOOST
-void private_cache_hit_rate_evaluate(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr) {
+void private_L1_cache_hit_rate_evaluate(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr) {
   boost::mpi::environment env(argc, argv);
   boost::mpi::communicator world;
 
@@ -274,8 +274,8 @@ int main(int argc, char **argv) {
   /* Set a barrier here to ensure all processes have received the data before proceeding. */
   world.barrier();
 
-  /* Print the SM_traces of every MPI rank. &SM_traces_all_passes[0] is thr first pass. */
-  private_cache_hit_rate_evaluate(argc, argv, &SM_traces_all_passes[0]);
+  /* Print the SM_traces of every MPI rank. &SM_traces_all_passes[0] is the first pass. */
+  private_L1_cache_hit_rate_evaluate(argc, argv, &SM_traces_all_passes[0]);
 #endif
 
   fflush(stdout);
