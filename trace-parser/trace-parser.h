@@ -231,15 +231,29 @@ class instn_config {
 
 /* -trace_issued_sm_id_0 4,(1,0),(1,80),(2,80),(2,0), */
 struct block_info_t {
-  block_info_t(unsigned _kernel_id, unsigned _block_id, unsigned long long _time_stamp) {
+  block_info_t() {}
+  block_info_t(unsigned _kernel_id, unsigned _block_id, unsigned long long _time_stamp, unsigned _sm_id) {
     kernel_id = _kernel_id;
     block_id = _block_id;
     time_stamp = _time_stamp;
+    sm_id = _sm_id;
   }
 
   unsigned kernel_id;
   unsigned block_id;
   unsigned long long time_stamp;
+  unsigned sm_id;
+
+#ifdef USE_BOOST
+  friend class boost::serialization::access;
+  template<class Archive>
+  void serialize(Archive & ar, const unsigned int version) {
+    ar & kernel_id;
+    ar & block_id;
+    ar & time_stamp;
+    ar & sm_id;
+  }
+#endif
 };
 
 class issue_config {
@@ -250,10 +264,25 @@ class issue_config {
   }
   void init(std::string config_path, bool PRINT_LOG);
 
-  
-  std::vector<std::vector<block_info_t>> get_trace_issued_sm_id_blocks() { return trace_issued_sm_id_blocks; }
-  std::vector<block_info_t> get_trace_issued_one_sm_blocks(int sm_id) { return trace_issued_sm_id_blocks[sm_id]; }
-  block_info_t get_trace_issued_one_sm_one_block(int sm_id, int block_id) { return trace_issued_sm_id_blocks[sm_id][block_id]; }
+  std::vector<std::vector<block_info_t>>* get_trace_issued_sm_id_blocks() { return &trace_issued_sm_id_blocks; }
+  std::vector<block_info_t>* get_trace_issued_one_sm_blocks(unsigned sm_id) { // BUG : sm_id is not index
+    for (auto iter = trace_issued_sm_id_blocks.begin();                  // fixed
+              iter != trace_issued_sm_id_blocks.end(); ++iter)           // fixed
+      if ((*iter)[0].sm_id == sm_id)                                     // fixed
+        return &(*iter);                                                 // fixed
+    return NULL; 
+  }
+
+  block_info_t* get_trace_issued_one_sm_one_block(unsigned sm_id, unsigned block_id) { // BUG : sm_id is not index
+    for (auto iter = trace_issued_sm_id_blocks.begin();                      // fixed
+              iter != trace_issued_sm_id_blocks.end(); ++iter)               // fixed
+      if ((*iter)[0].sm_id == sm_id)                                         // fixed
+        for (auto iter2 = iter->begin(); iter2 != iter->end(); ++iter2)      // fixed
+          if (iter2->block_id == block_id)                                   // fixed
+            return &(*iter2);                                                // fixed
+
+    return NULL;
+  } 
 
   int get_trace_issued_sms_num() { return trace_issued_sms_num; }
 
@@ -265,9 +294,9 @@ class issue_config {
   
 
   std::vector<block_info_t> parse_blocks_info(const std::string& blocks_info_str);
-  
+  std::vector<int> trace_issued_sms_vector = {};
   /*
-    trace_issued_sm_id_blocks[0]: SM0 -> block(kernel_id, block_id)
+    trace_issued_sm_id_blocks[0]: SMx -> block(kernel_id, block_id)
   */
   std::vector<std::string> trace_issued_sm_id_blocks_str;
   std::vector<std::vector<block_info_t>> trace_issued_sm_id_blocks;
