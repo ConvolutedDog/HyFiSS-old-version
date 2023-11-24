@@ -19,7 +19,7 @@
 #include "./trace-driven/trace-driven.h"
 #include "./common/CLI/CLI.hpp"
 #include "./common/common_def.h"
-
+#include "./parda/parda.h"
 
 trace_kernel_info_t *create_kernel_info(kernel_trace_t* kernel_trace_info,
 							                          trace_parser *parser){
@@ -31,8 +31,7 @@ trace_kernel_info_t *create_kernel_info(kernel_trace_t* kernel_trace_info,
   return kernel_info;
 }
 
-
-bool compare(const mem_instn &a, const mem_instn &b) {
+bool compare_stamp(const mem_instn &a, const mem_instn &b) {
   return a.time_stamp <= b.time_stamp;
 }
 
@@ -70,7 +69,7 @@ void simple_mpi_test(int argc, char **argv) {
 
 
 #ifdef USE_BOOST
-void private_L1_cache_hit_rate_evaluate(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr) {
+void simple_print_test(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int pass_issue) {
   boost::mpi::environment env(argc, argv);
   boost::mpi::communicator world;
 
@@ -80,11 +79,12 @@ void private_L1_cache_hit_rate_evaluate(int argc, char **argv, std::map<int, std
   const int pass_num = int((SM_traces_ptr_size + world.size() - 1)/world.size());
 
   for (int pass = 0; pass < pass_num; pass++) {
-    /* During pass,  */
     int curr_process_idx = world.rank() + pass * world.size();
+    std::cout << "rank-" << std::dec << world.rank() << ", " << "pass-" << pass << ", ";
+    std::cout << "curr_process_idx: " << curr_process_idx << std::endl;
     if (curr_process_idx < SM_traces_ptr_size) {
       // TODO: implement the private cache hit rate evaluate.
-      for (auto mem_ins : (*SM_traces_ptr)[world.rank()]) {
+      for (auto mem_ins : (*SM_traces_ptr)[curr_process_idx]) {
         std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_idx << " ";
         std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
         std::cout << std::hex << mem_ins.time_stamp << " ";
@@ -92,6 +92,99 @@ void private_L1_cache_hit_rate_evaluate(int argc, char **argv, std::map<int, std
       }
     }
   }
+}
+#endif
+
+int getIthKey(std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int i) {
+  auto it = (*SM_traces_ptr).begin();
+  std::advance(it, i);
+  /* std::cout << "@@@ " << (*SM_traces_ptr).size() << " " << i << " " << it->first << std::endl; */
+  return it->first;
+}
+
+#ifdef USE_BOOST
+void private_L1_cache_hit_rate_evaluate_boost(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int pass_issue) {
+  boost::mpi::environment env(argc, argv);
+  boost::mpi::communicator world;
+
+  const int SM_traces_ptr_size = (int)(*SM_traces_ptr).size();
+  /* Every rank process one *(SM_traces_ptr)[i], it will have pass_num passes to complete, 
+   * which also means that every rank should process at most pass_num traces. */
+  const int pass_num = int((SM_traces_ptr_size + world.size() - 1)/world.size());
+  std::cout << "SM_traces_ptr_size: " << SM_traces_ptr_size << std::endl;
+
+  HKEY input;
+  long tim = 0;
+  program_data_t pdt_c = parda_init();
+
+  unsigned l1_cache_line_size = 32; // BUG: need configure
+
+  for (int pass = 0; pass < pass_num; pass++) {
+    int curr_process_idx = world.rank() + pass * world.size();
+
+    int curr_process_sm_id = getIthKey(SM_traces_ptr, curr_process_idx);
+
+    std::cout << "rank-" << std::dec << world.rank() << ", " << "pass-" << pass << ", ";
+    std::cout << "curr_process_idx: " << curr_process_idx << std::endl;
+    std::cout << "curr_process_sm_id: " << curr_process_sm_id << " " << (int)(*SM_traces_ptr).size() << std::endl;
+    if (curr_process_idx < SM_traces_ptr_size) {
+      // TODO: implement the private cache hit rate evaluate.
+      for (auto mem_ins : (*SM_traces_ptr)[curr_process_sm_id]) {
+        if (world.rank() == 0) {
+          std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_sm_id << " ";
+          std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
+          std::cout << std::hex << mem_ins.time_stamp << " ";
+          std::cout << std::hex << mem_ins.addr[0] << std::endl;
+        }
+        /* HKEY input should be char* of addr */
+        for (unsigned j = 0; j < (mem_ins.addr).size(); j++) { // BUG: mask + merge
+          sprintf(input, "0x%llx", mem_ins.addr[j] >> int(log2(l1_cache_line_size)));
+          // std::cout << input << std::endl;
+          process_one_access(input, &pdt_c, tim);
+          tim++;
+        }
+      }
+    }
+  }
+
+  program_data_t* pdt = &pdt_c;
+  pdt->histogram[B_INF] += narray_get_len(pdt->ga);
+  parda_print_histogram(pdt->histogram);
+  parda_free(pdt);
+}
+#else
+void private_L1_cache_hit_rate_evaluate(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int pass_issue) {
+  const int SM_traces_ptr_size = (int)(*SM_traces_ptr).size();
+  /* Every rank process one *(SM_traces_ptr)[i], it will have pass_num passes to complete, 
+   * which also means that every rank should process at most pass_num traces. */
+  const int pass_num = SM_traces_ptr_size;
+
+  HKEY input;
+  long tim = 0;
+  program_data_t pdt_c = parda_init();
+
+  unsigned l1_cache_line_size = 32; // BUG: need configure
+
+  for (int pass = 0; pass < pass_num; pass++) {
+    // TODO: implement the private cache hit rate evaluate.
+    int curr_process_sm_id = getIthKey(SM_traces_ptr, pass);
+    for (auto mem_ins : (*SM_traces_ptr)[curr_process_sm_id]) {
+      // std::cout << "SM-" << pass << " ";
+      // std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
+      // std::cout << std::hex << mem_ins.time_stamp << " ";
+      // std::cout << std::hex << mem_ins.addr[0] << std::endl;
+      for (unsigned j = 0; j < (mem_ins.addr).size(); j++) { // BUG: mask + merge
+        sprintf(input, "0x%llx", mem_ins.addr[j] >> int(log2(l1_cache_line_size)));
+        process_one_access(input, &pdt_c, tim);
+        tim++;
+      }
+    }
+  }
+
+  program_data_t* pdt = &pdt_c;
+  pdt->histogram[B_INF] += narray_get_len(pdt->ga);
+  parda_print_histogram(pdt->histogram);
+  parda_free(pdt);
 }
 #endif
 
@@ -143,7 +236,7 @@ int main(int argc, char **argv) {
     passnum_concurrent_issue_to_sm = int((tracer.get_appcfg()->get_kernels_num() + 
                                          cc_config[SM70].max_concurrent_kernels_num - 1) / 
                                          cc_config[SM70].max_concurrent_kernels_num);
-
+    std::cout << "passnum_concurrent_issue_to_sm: " << passnum_concurrent_issue_to_sm << std::endl;
     std::cout << std::endl;
 #ifdef USE_BOOST
   } /* end rank = 0 */
@@ -152,10 +245,14 @@ int main(int argc, char **argv) {
   /* SM_traces_all_passes will store all the SM_traces of all the passes, and the SM_traces_all_passes[pass_num]
    * means: pass_num -> sm_id -> std::vector<mem_instn>. */
   std::vector<std::map<int, std::vector<mem_instn>>> SM_traces_all_passes;
+  
+  /*  */
+  std::vector<std::vector<block_info_t>> trace_issued_sm_id_blocks;
 
 #ifdef USE_BOOST
   if (world.rank() == 0) {
 #endif
+    trace_issued_sm_id_blocks = *(tracer.get_issuecfg()->get_trace_issued_sm_id_blocks());
 
     SM_traces_all_passes.resize(passnum_concurrent_issue_to_sm);
 
@@ -215,6 +312,8 @@ int main(int argc, char **argv) {
          * if (PRINT_LOG) std::cout << "        num_warps_per_thread_block: " << num_warps_per_thread_block << std::endl; */
         if (PRINT_LOG) std::cout << "        num_threadblocks_current_kernel: " << num_threadblocks_current_kernel << std::endl;
 
+        std::cout << "        num_threadblocks_current_kernel: " << num_threadblocks_current_kernel << std::endl;
+
         /* Traversal all the blocks of kernel k. */
         for (unsigned i = 0; i < num_threadblocks_current_kernel; i++) {
           /* The threadblock_traces[i] stores the memory traces that belong to k->get_trace_info()->kernel_id 
@@ -231,14 +330,16 @@ int main(int argc, char **argv) {
 
         /* Next we will interleave the threadblock_traces[...] to the whole traces belong to kernel_id. */
       }
-
+      
       /* Traversal the SM_traces, theoretically, SM_traces.size() is the total usage amount of SM. */
       assert((int)(*SM_traces).size() == issuecfg->get_trace_issued_sms_num());
-      for (unsigned i=0; i < (*SM_traces).size(); i++) {
+      /* for (unsigned i=0; i < (*SM_traces).size(); i++) { // BUG */
+      for (auto iter : (*SM_traces)) {                      // fixed
+        unsigned i = iter.first;                            // fixed
         if (PRINT_LOG) std::cout << "        SM[" << i << "] | traces_num[" << (*SM_traces)[i].size() << "]:" << std::endl;
         /* Reorder SM_trace[i] by timestamp, from smallest to largest, so as to simulate the issue order 
          * of memory instructions. */
-        if (sort) std::sort((*SM_traces)[i].begin(), (*SM_traces)[i].end(), compare);
+        if (sort) std::sort((*SM_traces)[i].begin(), (*SM_traces)[i].end(), compare_stamp);
 
         /* Output the traces. */
         if (PRINT_LOG) print_SM_traces(&(*SM_traces)[i]);
@@ -255,7 +356,11 @@ int main(int argc, char **argv) {
 
 #ifdef USE_BOOST
     /* Now we need to broadcast the data in SM_traces_all_passes. */
-    boost::mpi::broadcast(world, SM_traces_all_passes, 0);
+    if (world.size() > 0) boost::mpi::broadcast(world, SM_traces_all_passes, 0);
+    /* Also we need to broadcast the variable passnum_concurrent_issue_to_sm. */
+    if (world.size() > 0) boost::mpi::broadcast(world, passnum_concurrent_issue_to_sm, 0);
+    /* Also we need to broadcast the variable trace_parser for all rank > 0. */
+    if (world.size() > 0) boost::mpi::broadcast(world, trace_issued_sm_id_blocks, 0);
 #endif
 
 #ifdef USE_BOOST
@@ -265,6 +370,10 @@ int main(int argc, char **argv) {
 #ifdef USE_BOOST
   /* Now we need to recieve the broadcasted data to SM_traces_all_passes for all rank > 0. */
   if (world.rank() != 0)  boost::mpi::broadcast(world, SM_traces_all_passes, 0);
+  /* Also we need to recieve the variable passnum_concurrent_issue_to_sm for all rank > 0. */
+  if (world.rank() != 0)  boost::mpi::broadcast(world, passnum_concurrent_issue_to_sm, 0);
+  /* Also we need to recieve the variable trace_parser for all rank > 0. */
+  if (world.rank() != 0)  boost::mpi::broadcast(world, trace_issued_sm_id_blocks, 0);
 #endif
 
 #ifdef USE_BOOST
@@ -275,8 +384,17 @@ int main(int argc, char **argv) {
   world.barrier();
 
   /* Print the SM_traces of every MPI rank. &SM_traces_all_passes[0] is the first pass. */
-  private_L1_cache_hit_rate_evaluate(argc, argv, &SM_traces_all_passes[0]);
+  for(int i = 0 ; i < passnum_concurrent_issue_to_sm; i++) { // BUG: need to merge all the SM_traces of all the passes.
+    private_L1_cache_hit_rate_evaluate_boost(argc, argv, &SM_traces_all_passes[i], i);
+  }
+#else
+  /* Print the SM_traces of every MPI rank. &SM_traces_all_passes[0] is the first pass. */
+  for(int i = 0 ; i < passnum_concurrent_issue_to_sm; i++) {
+    private_L1_cache_hit_rate_evaluate(argc, argv, &SM_traces_all_passes[i], i);
+  }
 #endif
+
+  world.barrier();
 
   fflush(stdout);
 
