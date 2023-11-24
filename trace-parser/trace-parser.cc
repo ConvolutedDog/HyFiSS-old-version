@@ -537,7 +537,7 @@ int issue_config::get_sm_id_of_one_block(unsigned kernel_id, unsigned block_id) 
 
       if (trace_issued_sm_id_blocks[i][j].kernel_id == kernel_id && 
           trace_issued_sm_id_blocks[i][j].block_id == block_id) {
-        return i;
+        return trace_issued_sm_id_blocks[i][j].sm_id;
       }
     }
   }
@@ -549,26 +549,17 @@ std::vector<block_info_t> issue_config::parse_blocks_info(const std::string& blo
     size_t start = 0;
     size_t end = blocks_info_str.find(',', start);
     int total_tuples = std::stoi(blocks_info_str.substr(start, end - start));
+
+    start = end + 1;
+    end = blocks_info_str.find(',', end + 1);
+    int sm_id = std::stoi(blocks_info_str.substr(start, end - start));
+
     // std::cout << "  total_tuples: " << total_tuples << std::endl;
+    // std::cout << "  sm_id: " << sm_id << std::endl;
     
-    
+    /* template: -trace_issued_sm_id_0 1,0,(1,0,bfbd36210c36), */
     for (int i = 0; i < total_tuples; ++i) {
-        // start = end + 1;//(
-        // end = blocks_info_str.find('(', start);//(
-        // size_t comma = blocks_info_str.find(',', end);//,
-        // // std::cout << "    kernel_id_str: " << blocks_info_str.substr(end + 1, comma - end - 1) << std::endl;
-        // unsigned kernel_id = std::stoi(blocks_info_str.substr(end + 1, comma - end - 1));
-        // // std::cout << "       kernel_id: " << kernel_id << std::endl;
-        // end = blocks_info_str.find(')', comma);
-        // // std::cout << "    block_id_str: " << blocks_info_str.substr(comma + 1, end - comma - 1) << std::endl;
-        // unsigned block_id = std::stoi(blocks_info_str.substr(comma + 1, end - comma - 1));
-        // // std::cout << "       block_id: " << block_id << std::endl;
-
-        // block_info_t info = block_info_t(kernel_id, block_id);
-        // // std::cout << info.kernel_id << " " << info.block_id << std::endl;
-        // result.push_back(info);
-
-        // 4,(1,80,a7140c84716c),(1,0,a7140c847156),(2,80,a7142bc9ecc1),(2,0,a7142bc9ecc5),
+        /* template: 4,x,(1,80,a7140c84716c),(1,0,a7140c847156),(2,80,a7142bc9ecc1),(2,0,a7142bc9ecc5), */
         start = end + 1;
         end = blocks_info_str.find('(', start);
         size_t comma = blocks_info_str.find(',', end);
@@ -585,8 +576,8 @@ std::vector<block_info_t> issue_config::parse_blocks_info(const std::string& blo
         // std::cout << "       time_stamp: " << std::hex << time_stamp << std::dec << std::endl;
         end = comma + 1;
 
-        block_info_t info = block_info_t(kernel_id, block_id, time_stamp);
-        // std::cout << info.kernel_id << " " << info.block_id << " " << std::hex << info.time_stamp << std::dec << std::endl;
+        block_info_t info = block_info_t(kernel_id, block_id, time_stamp, sm_id);
+        // std::cout << info.kernel_id << " " << info.block_id << " " << std::hex << info.time_stamp << std::dec << " " << info.sm_id << std::endl;
         result.push_back(info);
     }
 
@@ -610,33 +601,48 @@ void issue_config::init(std::string config_path, bool PRINT_LOG) {
       exit(1);
     }
 
-    std::string target = "-trace_issued_sms_num";
+    std::string target1 = "-trace_issued_sms_num";
+    std::string target2 = "-trace_issued_sms_vector";
     std::string line;
     size_t commentStart;
-    size_t found;
-    std::string result;
+    size_t found1, found2;
+    std::string result1, result2;
     while (inputFile.good()) {
       getline(inputFile, line);
       commentStart = line.find_first_of("#");
       if (commentStart != line.npos) continue;
-      found = line.find(target);
-      if (found != std::string::npos) {
-        result = line.substr(found + target.length() + 1);
+      found1 = line.find(target1);
+      found2 = line.find(target2);
+      if (found1 != std::string::npos) {
+        result1 = line.substr(found1 + target1.length() + 1);
         // std::cout << ">>>" << std::stoi(result) << "<<<" << std::endl;
-        trace_issued_sms_num = std::stoi(result);
-        break;
+        trace_issued_sms_num = std::stoi(result1);
+      }
+      if (found2 != std::string::npos) {
+        result2 = line.substr(found2 + target2.length() + 1);
+        // std::cout << ">>>" << result << "<<<" << std::endl;
+        std::istringstream iss(result2);
+        std::string token;
+        while (std::getline(iss, token, ',')) {
+          trace_issued_sms_vector.push_back(std::stoi(token));
+          std::cout << "trace_issued_sms_vector: " << std::stoi(token) << std::endl;
+        }
       }
     }
     inputFile.close();
     /****************************************************************/
     trace_issued_sm_id_blocks_str.resize(trace_issued_sms_num);
 
-    int tmp;
+    int tmp1;
+    std::string tmp2;
     option_parser_register(issue_config_opp, "-trace_issued_sms_num", OPT_INT32,
-                           &tmp, "number of SMs that have been issued blocks (default=1)", "1");
+                           &tmp1, "number of SMs that have been issued blocks (default=1)", "1");
+    option_parser_register(issue_config_opp, "-trace_issued_sms_vector", OPT_CSTR,
+                           &tmp2, "vector of SMs id that have been issued blocks (default=None)", "");
     
     for (int j = 0; j < trace_issued_sms_num; ++j) {
-      ss << "-trace_issued_sm_id_" << std::to_string(j);
+      int sm_num = trace_issued_sms_vector[j];
+      ss << "-trace_issued_sm_id_" << std::to_string(sm_num);
       option_parser_register(issue_config_opp, ss.str().c_str(), OPT_CSTR,
                              &trace_issued_sm_id_blocks_str[j],
                              "issued blocks list on i-th SM (default=None)", "None");
@@ -650,18 +656,17 @@ void issue_config::init(std::string config_path, bool PRINT_LOG) {
     option_parser_destroy(issue_config_opp);
 
     /****************************************************************/
-    // parse the issued blocks list on each SM
-    // std::vector<std::vector<block_info_t>> trace_issued_sm_id_blocks;
+    /* parse the issued blocks list on each SM */
     std::string blocks_info_str;
     trace_issued_sm_id_blocks.resize(trace_issued_sms_num);
     for (int j = 0; j < trace_issued_sms_num; ++j) {
-      // std::cout << "trace_issued_sm_id_blocks_str[" << j << "]: " 
-      //           << trace_issued_sm_id_blocks_str[j].c_str() << std::endl;
+      std::cout << "trace_issued_sm_id_blocks_str[" << j << "]: " 
+                << trace_issued_sm_id_blocks_str[j].c_str() << std::endl;
       blocks_info_str = trace_issued_sm_id_blocks_str[j].c_str();
       std::vector<block_info_t> result = parse_blocks_info(blocks_info_str);
       trace_issued_sm_id_blocks[j] = result;
     }
-
+    
     // for (int j = 0; j < trace_issued_sms_num; ++j) {
     //   std::cout << "@@@ trace_issued_sm_id_blocks[" << j << "]: " << std::endl;
     //   for (unsigned k = 0; k < trace_issued_sm_id_blocks[j].size(); ++k) {
@@ -670,7 +675,6 @@ void issue_config::init(std::string config_path, bool PRINT_LOG) {
     //   }
     // }
     /****************************************************************/
-
     m_valid = true;
 }
 
