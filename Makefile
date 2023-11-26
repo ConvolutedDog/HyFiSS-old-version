@@ -2,6 +2,7 @@
 USE_BOOST = 1
 MPI_HOME = /usr/local/mpich-3.3.2
 BOOST_HOME = /usr/local/boost
+DEBUG = 1
 
 MPICXX = $(MPI_HOME)/bin/mpic++
 MPIRUN = $(MPI_HOME)/bin/mpirun
@@ -12,7 +13,7 @@ else
 CXX = g++
 endif
 
-CXXFLAGS = -Wall -O3
+CXXFLAGS = -Wall
 
 # Detect Support for C++11 (C++0x) from GCC Version 
 GNUC_CPP0X := $(shell g++ --version | perl -ne 'if (/g++\s+\(.*\)\s+([0-9.]+)/){ if($$1 >= 4.3) {$$n=1} else {$$n=0;} } END { print $$n; }')
@@ -30,7 +31,11 @@ CXXFLAGS += $(shell pkg-config --cflags glib-2.0)
 LIBRARIES = -L$(BOOST_HOME)/lib -lboost_mpi -lboost_serialization
 LIBRARIES += $(shell pkg-config --libs glib-2.0)
 
-OPTFLAGS = -O3 -g3 -fPIC
+ifeq ($(DEBUG),1)
+OPTFLAGS = -O0 -g3 -fPIC
+else
+OPTFLAGS = -O3 -fPIC
+endif
 
 OBJ_PATH = obj
 
