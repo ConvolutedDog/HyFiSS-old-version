@@ -459,7 +459,7 @@ void app_config::init(std::string config_path, bool PRINT_LOG) {
     delete[] toks;
 
     if (PRINT_LOG) fprintf(stdout, ">>> APP config Options <<<:\n");
-    if (PRINT_LOG) option_parser_print(app_config_opp, stdout);
+    if (PRINT_LOG) option_parser_print(app_config_opp, stdout); //BUG: del this will cause fault
     option_parser_destroy(app_config_opp);
 
     m_valid = true;
@@ -625,7 +625,7 @@ void issue_config::init(std::string config_path, bool PRINT_LOG) {
         std::string token;
         while (std::getline(iss, token, ',')) {
           trace_issued_sms_vector.push_back(std::stoi(token));
-          std::cout << "trace_issued_sms_vector: " << std::stoi(token) << std::endl;
+          // std::cout << "trace_issued_sms_vector: " << std::stoi(token) << std::endl;
         }
       }
     }
@@ -652,7 +652,7 @@ void issue_config::init(std::string config_path, bool PRINT_LOG) {
     option_parser_cfgfile(issue_config_opp, config_path.c_str());
     
     if (PRINT_LOG) fprintf(stdout, ">>> ISSUE config Options <<<:\n");
-    if (PRINT_LOG) option_parser_print(issue_config_opp, stdout);
+    if (PRINT_LOG) option_parser_print(issue_config_opp, stdout); //BUG: del this will cause fault
     option_parser_destroy(issue_config_opp);
 
     /****************************************************************/
@@ -660,8 +660,8 @@ void issue_config::init(std::string config_path, bool PRINT_LOG) {
     std::string blocks_info_str;
     trace_issued_sm_id_blocks.resize(trace_issued_sms_num);
     for (int j = 0; j < trace_issued_sms_num; ++j) {
-      std::cout << "trace_issued_sm_id_blocks_str[" << j << "]: " 
-                << trace_issued_sm_id_blocks_str[j].c_str() << std::endl;
+      // std::cout << "trace_issued_sm_id_blocks_str[" << j << "]: " 
+      //           << trace_issued_sm_id_blocks_str[j].c_str() << std::endl;
       blocks_info_str = trace_issued_sm_id_blocks_str[j].c_str();
       std::vector<block_info_t> result = parse_blocks_info(blocks_info_str);
       trace_issued_sm_id_blocks[j] = result;
@@ -927,7 +927,7 @@ void trace_parser::process_mem_instns(std::string mem_instns_dir, bool PRINT_LOG
               ss >> std::hex >> _addr_start2;
             } else addr_groups = 1;
 
-            // std::cout << "  " << line << std::endl;
+            // std::cout << "  " << line << " ";
             // std::cout << "  pc: " << std::hex << _pc << " " << _time_stamp << " " 
             //           << addr_groups << " " << _addr_start1 << std::endl;
             mem_instns[kernel_id-1][block_id].push_back(mem_instn(_pc, _addr_start1, _time_stamp, addr_groups, _addr_start2));
