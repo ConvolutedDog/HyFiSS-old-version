@@ -314,10 +314,12 @@ struct mem_instn {
     if (addr_groups == 2) 
       for (unsigned i = 0; i < 32; i++) 
         addr.push_back(_addr_start2 + i*8);
+    valid = true;
   }
   unsigned pc;
   std::vector<unsigned long long> addr;
   unsigned time_stamp;
+  bool valid = false;
 
 #ifdef USE_BOOST
   friend class boost::serialization::access;
