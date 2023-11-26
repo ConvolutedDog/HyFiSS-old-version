@@ -209,9 +209,9 @@ class OptionParser {
       if (i_option != m_optionMap.end()) {
         // std::cout << "@@@ ";
         const char *argstr = (i + 1 < argc) ? argv[i + 1] : "";
-        // std::cout << "argstr = " << argstr;
+        // std::cout << "argstr = " << argstr << std::endl;
         OptionRegistryInterface *p_option = i_option->second;
-        // std::cout << p_option->toString() << std::endl;
+        p_option->toString(); // BUG: delete this may raise error // yangjianchao16 add
         if (p_option->isFlag()) {
           if (p_option->fromString(argstr) == true) {
             i += 1;
