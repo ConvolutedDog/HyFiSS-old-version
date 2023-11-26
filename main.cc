@@ -32,6 +32,8 @@ trace_kernel_info_t *create_kernel_info(kernel_trace_t* kernel_trace_info,
 }
 
 bool compare_stamp(const mem_instn &a, const mem_instn &b) {
+  // std::cout << "    a.time_stamp: " << a.time_stamp << " ";
+  // std::cout << "    b.time_stamp: " << b.time_stamp << " pc-" << b.pc << std::endl;
   return a.time_stamp <= b.time_stamp;
 }
 
@@ -111,7 +113,7 @@ void private_L1_cache_hit_rate_evaluate_boost(int argc, char **argv, std::map<in
   /* Every rank process one *(SM_traces_ptr)[i], it will have pass_num passes to complete, 
    * which also means that every rank should process at most pass_num traces. */
   const int pass_num = int((SM_traces_ptr_size + world.size() - 1)/world.size());
-  std::cout << "SM_traces_ptr_size: " << SM_traces_ptr_size << std::endl;
+  // std::cout << "SM_traces_ptr_size: " << SM_traces_ptr_size << std::endl;
 
   HKEY input;
   long tim = 0;
@@ -124,21 +126,21 @@ void private_L1_cache_hit_rate_evaluate_boost(int argc, char **argv, std::map<in
 
     int curr_process_sm_id = getIthKey(SM_traces_ptr, curr_process_idx);
 
-    std::cout << "rank-" << std::dec << world.rank() << ", " << "pass-" << pass << ", ";
-    std::cout << "curr_process_idx: " << curr_process_idx << std::endl;
-    std::cout << "curr_process_sm_id: " << curr_process_sm_id << " " << (int)(*SM_traces_ptr).size() << std::endl;
+    // std::cout << "rank-" << std::dec << world.rank() << ", " << "pass-" << pass << ", ";
+    // std::cout << "curr_process_idx: " << curr_process_idx << std::endl;
+    // std::cout << "curr_process_sm_id: " << curr_process_sm_id << " " << (int)(*SM_traces_ptr).size() << std::endl;
     if (curr_process_idx < SM_traces_ptr_size) {
       // TODO: implement the private cache hit rate evaluate.
       for (auto mem_ins : (*SM_traces_ptr)[curr_process_sm_id]) {
         if (world.rank() == 0) {
-          std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_sm_id << " ";
-          std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
-          std::cout << std::hex << mem_ins.time_stamp << " ";
-          std::cout << std::hex << mem_ins.addr[0] << std::endl;
+          // std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_sm_id << " ";
+          // std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
+          // std::cout << std::hex << mem_ins.time_stamp << " ";
+          // std::cout << std::hex << mem_ins.addr[0] << std::endl;
         }
         /* HKEY input should be char* of addr */
         for (unsigned j = 0; j < (mem_ins.addr).size(); j++) { // BUG: mask + merge
-          sprintf(input, "0x%llx", mem_ins.addr[j] >> int(log2(l1_cache_line_size)));
+          sprintf(input, "0x%llx", mem_ins.addr[j] /*>> int(log2(l1_cache_line_size))*/);
           // std::cout << input << std::endl;
           process_one_access(input, &pdt_c, tim);
           tim++;
@@ -211,7 +213,6 @@ int main(int argc, char **argv) {
 
   trace_parser tracer(configs.c_str());
 
-  std::vector<trace_kernel_info_t*> single_pass_kernels_info;
 
 #ifdef USE_BOOST
   if (world.rank() == 0) {
@@ -229,14 +230,13 @@ int main(int argc, char **argv) {
     std::vector<trace_kernel_info_t*> all_kernels_info;
     all_kernels_info.reserve(tracer.get_appcfg()->get_kernels_num());
 
-    single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? std::min(tracer.get_appcfg()->get_kernels_num(), 
-                                                                           cc_config[SM70].max_concurrent_kernels_num) : 1);
 
     /* V100 schedules 128 kernels for concurrent execution at a time, thus requiring (all_kernels_num + 127)/128 schedules. */
     passnum_concurrent_issue_to_sm = int((tracer.get_appcfg()->get_kernels_num() + 
                                          cc_config[SM70].max_concurrent_kernels_num - 1) / 
                                          cc_config[SM70].max_concurrent_kernels_num);
-    std::cout << "passnum_concurrent_issue_to_sm: " << passnum_concurrent_issue_to_sm << std::endl;
+    // std::cout << "get_kernels_num:" << tracer.get_appcfg()->get_kernels_num() << std::endl;
+    // std::cout << "max_concurrent_kernels_num:" << cc_config[SM70].max_concurrent_kernels_num << std::endl;
     std::cout << std::endl;
 #ifdef USE_BOOST
   } /* end rank = 0 */
@@ -249,6 +249,9 @@ int main(int argc, char **argv) {
   /*  */
   std::vector<std::vector<block_info_t>> trace_issued_sm_id_blocks;
 
+  std::vector<int> SM_traces_sm_id;
+  int SM_traces_ptr_size;
+
 #ifdef USE_BOOST
   if (world.rank() == 0) {
 #endif
@@ -258,6 +261,22 @@ int main(int argc, char **argv) {
 
     for (int pass = 0; pass < passnum_concurrent_issue_to_sm; pass++) {
       if (PRINT_LOG) std::cout << "Schedule pass: " << pass << std::endl;
+
+      
+      std::vector<trace_kernel_info_t*> single_pass_kernels_info;
+      
+      if (pass == passnum_concurrent_issue_to_sm - 1) {
+        single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? tracer.get_appcfg()->get_kernels_num() - 
+                                                                      cc_config[SM70].max_concurrent_kernels_num * pass : 1);
+      } else if (pass == 0) {
+        single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? std::min(tracer.get_appcfg()->get_kernels_num(), 
+                                                                               cc_config[SM70].max_concurrent_kernels_num) : 1);
+      } else {
+        single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? cc_config[SM70].max_concurrent_kernels_num : 1);
+      }
+
+      // single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? std::min(tracer.get_appcfg()->get_kernels_num(), 
+      //                                                                        cc_config[SM70].max_concurrent_kernels_num) : 1);
       
       /* for the pass-th scheduling process, V100 will schedule min(128,tracer.kernels_num) kernels to SMs,
        * here we will find the kernels that will be scheduled in this pass and create their kernel_info_t objects,
@@ -312,8 +331,6 @@ int main(int argc, char **argv) {
          * if (PRINT_LOG) std::cout << "        num_warps_per_thread_block: " << num_warps_per_thread_block << std::endl; */
         if (PRINT_LOG) std::cout << "        num_threadblocks_current_kernel: " << num_threadblocks_current_kernel << std::endl;
 
-        std::cout << "        num_threadblocks_current_kernel: " << num_threadblocks_current_kernel << std::endl;
-
         /* Traversal all the blocks of kernel k. */
         for (unsigned i = 0; i < num_threadblocks_current_kernel; i++) {
           /* The threadblock_traces[i] stores the memory traces that belong to k->get_trace_info()->kernel_id 
@@ -326,34 +343,59 @@ int main(int argc, char **argv) {
           
           // SM_traces[sm_id].insert(SM_traces[sm_id].end(), threadblock_traces[i].begin(), threadblock_traces[i].end()); // old
           (*SM_traces)[sm_id].insert((*SM_traces)[sm_id].end(), threadblock_traces[i].begin(), threadblock_traces[i].end());
+          // std::cout << "sm_id-" << sm_id << " " << threadblock_traces[i].size() << std::endl;
         }
 
         /* Next we will interleave the threadblock_traces[...] to the whole traces belong to kernel_id. */
       }
+
+      // for (auto iter : (*SM_traces)) {
+      //   std::cout << "###SM-" << iter.first << " " << iter.second.size() << std::endl;
+      // }
       
       /* Traversal the SM_traces, theoretically, SM_traces.size() is the total usage amount of SM. */
-      assert((int)(*SM_traces).size() == issuecfg->get_trace_issued_sms_num());
+      // assert((int)(*SM_traces).size() == issuecfg->get_trace_issued_sms_num()); // BUG: only pass_num = 1 will be true
       /* for (unsigned i=0; i < (*SM_traces).size(); i++) { // BUG */
       for (auto iter : (*SM_traces)) {                      // fixed
         unsigned i = iter.first;                            // fixed
-        if (PRINT_LOG) std::cout << "        SM[" << i << "] | traces_num[" << (*SM_traces)[i].size() << "]:" << std::endl;
+        if (PRINT_LOG) std::cout << std::dec << "        SM[" << i << "] | traces_num[" << (*SM_traces)[i].size() << "]:" << std::endl;
         /* Reorder SM_trace[i] by timestamp, from smallest to largest, so as to simulate the issue order 
          * of memory instructions. */
-        if (sort) std::sort((*SM_traces)[i].begin(), (*SM_traces)[i].end(), compare_stamp);
-
+        if (sort) std::sort((*SM_traces)[i].begin(), (*SM_traces)[i].end(), compare_stamp); // BUG: vector-add will be wrong
+        
         /* Output the traces. */
-        if (PRINT_LOG) print_SM_traces(&(*SM_traces)[i]);
+        //if (PRINT_LOG) print_SM_traces(&(*SM_traces)[i]);
 
         /* Now we can evaluate the hit rate of L1D cache of SM[i]. */
       }
 
-      for (auto k : single_pass_kernels_info) {
-        delete k;
-      }
-      single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? std::min(tracer.get_appcfg()->get_kernels_num(), 
-                                                                             cc_config[SM70].max_concurrent_kernels_num) : 1);
+      // for (unsigned i = 0; i < SM_traces_all_passes.size(); i++) {
+      //   for (auto& pair : SM_traces_all_passes[i]) {
+      //     std::sort(pair.second.begin(), pair.second.end(), compare_stamp);
+      //   }
+      // }
+
+      // for (auto k : single_pass_kernels_info) {
+      //   delete k;
+      // }
+      // single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? std::min(tracer.get_appcfg()->get_kernels_num(), 
+      //                                                                        cc_config[SM70].max_concurrent_kernels_num) : 1);
     }
 
+    
+    for (int _pass = 0; _pass < passnum_concurrent_issue_to_sm; _pass++) {
+      for (auto _sm_id_map : SM_traces_all_passes[_pass]) {
+        if (std::find(SM_traces_sm_id.begin(), SM_traces_sm_id.end(), _sm_id_map.first) == SM_traces_sm_id.end()) {
+          SM_traces_sm_id.push_back(_sm_id_map.first);
+        }
+      }
+    }
+
+    // for (auto x : SM_traces_sm_id) std::cout << x << " ";
+    std::cout << std::endl;
+
+    SM_traces_ptr_size = SM_traces_sm_id.size();
+    
 #ifdef USE_BOOST
     /* Now we need to broadcast the data in SM_traces_all_passes. */
     if (world.size() > 0) boost::mpi::broadcast(world, SM_traces_all_passes, 0);
@@ -361,6 +403,8 @@ int main(int argc, char **argv) {
     if (world.size() > 0) boost::mpi::broadcast(world, passnum_concurrent_issue_to_sm, 0);
     /* Also we need to broadcast the variable trace_parser for all rank > 0. */
     if (world.size() > 0) boost::mpi::broadcast(world, trace_issued_sm_id_blocks, 0);
+    if (world.size() > 0) boost::mpi::broadcast(world, SM_traces_sm_id, 0);
+    if (world.size() > 0) boost::mpi::broadcast(world, SM_traces_ptr_size, 0);
 #endif
 
 #ifdef USE_BOOST
@@ -369,11 +413,13 @@ int main(int argc, char **argv) {
 
 #ifdef USE_BOOST
   /* Now we need to recieve the broadcasted data to SM_traces_all_passes for all rank > 0. */
-  if (world.rank() != 0)  boost::mpi::broadcast(world, SM_traces_all_passes, 0);
+  if (world.rank() != 0) boost::mpi::broadcast(world, SM_traces_all_passes, 0);
   /* Also we need to recieve the variable passnum_concurrent_issue_to_sm for all rank > 0. */
-  if (world.rank() != 0)  boost::mpi::broadcast(world, passnum_concurrent_issue_to_sm, 0);
+  if (world.rank() != 0) boost::mpi::broadcast(world, passnum_concurrent_issue_to_sm, 0);
   /* Also we need to recieve the variable trace_parser for all rank > 0. */
-  if (world.rank() != 0)  boost::mpi::broadcast(world, trace_issued_sm_id_blocks, 0);
+  if (world.rank() != 0) boost::mpi::broadcast(world, trace_issued_sm_id_blocks, 0);
+  if (world.rank() != 0) boost::mpi::broadcast(world, SM_traces_sm_id, 0);
+  if (world.rank() != 0) boost::mpi::broadcast(world, SM_traces_ptr_size, 0);
 #endif
 
 #ifdef USE_BOOST
@@ -384,19 +430,105 @@ int main(int argc, char **argv) {
   world.barrier();
 
   /* Print the SM_traces of every MPI rank. &SM_traces_all_passes[0] is the first pass. */
+  /* std::vector<std::map<int, std::vector<mem_instn>>> SM_traces_all_passes; */
   for(int i = 0 ; i < passnum_concurrent_issue_to_sm; i++) { // BUG: need to merge all the SM_traces of all the passes.
-    private_L1_cache_hit_rate_evaluate_boost(argc, argv, &SM_traces_all_passes[i], i);
+    // private_L1_cache_hit_rate_evaluate_boost(argc, argv, &SM_traces_all_passes[i], i);
   }
+  // std::cout << "###" << passnum_concurrent_issue_to_sm << std::endl;
+
+
+  
+  if (passnum_concurrent_issue_to_sm > 1) {
+    /* Now we try to merge all the SM_traces of all the passes. Using boost::mpi, we can let rank-0 process 
+    * 0+0*world.size(), 0+1*world.size() -th SM_id. */
+    std::map<int, std::vector<mem_instn>> SM_traces_all_passes_merged;
+
+    /* num_merge_sms_pass is int((SM number + world.size() - 1) / world.size()), means that every rank will process at most 
+    * num_merge_sms_pass SMs. */
+    
+    // std::cout << "SM_traces_ptr_size: " << SM_traces_ptr_size << std::endl;
+
+    int num_merge_sms_pass = int((SM_traces_ptr_size + world.size() - 1) / world.size());
+    if (PRINT_LOG) std::cout << "num_merge_sms_pass: " << num_merge_sms_pass << std::endl;
+    // std::cout << "num_merge_sms_pass: " << num_merge_sms_pass << std::endl;
+
+    for (int pass = 0; pass < num_merge_sms_pass; pass++) {
+      int curr_process_idx_rank = world.rank() + pass * world.size();
+      int curr_process_idx;
+      if (curr_process_idx_rank < SM_traces_ptr_size) 
+        curr_process_idx = SM_traces_sm_id[curr_process_idx_rank];
+      else
+        continue;
+      
+      if (PRINT_LOG) std::cout << "rank-" << std::dec << world.rank() << ", " << "pass-" << pass << ", ";
+      if (PRINT_LOG) std::cout << "curr_process_idx: " << curr_process_idx << std::endl;
+
+      /* merge SM_traces_all_passes[i=1...passnum_concurrent_issue_to_sm][curr_process_idx] to
+       * SM_traces_all_passes_merged. */
+      for (int i = 0; i < passnum_concurrent_issue_to_sm; i++) {
+        // int curr_process_sm_id = getIthKey(&SM_traces_all_passes[i], curr_process_idx);
+        if (SM_traces_all_passes[i].find(curr_process_idx) != SM_traces_all_passes[i].end())
+          if (SM_traces_all_passes[i][curr_process_idx].size() > 0) {
+            SM_traces_all_passes_merged[curr_process_idx].insert(SM_traces_all_passes_merged[curr_process_idx].end(), 
+                                                                 SM_traces_all_passes[i][curr_process_idx].begin(), 
+                                                                 SM_traces_all_passes[i][curr_process_idx].end());
+          }
+      }
+    }
+
+    // for (int i = 0; i < passnum_concurrent_issue_to_sm; i++) {
+    //   for (auto iter : SM_traces_all_passes[i]) {
+    //     std::cout << "@@@ sm_id-" << iter.first << " size" << iter.second.size() << std::endl;
+    //   }
+    // }
+
+    for (auto x : SM_traces_all_passes_merged) {
+      // std::cout << "### rankkk-" << world.rank() << " sm_id-" << x.first << " size" << x.second.size() << std::endl;
+      std::vector<mem_instn> mem_instns = x.second;
+      for (auto mem_ins : mem_instns) {
+        // std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
+        // std::cout << std::hex << mem_ins.time_stamp << " ";
+        // std::cout << std::hex << mem_ins.addr[0] << std::endl;
+      }
+    }
+    
+    if (sort) {
+      for (int pass = 0; pass < num_merge_sms_pass; pass++) {
+        int curr_process_idx_rank = world.rank() + pass * world.size();
+        int curr_process_idx;
+        if (curr_process_idx_rank < SM_traces_ptr_size) {
+          curr_process_idx = SM_traces_sm_id[curr_process_idx_rank];
+          if (world.rank() == 0) std::cout << world.rank() << " " << curr_process_idx << std::endl;
+          if (world.rank() == 1) std::cout << world.rank() << " " << curr_process_idx << std::endl;
+          if (world.rank() == 2) std::cout << world.rank() << " " << curr_process_idx << std::endl;
+        } else continue;
+
+        // std::cout << "### rank-" << std::dec << world.rank() << " curr_process_idx: " << curr_process_idx << std::endl;
+        if (curr_process_idx == 18) 
+          std::cout << (SM_traces_all_passes_merged.find(curr_process_idx) != SM_traces_all_passes_merged.end()) 
+                    << /*" " << SM_traces_all_passes_merged[curr_process_idx].size() <<*/ std::endl;
+        if (SM_traces_all_passes_merged.find(curr_process_idx) != SM_traces_all_passes_merged.end())
+          if (SM_traces_all_passes_merged[curr_process_idx].size() > 0)
+              std::sort(SM_traces_all_passes_merged[curr_process_idx].begin(), SM_traces_all_passes_merged[curr_process_idx].end(), compare_stamp);
+      }
+    }
+  }
+
+
+
 #else
   /* Print the SM_traces of every MPI rank. &SM_traces_all_passes[0] is the first pass. */
   for(int i = 0 ; i < passnum_concurrent_issue_to_sm; i++) {
-    private_L1_cache_hit_rate_evaluate(argc, argv, &SM_traces_all_passes[i], i);
+    //private_L1_cache_hit_rate_evaluate(argc, argv, &SM_traces_all_passes[i], i);
   }
 #endif
 
+#ifdef USE_BOOST
+  // std::cout << "END: " << world.rank() << std::endl;
   world.barrier();
+#endif
 
   fflush(stdout);
-
+  
   return 0;
 }
