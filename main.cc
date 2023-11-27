@@ -105,40 +105,43 @@ int getIthKey(std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int i) {
 }
 
 #ifdef USE_BOOST
-void private_L1_cache_hit_rate_evaluate_boost1(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int pass_issue) {
+void private_L1_cache_hit_rate_evaluate_boost(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_all_passes_merged, 
+                                              int SM_traces_ptr_size, std::vector<int>* SM_traces_sm_id, int _tmp_print_) {
   boost::mpi::environment env(argc, argv);
   boost::mpi::communicator world;
 
-  const int SM_traces_ptr_size = (int)(*SM_traces_ptr).size();
-  /* Every rank process one *(SM_traces_ptr)[i], it will have pass_num passes to complete, 
-   * which also means that every rank should process at most pass_num traces. */
+  // Every rank process one *(SM_traces_all_passes_merged)[i], it will have pass_num passes to complete, 
+  // which also means that every rank should process at most pass_num traces. 
   const int pass_num = int((SM_traces_ptr_size + world.size() - 1)/world.size());
   // std::cout << "SM_traces_ptr_size: " << SM_traces_ptr_size << std::endl;
-
-  HKEY input;
-  long tim = 0;
-  program_data_t pdt_c = parda_init();
 
   unsigned l1_cache_line_size = 32; // BUG: need configure
 
   for (int pass = 0; pass < pass_num; pass++) {
-    int curr_process_idx = world.rank() + pass * world.size();
+    int curr_process_idx_rank = world.rank() + pass * world.size();
+    int curr_process_idx;
+    if (curr_process_idx_rank < SM_traces_ptr_size) {
+      curr_process_idx = (*SM_traces_sm_id)[curr_process_idx_rank];
+      if (_tmp_print_ == world.rank()) std::cout << "  L1-" << world.rank() << " " << curr_process_idx << std::endl;
+    } else continue;
 
-    int curr_process_sm_id = getIthKey(SM_traces_ptr, curr_process_idx);
+    if (_tmp_print_ == world.rank()) std::cout << "rank-" << std::dec << world.rank() << ", " << "pass-" << pass << ", ";
+    if (_tmp_print_ == world.rank()) std::cout << "curr_process_idx_rank: " << curr_process_idx_rank << std::endl;
+    if (_tmp_print_ == world.rank()) std::cout << "curr_process_sm_id: " << curr_process_idx << " " << (int)(*SM_traces_all_passes_merged).size() << std::endl;
+    if (curr_process_idx_rank < SM_traces_ptr_size) {
+      HKEY input;
+      long tim = 0;
+      program_data_t pdt_c = parda_init();
 
-    // std::cout << "rank-" << std::dec << world.rank() << ", " << "pass-" << pass << ", ";
-    // std::cout << "curr_process_idx: " << curr_process_idx << std::endl;
-    // std::cout << "curr_process_sm_id: " << curr_process_sm_id << " " << (int)(*SM_traces_ptr).size() << std::endl;
-    if (curr_process_idx < SM_traces_ptr_size) {
       // TODO: implement the private cache hit rate evaluate.
-      for (auto mem_ins : (*SM_traces_ptr)[curr_process_sm_id]) {
+      for (auto mem_ins : (*SM_traces_all_passes_merged)[curr_process_idx]) {
         if (world.rank() == 0) {
-          // std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_sm_id << " ";
+          // std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_idx << " ";
           // std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
           // std::cout << std::hex << mem_ins.time_stamp << " ";
           // std::cout << std::hex << mem_ins.addr[0] << std::endl;
         }
-        /* HKEY input should be char* of addr */
+        // HKEY input should be char* of addr
         for (unsigned j = 0; j < (mem_ins.addr).size(); j++) { // BUG: mask + merge
           sprintf(input, "0x%llx", mem_ins.addr[j] >> int(log2(l1_cache_line_size)));
           // std::cout << input << std::endl;
@@ -146,74 +149,16 @@ void private_L1_cache_hit_rate_evaluate_boost1(int argc, char **argv, std::map<i
           tim++;
         }
       }
+
+      program_data_t* pdt = &pdt_c;
+      pdt->histogram[B_INF] += narray_get_len(pdt->ga);
+      if (_tmp_print_ == world.rank()) parda_print_histogram(pdt->histogram);
+      parda_free(pdt);
     }
   }
-
-  program_data_t* pdt = &pdt_c;
-  pdt->histogram[B_INF] += narray_get_len(pdt->ga);
-  parda_print_histogram(pdt->histogram);
-  parda_free(pdt);
 }
-
-    void private_L1_cache_hit_rate_evaluate_boost(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_all_passes_merged, 
-                                                  int SM_traces_ptr_size, std::vector<int>* SM_traces_sm_id, int _tmp_print_) {
-      boost::mpi::environment env(argc, argv);
-      boost::mpi::communicator world;
-
-      // Every rank process one *(SM_traces_all_passes_merged)[i], it will have pass_num passes to complete, 
-      // which also means that every rank should process at most pass_num traces. 
-      const int pass_num = int((SM_traces_ptr_size + world.size() - 1)/world.size());
-      // std::cout << "SM_traces_ptr_size: " << SM_traces_ptr_size << std::endl;
-
-      
-
-      unsigned l1_cache_line_size = 32; // BUG: need configure
-
-      for (int pass = 0; pass < pass_num; pass++) {
-        int curr_process_idx_rank = world.rank() + pass * world.size();
-        int curr_process_idx;
-        if (curr_process_idx_rank < SM_traces_ptr_size) {
-          curr_process_idx = (*SM_traces_sm_id)[curr_process_idx_rank];
-          if (_tmp_print_ == world.rank()) std::cout << "  L1-" << world.rank() << " " << curr_process_idx << std::endl;
-        } else continue;
-
-        if (_tmp_print_ == world.rank()) std::cout << "rank-" << std::dec << world.rank() << ", " << "pass-" << pass << ", ";
-        if (_tmp_print_ == world.rank()) std::cout << "curr_process_idx_rank: " << curr_process_idx_rank << std::endl;
-        if (_tmp_print_ == world.rank()) std::cout << "curr_process_sm_id: " << curr_process_idx << " " << (int)(*SM_traces_all_passes_merged).size() << std::endl;
-        if (curr_process_idx_rank < SM_traces_ptr_size) {
-          HKEY input;
-          long tim = 0;
-          program_data_t pdt_c = parda_init();
-
-          // TODO: implement the private cache hit rate evaluate.
-          for (auto mem_ins : (*SM_traces_all_passes_merged)[curr_process_idx]) {
-            if (world.rank() == 0) {
-              // std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_idx << " ";
-              // std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
-              // std::cout << std::hex << mem_ins.time_stamp << " ";
-              // std::cout << std::hex << mem_ins.addr[0] << std::endl;
-            }
-            // HKEY input should be char* of addr
-            for (unsigned j = 0; j < (mem_ins.addr).size(); j++) { // BUG: mask + merge
-              sprintf(input, "0x%llx", mem_ins.addr[j] >> int(log2(l1_cache_line_size)));
-              // std::cout << input << std::endl;
-              process_one_access(input, &pdt_c, tim);
-              tim++;
-            }
-          }
-
-          program_data_t* pdt = &pdt_c;
-          pdt->histogram[B_INF] += narray_get_len(pdt->ga);
-          if (_tmp_print_ == world.rank()) parda_print_histogram(pdt->histogram);
-          parda_free(pdt);
-        }
-      }
-
-      
-    }
-
 #else
-void private_L1_cache_hit_rate_evaluate(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int pass_issue) {
+void private_L1_cache_hit_rate_evaluate(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int pass_issue) { // BUG， have not modified
   const int SM_traces_ptr_size = (int)(*SM_traces_ptr).size();
   /* Every rank process one *(SM_traces_ptr)[i], it will have pass_num passes to complete, 
    * which also means that every rank should process at most pass_num traces. */
