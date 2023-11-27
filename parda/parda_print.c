@@ -108,5 +108,5 @@ void parda_fprintf_histogram(const unsigned* histogram, FILE* file) {
   fprintf(file, "#OVFL \t%9u\t%0.8f\t%9llu\t%0.8lf\n", histogram[B_OVFL], histogram[B_OVFL]/(double)sum, cum, cum/(double)sum);
   cum += histogram[B_INF];
   fprintf(file, "#INF  \t%9u\t%0.8f\t%9llu\t%0.8lf\n", histogram[B_INF], histogram[B_INF]/(double)sum, cum, cum/(double)sum);
-  //fprintf(file, "#INF  \t%9u\n", histogram[B_INF]);
+  // fprintf(file, "#INF  \t%9u\n", histogram[B_INF]);
 }
