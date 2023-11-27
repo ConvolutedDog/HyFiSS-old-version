@@ -82,12 +82,12 @@ void simple_print_test(int argc, char **argv, std::map<int, std::vector<mem_inst
 
   for (int pass = 0; pass < pass_num; pass++) {
     int curr_process_idx = world.rank() + pass * world.size();
-    std::cout << "rank-" << std::dec << world.rank() << ", " << "pass-" << pass << ", ";
-    std::cout << "curr_process_idx: " << curr_process_idx << std::endl;
+    // std::cout << "rank-" << std::dec << world.rank() << ", " << "pass-" << pass << ", ";
+    // std::cout << "curr_process_idx: " << curr_process_idx << std::endl;
     if (curr_process_idx < SM_traces_ptr_size) {
       // TODO: implement the private cache hit rate evaluate.
       for (auto mem_ins : (*SM_traces_ptr)[curr_process_idx]) {
-        std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_idx << " ";
+        // std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_idx << " ";
         std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
         std::cout << std::hex << mem_ins.time_stamp << " ";
         std::cout << std::hex << mem_ins.addr[0] << std::endl;
@@ -106,7 +106,7 @@ int getIthKey(std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int i) {
 
 #ifdef USE_BOOST
 void private_L1_cache_hit_rate_evaluate_boost(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_all_passes_merged, 
-                                              int SM_traces_ptr_size, std::vector<int>* SM_traces_sm_id, int _tmp_print_) {
+                                              int SM_traces_ptr_size, std::vector<int>* SM_traces_sm_id, int _tmp_print_, std::string configs_dir) {
   boost::mpi::environment env(argc, argv);
   boost::mpi::communicator world;
 
@@ -117,17 +117,20 @@ void private_L1_cache_hit_rate_evaluate_boost(int argc, char **argv, std::map<in
 
   unsigned l1_cache_line_size = 32; // BUG: need configure
 
+  // for (auto x : *SM_traces_sm_id) std::cout << x << " ";
+  std::cout << std::endl;
+
   for (int pass = 0; pass < pass_num; pass++) {
     int curr_process_idx_rank = world.rank() + pass * world.size();
     int curr_process_idx;
     if (curr_process_idx_rank < SM_traces_ptr_size) {
       curr_process_idx = (*SM_traces_sm_id)[curr_process_idx_rank];
-      if (_tmp_print_ == world.rank()) std::cout << "  L1-" << world.rank() << " " << curr_process_idx << std::endl;
+      // if (_tmp_print_ == world.rank()) std::cout << "  L1-" << world.rank() << " " << curr_process_idx << std::endl;
     } else continue;
 
-    if (_tmp_print_ == world.rank()) std::cout << "rank-" << std::dec << world.rank() << ", " << "pass-" << pass << ", ";
-    if (_tmp_print_ == world.rank()) std::cout << "curr_process_idx_rank: " << curr_process_idx_rank << std::endl;
-    if (_tmp_print_ == world.rank()) std::cout << "curr_process_sm_id: " << curr_process_idx << " " << (int)(*SM_traces_all_passes_merged).size() << std::endl;
+    // if (_tmp_print_ == world.rank()) std::cout << "rank-" << std::dec << world.rank() << ", " << "pass-" << pass << ", ";
+    // if (_tmp_print_ == world.rank()) std::cout << "curr_process_idx_rank: " << curr_process_idx_rank << std::endl;
+    // if (_tmp_print_ == world.rank()) std::cout << "curr_process_sm_id: " << curr_process_idx << " " << (*SM_traces_all_passes_merged).size() << std::endl;
     if (curr_process_idx_rank < SM_traces_ptr_size) {
       HKEY input;
       long tim = 0;
@@ -152,7 +155,21 @@ void private_L1_cache_hit_rate_evaluate_boost(int argc, char **argv, std::map<in
 
       program_data_t* pdt = &pdt_c;
       pdt->histogram[B_INF] += narray_get_len(pdt->ga);
-      if (_tmp_print_ == world.rank()) parda_print_histogram(pdt->histogram);
+
+      std::string parda_histogram_filepath;
+      if (configs_dir.back() == '/') {
+        parda_histogram_filepath = configs_dir + "../SM_" + std::to_string(curr_process_idx) + ".histogram";
+      } else {
+        parda_histogram_filepath = configs_dir + "/" + "../SM_" + std::to_string(curr_process_idx) + ".histogram";
+      }
+      FILE* file = fopen(parda_histogram_filepath.c_str(), "w");
+      if (file != NULL) {
+        parda_fprintf_histogram(pdt->histogram, file);
+        fclose(file);
+      }
+
+      // parda_print_histogram(pdt->histogram);
+      
       parda_free(pdt);
     }
   }
@@ -245,7 +262,7 @@ int main(int argc, char **argv) {
                                          cc_config[SM70].max_concurrent_kernels_num);
     // std::cout << "get_kernels_num:" << tracer.get_appcfg()->get_kernels_num() << std::endl;
     // std::cout << "max_concurrent_kernels_num:" << cc_config[SM70].max_concurrent_kernels_num << std::endl;
-    std::cout << std::endl;
+    // std::cout << std::endl;
 #ifdef USE_BOOST
   } /* end rank = 0 */
 #endif
@@ -348,10 +365,12 @@ int main(int argc, char **argv) {
           /* Calculate the allocated SM index of current thread block i. */
           unsigned kernel_id = k->get_trace_info()->kernel_id - 1;
           int sm_id = issuecfg->get_sm_id_of_one_block(unsigned(kernel_id + 1), unsigned(i));
-          
-          // SM_traces[sm_id].insert(SM_traces[sm_id].end(), threadblock_traces[i].begin(), threadblock_traces[i].end()); // old
-          (*SM_traces)[sm_id].insert((*SM_traces)[sm_id].end(), threadblock_traces[i].begin(), threadblock_traces[i].end());
-          // std::cout << "sm_id-" << sm_id << " " << threadblock_traces[i].size() << std::endl;
+          // std::cout << "        kernel_id: " << kernel_id << " | block_id: " << i << " | sm_id: " << sm_id << std::endl;
+          if (sm_id != -1) {
+            // SM_traces[sm_id].insert(SM_traces[sm_id].end(), threadblock_traces[i].begin(), threadblock_traces[i].end()); // old
+            (*SM_traces)[sm_id].insert((*SM_traces)[sm_id].end(), threadblock_traces[i].begin(), threadblock_traces[i].end());
+            // std::cout << "sm_id-" << sm_id << " " << threadblock_traces[i].size() << std::endl;
+          }
         }
 
         /* Next we will interleave the threadblock_traces[...] to the whole traces belong to kernel_id. */
@@ -383,9 +402,10 @@ int main(int argc, char **argv) {
       //   }
       // }
 
-      // for (auto k : single_pass_kernels_info) {
-      //   delete k;
-      // }
+      for (auto k : single_pass_kernels_info) {
+        delete k;
+      }
+      single_pass_kernels_info.clear();
       // single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? std::min(tracer.get_appcfg()->get_kernels_num(), 
       //                                                                        cc_config[SM70].max_concurrent_kernels_num) : 1);
     }
@@ -393,6 +413,7 @@ int main(int argc, char **argv) {
     
     for (int _pass = 0; _pass < passnum_concurrent_issue_to_sm; _pass++) {
       for (auto _sm_id_map : SM_traces_all_passes[_pass]) {
+        // std::cout << "@@@" << _sm_id_map.first << std::endl;
         if (std::find(SM_traces_sm_id.begin(), SM_traces_sm_id.end(), _sm_id_map.first) == SM_traces_sm_id.end()) {
           SM_traces_sm_id.push_back(_sm_id_map.first);
         }
@@ -400,7 +421,7 @@ int main(int argc, char **argv) {
     }
 
     // for (auto x : SM_traces_sm_id) std::cout << x << " ";
-    std::cout << std::endl;
+    // std::cout << std::endl;
 
     SM_traces_ptr_size = SM_traces_sm_id.size();
     
@@ -520,9 +541,6 @@ int main(int argc, char **argv) {
         } else continue;
 
         // std::cout << "### rank-" << std::dec << world.rank() << " curr_process_idx: " << curr_process_idx << std::endl;
-        if (curr_process_idx == 18) 
-          std::cout << (SM_traces_all_passes_merged.find(curr_process_idx) != SM_traces_all_passes_merged.end()) 
-                    << /*" " << SM_traces_all_passes_merged[curr_process_idx].size() <<*/ std::endl;
         if (SM_traces_all_passes_merged.find(curr_process_idx) != SM_traces_all_passes_merged.end())
           if (SM_traces_all_passes_merged[curr_process_idx].size() > 0)
               std::sort(SM_traces_all_passes_merged[curr_process_idx].begin(), SM_traces_all_passes_merged[curr_process_idx].end(), compare_stamp);
@@ -530,7 +548,7 @@ int main(int argc, char **argv) {
     }
 
     /* Process L1 Cache Hit rate. */
-    private_L1_cache_hit_rate_evaluate_boost(argc, argv, &SM_traces_all_passes_merged, SM_traces_ptr_size, &SM_traces_sm_id, _tmp_print_);
+    private_L1_cache_hit_rate_evaluate_boost(argc, argv, &SM_traces_all_passes_merged, SM_traces_ptr_size, &SM_traces_sm_id, _tmp_print_, configs.c_str());
   } else {
     /* In this case, passnum_concurrent_issue_to_sm == 1 */
     /* We have merged SM_traces_all_passes[i=1...passnum_concurrent_issue_to_sm][curr_process_idx] to
