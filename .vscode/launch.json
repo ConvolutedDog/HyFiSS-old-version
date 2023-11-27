@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/memory_model.x",
-            "args": ["--configs", "./traces/vectoradd-2/configs/", "--sort", "1", "--log", "0", ">", "tmp.txt"],
+            "args": ["--configs", "./traces/vectoradd-2/configs/", "--sort", "0", "--log", "0", ">", "tmp.txt"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
