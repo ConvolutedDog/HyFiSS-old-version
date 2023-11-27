@@ -577,7 +577,7 @@ class trace_kernel_info_t : public kernel_info_t{
                       trace_parser *parser, 
                     //   class trace_config *config,
                       kernel_trace_t *kernel_trace_info);
-
+  ~trace_kernel_info_t(){ delete m_kernel_trace_info; };
   std::vector<std::vector<inst_trace_t> *> get_next_threadblock_traces(std::string kernel_name,
                                                                        unsigned kernel_id,
                                                                        unsigned num_warps_per_thread_block);
