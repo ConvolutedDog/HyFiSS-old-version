@@ -2,7 +2,9 @@
 USE_BOOST = 1
 MPI_HOME = /usr/local/mpich-3.3.2
 BOOST_HOME = /usr/local/boost
-DEBUG = 1
+DEBUG = 0
+
+USE_OPTION_PARSER = 0
 
 MPICXX = $(MPI_HOME)/bin/mpic++
 MPIRUN = $(MPI_HOME)/bin/mpirun
@@ -50,7 +52,11 @@ $(shell mkdir $(OBJ_PATH))
 endif
 
 OBJS = $(OBJ_PATH)/splay.o $(OBJ_PATH)/process_args.o $(OBJ_PATH)/parda_print.o $(OBJ_PATH)/narray.o $(OBJ_PATH)/parda.o
-OBJS += $(OBJ_PATH)/common_def.o $(OBJ_PATH)/option_parser.o $(OBJ_PATH)/trace-parser.o $(OBJ_PATH)/trace-driven.o $(OBJ_PATH)/main.o
+OBJS += $(OBJ_PATH)/common_def.o $(OBJ_PATH)/trace-parser.o $(OBJ_PATH)/trace-driven.o $(OBJ_PATH)/main.o
+
+ifeq ($(USE_OPTION_PARSER),1)
+OBJS += $(OBJ_PATH)/option_parser.o
+endif
 
 default: $(TARGET)
 
