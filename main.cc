@@ -272,7 +272,7 @@ int main(int argc, char **argv) {
   std::vector<std::map<int, std::vector<mem_instn>>> SM_traces_all_passes;
   
   /*  */
-  std::vector<std::vector<block_info_t>> trace_issued_sm_id_blocks;
+  // std::vector<std::vector<block_info_t>> trace_issued_sm_id_blocks;
 
   std::vector<int> SM_traces_sm_id;
   int SM_traces_ptr_size;
@@ -280,7 +280,7 @@ int main(int argc, char **argv) {
 #ifdef USE_BOOST
   if (world.rank() == 0) {
 #endif
-    trace_issued_sm_id_blocks = *(tracer.get_issuecfg()->get_trace_issued_sm_id_blocks());
+    // trace_issued_sm_id_blocks = *(tracer.get_issuecfg()->get_trace_issued_sm_id_blocks());
 
     SM_traces_all_passes.resize(passnum_concurrent_issue_to_sm);
 
@@ -431,7 +431,7 @@ int main(int argc, char **argv) {
     /* Also we need to broadcast the variable passnum_concurrent_issue_to_sm. */
     if (world.size() > 0) boost::mpi::broadcast(world, passnum_concurrent_issue_to_sm, 0);
     /* Also we need to broadcast the variable trace_parser for all rank > 0. */
-    if (world.size() > 0) boost::mpi::broadcast(world, trace_issued_sm_id_blocks, 0);
+    // if (world.size() > 0) boost::mpi::broadcast(world, trace_issued_sm_id_blocks, 0);
     if (world.size() > 0) boost::mpi::broadcast(world, SM_traces_sm_id, 0);
     if (world.size() > 0) boost::mpi::broadcast(world, SM_traces_ptr_size, 0);
 #endif
@@ -446,7 +446,7 @@ int main(int argc, char **argv) {
   /* Also we need to recieve the variable passnum_concurrent_issue_to_sm for all rank > 0. */
   if (world.rank() != 0) boost::mpi::broadcast(world, passnum_concurrent_issue_to_sm, 0);
   /* Also we need to recieve the variable trace_parser for all rank > 0. */
-  if (world.rank() != 0) boost::mpi::broadcast(world, trace_issued_sm_id_blocks, 0);
+  // if (world.rank() != 0) boost::mpi::broadcast(world, trace_issued_sm_id_blocks, 0);
   if (world.rank() != 0) boost::mpi::broadcast(world, SM_traces_sm_id, 0);
   if (world.rank() != 0) boost::mpi::broadcast(world, SM_traces_ptr_size, 0);
 #endif
