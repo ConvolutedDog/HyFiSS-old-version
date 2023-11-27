@@ -105,7 +105,7 @@ int getIthKey(std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int i) {
 }
 
 #ifdef USE_BOOST
-void private_L1_cache_hit_rate_evaluate_boost(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int pass_issue) {
+void private_L1_cache_hit_rate_evaluate_boost1(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int pass_issue) {
   boost::mpi::environment env(argc, argv);
   boost::mpi::communicator world;
 
@@ -140,7 +140,7 @@ void private_L1_cache_hit_rate_evaluate_boost(int argc, char **argv, std::map<in
         }
         /* HKEY input should be char* of addr */
         for (unsigned j = 0; j < (mem_ins.addr).size(); j++) { // BUG: mask + merge
-          sprintf(input, "0x%llx", mem_ins.addr[j] /*>> int(log2(l1_cache_line_size))*/);
+          sprintf(input, "0x%llx", mem_ins.addr[j] >> int(log2(l1_cache_line_size)));
           // std::cout << input << std::endl;
           process_one_access(input, &pdt_c, tim);
           tim++;
@@ -154,6 +154,64 @@ void private_L1_cache_hit_rate_evaluate_boost(int argc, char **argv, std::map<in
   parda_print_histogram(pdt->histogram);
   parda_free(pdt);
 }
+
+    void private_L1_cache_hit_rate_evaluate_boost(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_all_passes_merged, 
+                                                  int SM_traces_ptr_size, std::vector<int>* SM_traces_sm_id, int _tmp_print_) {
+      boost::mpi::environment env(argc, argv);
+      boost::mpi::communicator world;
+
+      // Every rank process one *(SM_traces_all_passes_merged)[i], it will have pass_num passes to complete, 
+      // which also means that every rank should process at most pass_num traces. 
+      const int pass_num = int((SM_traces_ptr_size + world.size() - 1)/world.size());
+      // std::cout << "SM_traces_ptr_size: " << SM_traces_ptr_size << std::endl;
+
+      
+
+      unsigned l1_cache_line_size = 32; // BUG: need configure
+
+      for (int pass = 0; pass < pass_num; pass++) {
+        int curr_process_idx_rank = world.rank() + pass * world.size();
+        int curr_process_idx;
+        if (curr_process_idx_rank < SM_traces_ptr_size) {
+          curr_process_idx = (*SM_traces_sm_id)[curr_process_idx_rank];
+          if (_tmp_print_ == world.rank()) std::cout << "  L1-" << world.rank() << " " << curr_process_idx << std::endl;
+        } else continue;
+
+        if (_tmp_print_ == world.rank()) std::cout << "rank-" << std::dec << world.rank() << ", " << "pass-" << pass << ", ";
+        if (_tmp_print_ == world.rank()) std::cout << "curr_process_idx_rank: " << curr_process_idx_rank << std::endl;
+        if (_tmp_print_ == world.rank()) std::cout << "curr_process_sm_id: " << curr_process_idx << " " << (int)(*SM_traces_all_passes_merged).size() << std::endl;
+        if (curr_process_idx_rank < SM_traces_ptr_size) {
+          HKEY input;
+          long tim = 0;
+          program_data_t pdt_c = parda_init();
+
+          // TODO: implement the private cache hit rate evaluate.
+          for (auto mem_ins : (*SM_traces_all_passes_merged)[curr_process_idx]) {
+            if (world.rank() == 0) {
+              // std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_idx << " ";
+              // std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
+              // std::cout << std::hex << mem_ins.time_stamp << " ";
+              // std::cout << std::hex << mem_ins.addr[0] << std::endl;
+            }
+            // HKEY input should be char* of addr
+            for (unsigned j = 0; j < (mem_ins.addr).size(); j++) { // BUG: mask + merge
+              sprintf(input, "0x%llx", mem_ins.addr[j] >> int(log2(l1_cache_line_size)));
+              // std::cout << input << std::endl;
+              process_one_access(input, &pdt_c, tim);
+              tim++;
+            }
+          }
+
+          program_data_t* pdt = &pdt_c;
+          pdt->histogram[B_INF] += narray_get_len(pdt->ga);
+          if (_tmp_print_ == world.rank()) parda_print_histogram(pdt->histogram);
+          parda_free(pdt);
+        }
+      }
+
+      
+    }
+
 #else
 void private_L1_cache_hit_rate_evaluate(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int pass_issue) {
   const int SM_traces_ptr_size = (int)(*SM_traces_ptr).size();
@@ -208,9 +266,9 @@ int main(int argc, char **argv) {
                                  "timestamps");
   app.add_option("--log", PRINT_LOG, "Print the traces processing log or not");
 
-  int _tmp_;
+  int _tmp_print_;
 
-  app.add_option("--tmp", _tmp_, "tmp");
+  app.add_option("--tmp", _tmp_print_, "tmp");
 
   CLI11_PARSE(app, argc, argv);
 
@@ -461,6 +519,8 @@ int main(int argc, char **argv) {
       int curr_process_idx_rank = world.rank() + pass * world.size();
       int curr_process_idx;
       if (curr_process_idx_rank < SM_traces_ptr_size) 
+        /* curr_process_idx is the SM index that world.rank() should process. SM_traces_sm_id stores
+         * all the SM indexes that have been issued by the trace parser. */
         curr_process_idx = SM_traces_sm_id[curr_process_idx_rank];
       else
         continue;
@@ -487,17 +547,22 @@ int main(int argc, char **argv) {
     //   }
     // }
 
-    if (world.rank() == _tmp_)
-    for (auto x : SM_traces_all_passes_merged) {
-      std::cout << "### rankkk-" << world.rank() << " sm_id-" << x.first << " size" << x.second.size() << std::endl;
-      std::vector<mem_instn> mem_instns = x.second;
-      for (auto mem_ins : mem_instns) {
-        std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
-        std::cout << std::hex << mem_ins.time_stamp << " ";
-        std::cout << std::hex << mem_ins.addr[0] << std::endl;
+    if (world.rank() == _tmp_print_) {
+      for (auto x : SM_traces_all_passes_merged) {
+        // std::cout << "### rankkk-" << world.rank() << " sm_id-" << x.first << " size" << x.second.size() << std::endl;
+        std::vector<mem_instn> mem_instns = x.second;
+        for (auto mem_ins : mem_instns) {
+          // std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
+          // std::cout << std::hex << mem_ins.time_stamp << " ";
+          // std::cout << std::hex << mem_ins.addr[0] << std::endl;
+        }
       }
     }
     
+    /* We have merged SM_traces_all_passes[i=1...passnum_concurrent_issue_to_sm][curr_process_idx] to
+     * SM_traces_all_passes_merged, now SM_traces_all_passes_merged[curr_process_idx] stores all the
+     * memory addrs from SM-curr_process_idx. We should sort the addrs by the time_stamp to simulator 
+     * the order they are issued to L1 Cache. */
     if (sort) {
       for (int pass = 0; pass < num_merge_sms_pass; pass++) {
         int curr_process_idx_rank = world.rank() + pass * world.size();
@@ -518,9 +583,37 @@ int main(int argc, char **argv) {
               std::sort(SM_traces_all_passes_merged[curr_process_idx].begin(), SM_traces_all_passes_merged[curr_process_idx].end(), compare_stamp);
       }
     }
+
+    /* Process L1 Cache Hit rate. */
+    private_L1_cache_hit_rate_evaluate_boost(argc, argv, &SM_traces_all_passes_merged, SM_traces_ptr_size, &SM_traces_sm_id, _tmp_print_);
+  } else {
+    /* In this case, passnum_concurrent_issue_to_sm == 1 */
+    /* We have merged SM_traces_all_passes[i=1...passnum_concurrent_issue_to_sm][curr_process_idx] to
+     * SM_traces_all_passes_merged, now SM_traces_all_passes_merged[curr_process_idx] stores all the
+     * memory addrs from SM-curr_process_idx. We should sort the addrs by the time_stamp to simulator 
+     * the order they are issued to L1 Cache. */
+    if (sort) {
+      int num_merge_sms_pass = int((SM_traces_ptr_size + world.size() - 1) / world.size());
+      for (int pass = 0; pass < num_merge_sms_pass; pass++) {
+        int curr_process_idx_rank = world.rank() + pass * world.size();
+        int curr_process_idx;
+        if (curr_process_idx_rank < SM_traces_ptr_size) 
+          /* curr_process_idx is the SM index that world.rank() should process. SM_traces_sm_id stores
+           * all the SM indexes that have been issued by the trace parser. */
+          curr_process_idx = SM_traces_sm_id[curr_process_idx_rank];
+        else
+          continue;
+        
+        if (PRINT_LOG) std::cout << "rank-" << std::dec << world.rank() << ", " << "pass-" << pass << ", ";
+        if (PRINT_LOG) std::cout << "curr_process_idx: " << curr_process_idx << std::endl;
+
+        
+        if (SM_traces_all_passes[0].find(curr_process_idx) != SM_traces_all_passes[0].end())
+          if (SM_traces_all_passes[0][curr_process_idx].size() > 0)
+              std::sort(SM_traces_all_passes[0][curr_process_idx].begin(), SM_traces_all_passes[0][curr_process_idx].end(), compare_stamp);
+      }
+    }
   }
-
-
 
 #else
   /* Print the SM_traces of every MPI rank. &SM_traces_all_passes[0] is the first pass. */
