@@ -293,15 +293,14 @@ kernel_trace_t::kernel_trace_t() {
 
 void app_config::init(std::string config_path, bool PRINT_LOG) {
     // named app config options (unordered)
-    option_parser_t app_config_opp = option_parser_create();
+    // option_parser_t app_config_opp = option_parser_create();
     
-    option_parser_register(
-      app_config_opp, "-app_kernels_id", OPT_CSTR, &app_kernels_id_string,
-      "kernels ID list (default=1)", "1");
+    // option_parser_register(
+    //   app_config_opp, "-app_kernels_id", OPT_CSTR, &app_kernels_id_string,
+    //   "kernels ID list (default=1)", "1");
     
     std::stringstream ss;
 
-    /****************************************************************/
     // read the "-app_kernels_id" config in the app config file
     // and register the kernel config options
     std::ifstream inputFile;
@@ -313,6 +312,7 @@ void app_config::init(std::string config_path, bool PRINT_LOG) {
     }
 
     std::string target = "-app_kernels_id";
+    
     std::string line;
     size_t commentStart;
     size_t found;
@@ -327,11 +327,11 @@ void app_config::init(std::string config_path, bool PRINT_LOG) {
         result = line.substr(found + target.length());
         comma_count = std::count(result.begin(), result.end(), ',');
         kernels_num = comma_count + 1;
+        // std::cout << ">>>" << result << "<<<" << std::endl;
+        app_kernels_id_string = line.substr(found + target.length() + 1);
       }
     }
     inputFile.close();
-
-    /****************************************************************/
 
     kernel_name.resize(kernels_num);
     kernel_num_registers.resize(kernels_num);
@@ -349,95 +349,222 @@ void app_config::init(std::string config_path, bool PRINT_LOG) {
     kernel_shmem_base_addr.resize(kernels_num);
     kernel_local_base_addr.resize(kernels_num);
     
+    /*************************************************************/
+    inputFile.open(config_path);
     for (int j = 0; j < kernels_num; ++j) {
-      ss.str("");
-      ss << "-kernel_" << j + 1 << "_kernel_name";
-      option_parser_register(app_config_opp, ss.str().c_str(), OPT_CSTR,
-                             &kernel_name[j],
-                             "kernel name",
-                             "None");
-      ss.str("");
-      ss << "-kernel_" << j + 1 << "_num_registers";
-      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-                             &kernel_num_registers[j],
-                             "number of registers used by kernel",
-                             "0");
-      ss.str("");
-      ss << "-kernel_" << j + 1 << "_shared_mem_bytes";
-      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-                             &kernel_shared_mem_bytes[j],
-                             "number of bytes of shared memory used by kernel",
-                             "0");
-      ss.str("");
-      ss << "-kernel_" << j + 1 << "_grid_size";
-      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-                             &kernel_grid_size[j],
-                             "grid size of kernel",
-                             "0");
-      ss.str("");
-      ss << "-kernel_" << j + 1 << "_block_size";
-      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-                             &kernel_block_size[j],
-                             "block size of kernel",
-                             "0");
-      ss.str("");
-      ss << "-kernel_" << j + 1 << "_cuda_stream_id";
-      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-                             &kernel_cuda_stream_id[j],
-                             "cuda stream id of kernel",
-                             "0");
-      ss.str("");
-      ss << "-kernel_" << j + 1 << "_grid_dim_x";
-      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-                             &kernel_grid_dim_x[j],
-                             "grid dim x of kernel",
-                             "0");
-      ss.str("");
-      ss << "-kernel_" << j + 1 << "_grid_dim_y";
-      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-                             &kernel_grid_dim_y[j],
-                             "grid dim y of kernel",
-                             "0");
-      ss.str("");
-      ss << "-kernel_" << j + 1 << "_grid_dim_z";
-      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-                             &kernel_grid_dim_z[j],
-                             "grid dim z of kernel",
-                             "0");
-      ss.str("");
-      ss << "-kernel_" << j + 1 << "_tb_dim_x";
-      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-                             &kernel_tb_dim_x[j],
-                             "tb dim x of kernel",
-                             "0");
-      ss.str("");
-      ss << "-kernel_" << j + 1 << "_tb_dim_y";
-      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-                             &kernel_tb_dim_y[j],
-                             "tb dim y of kernel",
-                             "0");
-      ss.str("");
-      ss << "-kernel_" << j + 1 << "_tb_dim_z";
-      option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-                             &kernel_tb_dim_z[j],
-                             "tb dim z of kernel",
-                             "0");
-      ss.str("");
-      ss << "-kernel_" << j + 1 << "_shmem_base_addr";
-      option_parser_register(app_config_opp, ss.str().c_str(), OPT_UINT64,
-                             &kernel_shmem_base_addr[j],
-                             "shmem base addr of kernel",
-                             "0");
-      ss.str("");
-      ss << "-kernel_" << j + 1 << "_local_base_addr";
-      option_parser_register(app_config_opp, ss.str().c_str(), OPT_UINT64,
-                             &kernel_local_base_addr[j],
-                             "local base addr of kernel",
-                             "0");
-      ss.str("");
-    }
+      while (inputFile.good()) {
+        getline(inputFile, line);
+        commentStart = line.find_first_of("#");
+        if (commentStart != line.npos) continue;
 
-    option_parser_cfgfile(app_config_opp, config_path.c_str());
+        std::stringstream ss;
+
+        ss.str("");
+        ss << "-kernel_" << j + 1 << "_kernel_name";
+        found = line.find(ss.str());
+        if (found != std::string::npos) {
+          kernel_name[j] = line.substr(found + ss.str().length());
+          // std::cout << "kernel_name[" << j << "]: " << kernel_name[j] << std::endl;
+        }
+
+        ss.str("");
+        ss << "-kernel_" << j + 1 << "_num_registers";
+        found = line.find(ss.str());
+        if (found != std::string::npos) {
+          kernel_num_registers[j] = std::stoi(line.substr(found + ss.str().length()));
+          // std::cout << "kernel_num_registers[" << j << "]: " << kernel_num_registers[j] << std::endl;
+        }
+
+        ss.str("");
+        ss << "-kernel_" << j + 1 << "_shared_mem_bytes";
+        found = line.find(ss.str());
+        if (found != std::string::npos) {
+          kernel_shared_mem_bytes[j] = std::stoi(line.substr(found + ss.str().length()));
+          // std::cout << "kernel_shared_mem_bytes[" << j << "]: " << kernel_shared_mem_bytes[j] << std::endl;
+        }
+
+        ss.str("");
+        ss << "-kernel_" << j + 1 << "_grid_size";
+        found = line.find(ss.str());
+        if (found != std::string::npos) {
+          kernel_grid_size[j] = std::stoi(line.substr(found + ss.str().length()));
+          // std::cout << "kernel_grid_size[" << j << "]: " << kernel_grid_size[j] << std::endl;
+        }
+
+        ss.str("");
+        ss << "-kernel_" << j + 1 << "_block_size";
+        found = line.find(ss.str());
+        if (found != std::string::npos) {
+          kernel_block_size[j] = std::stoi(line.substr(found + ss.str().length()));
+          // std::cout << "kernel_block_size[" << j << "]: " << kernel_block_size[j] << std::endl;
+        }
+
+        ss.str("");
+        ss << "-kernel_" << j + 1 << "_cuda_stream_id";
+        found = line.find(ss.str());
+        if (found != std::string::npos) {
+          kernel_cuda_stream_id[j] = std::stoi(line.substr(found + ss.str().length()));
+          // std::cout << "kernel_cuda_stream_id[" << j << "]: " << kernel_cuda_stream_id[j] << std::endl;
+        }
+
+        ss.str("");
+        ss << "-kernel_" << j + 1 << "_grid_dim_x";
+        found = line.find(ss.str());
+        if (found != std::string::npos) {
+          kernel_grid_dim_x[j] = std::stoi(line.substr(found + ss.str().length()));
+          // std::cout << "kernel_grid_dim_x[" << j << "]: " << kernel_grid_dim_x[j] << std::endl;
+        }
+
+        ss.str("");
+        ss << "-kernel_" << j + 1 << "_grid_dim_y";
+        found = line.find(ss.str());
+        if (found != std::string::npos) {
+          kernel_grid_dim_y[j] = std::stoi(line.substr(found + ss.str().length()));
+          // std::cout << "kernel_grid_dim_y[" << j << "]: " << kernel_grid_dim_y[j] << std::endl;
+        }
+
+        ss.str("");
+        ss << "-kernel_" << j + 1 << "_grid_dim_z";
+        found = line.find(ss.str());
+        if (found != std::string::npos) {
+          kernel_grid_dim_z[j] = std::stoi(line.substr(found + ss.str().length()));
+          // std::cout << "kernel_grid_dim_z[" << j << "]: " << kernel_grid_dim_z[j] << std::endl;
+        }
+
+        ss.str("");
+        ss << "-kernel_" << j + 1 << "_tb_dim_x";
+        found = line.find(ss.str());
+        if (found != std::string::npos) {
+          kernel_tb_dim_x[j] = std::stoi(line.substr(found + ss.str().length()));
+          // std::cout << "kernel_tb_dim_x[" << j << "]: " << kernel_tb_dim_x[j] << std::endl;
+        }
+
+        ss.str("");
+        ss << "-kernel_" << j + 1 << "_tb_dim_y";
+        found = line.find(ss.str());
+        if (found != std::string::npos) {
+          kernel_tb_dim_y[j] = std::stoi(line.substr(found + ss.str().length()));
+          // std::cout << "kernel_tb_dim_y[" << j << "]: " << kernel_tb_dim_y[j] << std::endl;
+        }
+
+        ss.str("");
+        ss << "-kernel_" << j + 1 << "_tb_dim_z";
+        found = line.find(ss.str());
+        if (found != std::string::npos) {
+          kernel_tb_dim_z[j] = std::stoi(line.substr(found + ss.str().length()));
+          // std::cout << "kernel_tb_dim_z[" << j << "]: " << kernel_tb_dim_z[j] << std::endl;
+        }
+
+        ss.str("");
+        ss << "-kernel_" << j + 1 << "_shmem_base_addr";
+        found = line.find(ss.str());
+        if (found != std::string::npos) {
+          kernel_shmem_base_addr[j] = std::stoull(line.substr(found + ss.str().length()), 0, 16);
+          // std::cout << "kernel_shmem_base_addr[" << j << "]: " << std::hex << kernel_shmem_base_addr[j] << std::dec << std::endl;
+        }
+
+        ss.str("");
+        ss << "-kernel_" << j + 1 << "_local_base_addr";
+        found = line.find(ss.str());
+        if (found != std::string::npos) {
+          kernel_local_base_addr[j] = std::stoull(line.substr(found + ss.str().length()), 0, 16);
+          // std::cout << "kernel_local_base_addr[" << j << "]: " << std::hex << kernel_local_base_addr[j] << std::dec << std::endl;
+        }
+      }
+      inputFile.clear();
+      inputFile.seekg(0, std::ios::beg);
+    }
+    /*************************************************************/
+
+    // for (int j = 0; j < kernels_num; ++j) {
+    //   ss.str("");
+    //   ss << "-kernel_" << j + 1 << "_kernel_name";
+    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_CSTR,
+    //                          &kernel_name[j],
+    //                          "kernel name",
+    //                          "None");
+    //   ss.str("");
+    //   ss << "-kernel_" << j + 1 << "_num_registers";
+    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+    //                          &kernel_num_registers[j],
+    //                          "number of registers used by kernel",
+    //                          "0");
+    //   ss.str("");
+    //   ss << "-kernel_" << j + 1 << "_shared_mem_bytes";
+    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+    //                          &kernel_shared_mem_bytes[j],
+    //                          "number of bytes of shared memory used by kernel",
+    //                          "0");
+    //   ss.str("");
+    //   ss << "-kernel_" << j + 1 << "_grid_size";
+    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+    //                          &kernel_grid_size[j],
+    //                          "grid size of kernel",
+    //                          "0");
+    //   ss.str("");
+    //   ss << "-kernel_" << j + 1 << "_block_size";
+    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+    //                          &kernel_block_size[j],
+    //                          "block size of kernel",
+    //                          "0");
+    //   ss.str("");
+    //   ss << "-kernel_" << j + 1 << "_cuda_stream_id";
+    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+    //                          &kernel_cuda_stream_id[j],
+    //                          "cuda stream id of kernel",
+    //                          "0");
+    //   ss.str("");
+    //   ss << "-kernel_" << j + 1 << "_grid_dim_x";
+    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+    //                          &kernel_grid_dim_x[j],
+    //                          "grid dim x of kernel",
+    //                          "0");
+    //   ss.str("");
+    //   ss << "-kernel_" << j + 1 << "_grid_dim_y";
+    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+    //                          &kernel_grid_dim_y[j],
+    //                          "grid dim y of kernel",
+    //                          "0");
+    //   ss.str("");
+    //   ss << "-kernel_" << j + 1 << "_grid_dim_z";
+    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+    //                          &kernel_grid_dim_z[j],
+    //                          "grid dim z of kernel",
+    //                          "0");
+    //   ss.str("");
+    //   ss << "-kernel_" << j + 1 << "_tb_dim_x";
+    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+    //                          &kernel_tb_dim_x[j],
+    //                          "tb dim x of kernel",
+    //                          "0");
+    //   ss.str("");
+    //   ss << "-kernel_" << j + 1 << "_tb_dim_y";
+    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+    //                          &kernel_tb_dim_y[j],
+    //                          "tb dim y of kernel",
+    //                          "0");
+    //   ss.str("");
+    //   ss << "-kernel_" << j + 1 << "_tb_dim_z";
+    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
+    //                          &kernel_tb_dim_z[j],
+    //                          "tb dim z of kernel",
+    //                          "0");
+    //   ss.str("");
+    //   ss << "-kernel_" << j + 1 << "_shmem_base_addr";
+    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_UINT64,
+    //                          &kernel_shmem_base_addr[j],
+    //                          "shmem base addr of kernel",
+    //                          "0");
+    //   ss.str("");
+    //   ss << "-kernel_" << j + 1 << "_local_base_addr";
+    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_UINT64,
+    //                          &kernel_local_base_addr[j],
+    //                          "local base addr of kernel",
+    //                          "0");
+    //   ss.str("");
+    // }
+
+    // option_parser_cfgfile(app_config_opp, config_path.c_str());
 
     char *toks = new char[2048];
     char *tokd = toks;
@@ -459,8 +586,8 @@ void app_config::init(std::string config_path, bool PRINT_LOG) {
     delete[] toks;
 
     if (PRINT_LOG) fprintf(stdout, ">>> APP config Options <<<:\n");
-    if (PRINT_LOG) option_parser_print(app_config_opp, stdout); //BUG: del this will cause fault
-    option_parser_destroy(app_config_opp);
+    // if (PRINT_LOG) option_parser_print(app_config_opp, stdout); //BUG: del this will cause fault
+    // option_parser_destroy(app_config_opp);
 
     m_valid = true;
 }
@@ -528,6 +655,7 @@ void instn_config::init(std::string config_path, bool PRINT_LOG) {
 }
 
 int issue_config::get_sm_id_of_one_block(unsigned kernel_id, unsigned block_id) {
+  // std::cout << "kernel_id: " << kernel_id << " block_id: " << block_id << std::endl;
   for (unsigned i = 0; i < trace_issued_sm_id_blocks.size(); i++) {
     for (unsigned j = 0; j < trace_issued_sm_id_blocks[i].size(); j++) {
       // std::cout << kernel_id << ", ";
@@ -586,7 +714,7 @@ std::vector<block_info_t> issue_config::parse_blocks_info(const std::string& blo
 
 void issue_config::init(std::string config_path, bool PRINT_LOG) {
     // named issue config options (unordered)
-    option_parser_t issue_config_opp = option_parser_create();
+    // option_parser_t issue_config_opp = option_parser_create();
 
     std::stringstream ss;
 
@@ -633,27 +761,43 @@ void issue_config::init(std::string config_path, bool PRINT_LOG) {
     /****************************************************************/
     trace_issued_sm_id_blocks_str.resize(trace_issued_sms_num);
 
-    int tmp1;
-    std::string tmp2;
-    option_parser_register(issue_config_opp, "-trace_issued_sms_num", OPT_INT32,
-                           &tmp1, "number of SMs that have been issued blocks (default=1)", "1");
-    option_parser_register(issue_config_opp, "-trace_issued_sms_vector", OPT_CSTR,
-                           &tmp2, "vector of SMs id that have been issued blocks (default=None)", "");
+    // int tmp1;
+    // std::string tmp2;
+    // option_parser_register(issue_config_opp, "-trace_issued_sms_num", OPT_INT32,
+    //                        &tmp1, "number of SMs that have been issued blocks (default=1)", "1");
+    // option_parser_register(issue_config_opp, "-trace_issued_sms_vector", OPT_CSTR,
+    //                        &tmp2, "vector of SMs id that have been issued blocks (default=None)", "");
     
+    inputFile.open(config_path);
     for (int j = 0; j < trace_issued_sms_num; ++j) {
       int sm_num = trace_issued_sms_vector[j];
-      ss << "-trace_issued_sm_id_" << std::to_string(sm_num);
-      option_parser_register(issue_config_opp, ss.str().c_str(), OPT_CSTR,
-                             &trace_issued_sm_id_blocks_str[j],
-                             "issued blocks list on i-th SM (default=None)", "None");
+
       ss.str("");
+      ss << "-trace_issued_sm_id_" << std::to_string(sm_num);
+      // option_parser_register(issue_config_opp, ss.str().c_str(), OPT_CSTR,
+      //                        &trace_issued_sm_id_blocks_str[j],
+      //                        "issued blocks list on i-th SM (default=None)", "None");
+
+      while (inputFile.good()) {
+        getline(inputFile, line);
+        commentStart = line.find_first_of("#");
+        if (commentStart != line.npos) continue;
+
+        size_t found = line.find(ss.str());
+        if (found != std::string::npos) {
+          trace_issued_sm_id_blocks_str[j] = line.substr(found + ss.str().length() + 1);
+        }
+      }
+
+      inputFile.clear();
+      inputFile.seekg(0, std::ios::beg);
     }
 
-    option_parser_cfgfile(issue_config_opp, config_path.c_str());
+    // option_parser_cfgfile(issue_config_opp, config_path.c_str());
     
     if (PRINT_LOG) fprintf(stdout, ">>> ISSUE config Options <<<:\n");
-    if (PRINT_LOG) option_parser_print(issue_config_opp, stdout); //BUG: del this will cause fault
-    option_parser_destroy(issue_config_opp);
+    // if (PRINT_LOG) option_parser_print(issue_config_opp, stdout); //BUG: del this will cause fault
+    // option_parser_destroy(issue_config_opp);
 
     /****************************************************************/
     /* parse the issued blocks list on each SM */
@@ -960,11 +1104,11 @@ void trace_parser::read_mem_instns(bool PRINT_LOG) {
   for (int kid = 0; kid < appcfg.get_kernels_num(); ++kid)
     mem_instns[kid].resize(appcfg.get_kernel_grid_size(kid));
 
-  DIR *dir;
-  if ((dir = opendir(mem_instns_dir.c_str())) == nullptr) {
-    std::cerr << "Not exist directory " << mem_instns_dir << ", please check." << std::endl;
-    exit(1);
-  }
+  // DIR *dir;
+  // if ((dir = opendir(mem_instns_dir.c_str())) == nullptr) {
+  //   std::cerr << "Not exist directory " << mem_instns_dir << ", please check." << std::endl;
+  //   exit(1);
+  // }
 
   // process mem_instns
   process_mem_instns(mem_instns_dir, PRINT_LOG);
