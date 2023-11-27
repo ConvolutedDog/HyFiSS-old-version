@@ -11,7 +11,7 @@
 #include <list>
 #include <string.h>
 
-#include "option_parser.h"
+// #include "option_parser.h"
 
 #include "../ISA-Def/ampere_opcode.h"
 #include "../ISA-Def/kepler_opcode.h"
