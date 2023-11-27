@@ -207,6 +207,11 @@ int main(int argc, char **argv) {
   app.add_option("--sort", sort, "Simulate the order in which instructions are issued based on their "
                                  "timestamps");
   app.add_option("--log", PRINT_LOG, "Print the traces processing log or not");
+
+  int _tmp_;
+
+  app.add_option("--tmp", _tmp_, "tmp");
+
   CLI11_PARSE(app, argc, argv);
 
   int passnum_concurrent_issue_to_sm = -1;
@@ -482,13 +487,14 @@ int main(int argc, char **argv) {
     //   }
     // }
 
+    if (world.rank() == _tmp_)
     for (auto x : SM_traces_all_passes_merged) {
-      // std::cout << "### rankkk-" << world.rank() << " sm_id-" << x.first << " size" << x.second.size() << std::endl;
+      std::cout << "### rankkk-" << world.rank() << " sm_id-" << x.first << " size" << x.second.size() << std::endl;
       std::vector<mem_instn> mem_instns = x.second;
       for (auto mem_ins : mem_instns) {
-        // std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
-        // std::cout << std::hex << mem_ins.time_stamp << " ";
-        // std::cout << std::hex << mem_ins.addr[0] << std::endl;
+        std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
+        std::cout << std::hex << mem_ins.time_stamp << " ";
+        std::cout << std::hex << mem_ins.addr[0] << std::endl;
       }
     }
     
