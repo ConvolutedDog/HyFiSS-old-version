@@ -21,6 +21,8 @@
 #include "./common/common_def.h"
 #include "./parda/parda.h"
 
+#include <chrono>
+
 trace_kernel_info_t *create_kernel_info(kernel_trace_t* kernel_trace_info,
 							                          trace_parser *parser){
   dim3 gridDim(kernel_trace_info->grid_dim_x, kernel_trace_info->grid_dim_y, kernel_trace_info->grid_dim_z);
@@ -174,6 +176,74 @@ void private_L1_cache_hit_rate_evaluate_boost(int argc, char **argv, std::map<in
     }
   }
 }
+
+void private_L1_cache_hit_rate_evaluate_boost_no_concurrent(int argc, char **argv, std::vector<std::map<int, std::vector<mem_instn>>>* SM_traces_all_passes, 
+                                                            int SM_traces_ptr_size, std::vector<int>* SM_traces_sm_id, int _tmp_print_, std::string configs_dir) {
+  boost::mpi::environment env(argc, argv);
+  boost::mpi::communicator world;
+
+
+  /* SM_traces_ptr_size is the number of the SMs that have been used during the execution. */
+  const int pass_num = int((SM_traces_ptr_size + world.size() - 1)/world.size());
+
+  unsigned l1_cache_line_size = 32; // BUG: need configure
+
+  std::cout << std::endl;
+
+  for (int pass = 0; pass < pass_num; pass++) {
+    int curr_process_idx_rank = world.rank() + pass * world.size();
+    int curr_process_idx;
+    if (curr_process_idx_rank < SM_traces_ptr_size) {
+      curr_process_idx = (*SM_traces_sm_id)[curr_process_idx_rank];
+    } else continue;
+
+    // if (_tmp_print_ == world.rank()) std::cout << "rank-" << std::dec << world.rank() << ", " << "pass-" << pass << ", ";
+    // if (_tmp_print_ == world.rank()) std::cout << "curr_process_idx_rank: " << curr_process_idx_rank << std::endl;
+    // if (_tmp_print_ == world.rank()) std::cout << "curr_process_sm_id: " << curr_process_idx << " " << (*SM_traces_all_passes_merged).size() << std::endl;
+    // if (curr_process_idx_rank < SM_traces_ptr_size) {
+      HKEY input;
+      long tim;
+      program_data_t pdt_c;
+      program_data_t* pdt;
+      FILE* file;
+      std::string parda_histogram_filepath;
+      for (unsigned kid = 0; kid < (*SM_traces_all_passes).size() ; kid++) {
+        tim = 0;
+        pdt_c = parda_init();
+        for (auto mem_ins : (*SM_traces_all_passes)[kid][curr_process_idx]) { // ONLY USE curr_process_idx !!!
+          // if (world.rank() == 0) {
+          //   std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_idx << " " << "kid-" << kid << " ";
+          //   std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
+          //   std::cout << std::hex << mem_ins.time_stamp << " ";
+          //   std::cout << std::hex << mem_ins.addr[0] << std::endl;
+          // }
+          // HKEY input should be char* of addr
+          for (unsigned j = 0; j < (mem_ins.addr).size(); j++) { // BUG: mask + merge
+            sprintf(input, "0x%llx", mem_ins.addr[j] >> int(log2(l1_cache_line_size)));
+            // std::cout << input << std::endl;
+            process_one_access(input, &pdt_c, tim);
+            tim++;
+          }
+        }
+
+        pdt = &pdt_c;
+        pdt->histogram[B_INF] += narray_get_len(pdt->ga);
+
+        if (configs_dir.back() == '/') {
+          parda_histogram_filepath = configs_dir + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
+        } else {
+          parda_histogram_filepath = configs_dir + "/" + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
+        }
+        file = fopen(parda_histogram_filepath.c_str(), "w");
+        if (file != NULL) {
+          parda_fprintf_histogram(pdt->histogram, file);
+          fclose(file);
+        }
+        parda_free(pdt);
+      }
+    // }
+  }
+}
 #else
 void private_L1_cache_hit_rate_evaluate(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int pass_issue) { // BUG， have not modified
   const int SM_traces_ptr_size = (int)(*SM_traces_ptr).size();
@@ -211,6 +281,9 @@ void private_L1_cache_hit_rate_evaluate(int argc, char **argv, std::map<int, std
 #endif
 
 int main(int argc, char **argv) {
+  
+auto start = std::chrono::system_clock::now();
+
 #ifdef USE_BOOST
   boost::mpi::environment env(argc, argv);
   boost::mpi::communicator world;
@@ -234,10 +307,14 @@ int main(int argc, char **argv) {
 
   CLI11_PARSE(app, argc, argv);
 
-  int passnum_concurrent_issue_to_sm = -1;
+  int passnum_concurrent_issue_to_sm = 1;
 
   trace_parser tracer(configs.c_str());
 
+auto end = std::chrono::system_clock::now();
+auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+auto cost = double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den;
+std::cout << "Cost 1-" << cost << std::endl;
 
 #ifdef USE_BOOST
   if (world.rank() == 0) {
@@ -245,21 +322,15 @@ int main(int argc, char **argv) {
 
     std::cout << "Memory Model." << std::endl << std::endl;
 
-    /* parse the config files */
+    
     tracer.parse_configs_file(PRINT_LOG);
 
-    /* read all memory traces */
     tracer.read_mem_instns(PRINT_LOG);
-
-    /* create all_kernels_info and single_pass_kernels_info */
-    std::vector<trace_kernel_info_t*> all_kernels_info;
-    all_kernels_info.reserve(tracer.get_appcfg()->get_kernels_num());
-
 
     /* V100 schedules 128 kernels for concurrent execution at a time, thus requiring (all_kernels_num + 127)/128 schedules. */
     passnum_concurrent_issue_to_sm = int((tracer.get_appcfg()->get_kernels_num() + 
-                                         cc_config[SM70].max_concurrent_kernels_num - 1) / 
-                                         cc_config[SM70].max_concurrent_kernels_num);
+                                         (gpgpu_concurrent_kernel_sm ? cc_config[SM70].max_concurrent_kernels_num : 1) - 1) / 
+                                         (gpgpu_concurrent_kernel_sm ? cc_config[SM70].max_concurrent_kernels_num : 1));
     // std::cout << "get_kernels_num:" << tracer.get_appcfg()->get_kernels_num() << std::endl;
     // std::cout << "max_concurrent_kernels_num:" << cc_config[SM70].max_concurrent_kernels_num << std::endl;
     // std::cout << std::endl;
@@ -271,23 +342,19 @@ int main(int argc, char **argv) {
    * means: pass_num -> sm_id -> std::vector<mem_instn>. */
   std::vector<std::map<int, std::vector<mem_instn>>> SM_traces_all_passes;
   
-  /*  */
-  // std::vector<std::vector<block_info_t>> trace_issued_sm_id_blocks;
-
   std::vector<int> SM_traces_sm_id;
   int SM_traces_ptr_size;
 
 #ifdef USE_BOOST
   if (world.rank() == 0) {
 #endif
-    // trace_issued_sm_id_blocks = *(tracer.get_issuecfg()->get_trace_issued_sm_id_blocks());
 
     SM_traces_all_passes.resize(passnum_concurrent_issue_to_sm);
 
+
     for (int pass = 0; pass < passnum_concurrent_issue_to_sm; pass++) {
       if (PRINT_LOG) std::cout << "Schedule pass: " << pass << std::endl;
-
-      
+auto start6 = std::chrono::system_clock::now();
       std::vector<trace_kernel_info_t*> single_pass_kernels_info;
       
       if (pass == passnum_concurrent_issue_to_sm - 1) {
@@ -300,21 +367,17 @@ int main(int argc, char **argv) {
         single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? cc_config[SM70].max_concurrent_kernels_num : 1);
       }
 
-      // single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? std::min(tracer.get_appcfg()->get_kernels_num(), 
-      //                                                                        cc_config[SM70].max_concurrent_kernels_num) : 1);
-      
       /* for the pass-th scheduling process, V100 will schedule min(128,tracer.kernels_num) kernels to SMs,
        * here we will find the kernels that will be scheduled in this pass and create their kernel_info_t objects,
        * and then to evaluate every L1D cache in SMs, and also will interleave their missed address to L2D cache,
        * and evaluate L2D cache. Here start_kernel_id and end_kernel_id is the range  of kernels that should be 
        * executed during this pass. */
-      int start_kernel_id = pass * cc_config[SM70].max_concurrent_kernels_num;
-      int end_kernel_id = std::min((pass + 1) * cc_config[SM70].max_concurrent_kernels_num - 1, 
-                                   tracer.get_appcfg()->get_kernels_num() - 1);
+      int start_kernel_id = pass * (gpgpu_concurrent_kernel_sm ? cc_config[SM70].max_concurrent_kernels_num : 1);
+      int end_kernel_id = (pass + 1) * (gpgpu_concurrent_kernel_sm ? cc_config[SM70].max_concurrent_kernels_num : 1) - 1;
       
       /* Here we traversal all the kernels that should be executed during this pass, to create their kernel-info 
        * object. And then the kernels that belong to the same SM will to be used to evaluate L1D cache. */
-      for (int kid = start_kernel_id; kid <= end_kernel_id; kid++) {
+      for (int kid = start_kernel_id; kid <= std::min(end_kernel_id, tracer.get_appcfg()->get_kernels_num() - 1); kid++) {
         kernel_trace_t * kernel_trace_info = tracer.parse_kernel_info(kid, PRINT_LOG);
         trace_kernel_info_t *kernel_info = create_kernel_info(kernel_trace_info, &tracer);
         single_pass_kernels_info.push_back(kernel_info);
@@ -408,9 +471,16 @@ int main(int argc, char **argv) {
       single_pass_kernels_info.clear();
       // single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? std::min(tracer.get_appcfg()->get_kernels_num(), 
       //                                                                        cc_config[SM70].max_concurrent_kernels_num) : 1);
+auto end6 = std::chrono::system_clock::now();
+auto duration6 = std::chrono::duration_cast<std::chrono::microseconds>(end6 - start6);
+auto cost6 = double(duration6.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den;
+std::cout << "pass-" << pass << " Cost 6-" << cost6 << std::endl;
+
     }
 
-    
+auto start2 = std::chrono::system_clock::now();
+
+    /* SM_traces_sm_id stores all the SMs that have been used during the execution. */
     for (int _pass = 0; _pass < passnum_concurrent_issue_to_sm; _pass++) {
       for (auto _sm_id_map : SM_traces_all_passes[_pass]) {
         // std::cout << "@@@" << _sm_id_map.first << std::endl;
@@ -420,36 +490,64 @@ int main(int argc, char **argv) {
       }
     }
 
+auto end2 = std::chrono::system_clock::now();
+auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2);
+auto cost2 = double(duration2.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den;
+std::cout << "rank-" << world.rank() << " Cost 2-" << cost2 << std::endl;
+
     // for (auto x : SM_traces_sm_id) std::cout << x << " ";
     // std::cout << std::endl;
 
+    /* SM_traces_ptr_size is the number of the SMs that have been used during the execution. */
     SM_traces_ptr_size = SM_traces_sm_id.size();
-    
+
+
+auto start3 = std::chrono::system_clock::now();
+
+
 #ifdef USE_BOOST
     /* Now we need to broadcast the data in SM_traces_all_passes. */
     if (world.size() > 0) boost::mpi::broadcast(world, SM_traces_all_passes, 0);
     /* Also we need to broadcast the variable passnum_concurrent_issue_to_sm. */
     if (world.size() > 0) boost::mpi::broadcast(world, passnum_concurrent_issue_to_sm, 0);
     /* Also we need to broadcast the variable trace_parser for all rank > 0. */
-    // if (world.size() > 0) boost::mpi::broadcast(world, trace_issued_sm_id_blocks, 0);
     if (world.size() > 0) boost::mpi::broadcast(world, SM_traces_sm_id, 0);
     if (world.size() > 0) boost::mpi::broadcast(world, SM_traces_ptr_size, 0);
 #endif
+
+
+auto end3 = std::chrono::system_clock::now();
+auto duration3 = std::chrono::duration_cast<std::chrono::microseconds>(end3 - start3);
+auto cost3 = double(duration3.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den;
+std::cout << "send rank-" << world.rank() << " Cost 3-" << cost3 << std::endl;
+
 
 #ifdef USE_BOOST
   } /* end rank = 0 */
 #endif
 
+
+auto start4 = std::chrono::system_clock::now();
+
+
 #ifdef USE_BOOST
   /* Now we need to recieve the broadcasted data to SM_traces_all_passes for all rank > 0. */
+  /* Most cost function. */
   if (world.rank() != 0) boost::mpi::broadcast(world, SM_traces_all_passes, 0);
+
+auto end4 = std::chrono::system_clock::now();
+auto duration4 = std::chrono::duration_cast<std::chrono::microseconds>(end4 - start4);
+auto cost4 = double(duration4.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den;
+std::cout << "rev rank-" << world.rank() << " Cost 4-" << cost4 << std::endl;
+
   /* Also we need to recieve the variable passnum_concurrent_issue_to_sm for all rank > 0. */
   if (world.rank() != 0) boost::mpi::broadcast(world, passnum_concurrent_issue_to_sm, 0);
   /* Also we need to recieve the variable trace_parser for all rank > 0. */
-  // if (world.rank() != 0) boost::mpi::broadcast(world, trace_issued_sm_id_blocks, 0);
   if (world.rank() != 0) boost::mpi::broadcast(world, SM_traces_sm_id, 0);
   if (world.rank() != 0) boost::mpi::broadcast(world, SM_traces_ptr_size, 0);
 #endif
+
+
 
 #ifdef USE_BOOST
   /* Just a simple test for MPI. */
@@ -465,9 +563,7 @@ int main(int argc, char **argv) {
   }
   // std::cout << "###" << passnum_concurrent_issue_to_sm << std::endl;
 
-
-  
-  if (passnum_concurrent_issue_to_sm > 1) {
+  if (passnum_concurrent_issue_to_sm > 1 && gpgpu_concurrent_kernel_sm) {
     /* Now we try to merge all the SM_traces of all the passes. Using boost::mpi, we can let rank-0 process 
     * 0+0*world.size(), 0+1*world.size() -th SM_id. */
     std::map<int, std::vector<mem_instn>> SM_traces_all_passes_merged;
@@ -548,7 +644,7 @@ int main(int argc, char **argv) {
     }
 
     /* Process L1 Cache Hit rate. */
-    private_L1_cache_hit_rate_evaluate_boost(argc, argv, &SM_traces_all_passes_merged, SM_traces_ptr_size, &SM_traces_sm_id, _tmp_print_, configs.c_str());
+    private_L1_cache_hit_rate_evaluate_boost(argc, argv, &SM_traces_all_passes_merged, SM_traces_ptr_size, &SM_traces_sm_id, _tmp_print_, configs);
   } else {
     /* In this case, passnum_concurrent_issue_to_sm == 1 */
     /* We have merged SM_traces_all_passes[i=1...passnum_concurrent_issue_to_sm][curr_process_idx] to
@@ -576,6 +672,20 @@ int main(int argc, char **argv) {
               std::sort(SM_traces_all_passes[0][curr_process_idx].begin(), SM_traces_all_passes[0][curr_process_idx].end(), compare_stamp);
       }
     }
+
+
+auto start5 = std::chrono::system_clock::now();
+
+
+    private_L1_cache_hit_rate_evaluate_boost_no_concurrent(argc, argv, &SM_traces_all_passes, 
+                                                           SM_traces_ptr_size, &SM_traces_sm_id, _tmp_print_, configs);
+
+auto end5 = std::chrono::system_clock::now();
+auto duration5 = std::chrono::duration_cast<std::chrono::microseconds>(end5 - start5);
+auto cost5 = double(duration5.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den;
+std::cout << "L1 rank-" << world.rank() << " Cost 5-" << cost5 << std::endl;
+
+
   }
 
 #else
