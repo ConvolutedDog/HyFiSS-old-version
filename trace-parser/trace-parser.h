@@ -177,9 +177,11 @@ class app_config {
   /* get kernel_local_base_addr */
   std::vector<unsigned long long>* get_kernels_local_base_addr() { return &kernel_local_base_addr; }
   unsigned long long get_kernel_local_base_addr(int kernel_id) { return kernel_local_base_addr[kernel_id]; }
+  int get_concurrentKernels() { return concurrentKernels; }
 
  private:
   bool m_valid;
+  int concurrentKernels = 0;
   std::string app_kernels_id_string;
   std::vector<int> app_kernels_id;
   int kernels_num;
@@ -341,6 +343,7 @@ class trace_parser {
 
   void parse_configs_file(bool PRINT_LOG);
   void process_configs_file(std::string config_path, int config_type, bool PRINT_LOG);
+  void judge_concurrent_issue();
 
   void read_mem_instns(bool PRINT_LOG);
   void process_mem_instns(std::string mem_instns_filepath, bool PRINT_LOG);
@@ -371,6 +374,9 @@ class trace_parser {
     return mem_instns[kernel_id][block_id]; 
   }
 
+  /* get concurrent_kernels */
+  std::vector<std::vector<int>>& get_concurrent_kernels() { return concurrent_kernels; }
+
  private:
   // configs_filepath is path to kernelslist.g
   std::string configs_filepath;
@@ -385,6 +391,9 @@ class trace_parser {
   issue_config issuecfg;
   /* kernel_id -> block_id -> mem_instn */
   std::vector<std::vector<std::vector<mem_instn>>> mem_instns;
+
+  /* concurrent idx -> vector<kernel_id> */
+  std::vector<std::vector<int>> concurrent_kernels;
 };
 
 /*
