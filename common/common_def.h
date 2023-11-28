@@ -4,7 +4,7 @@
 
 /* User define Start. */
 #define USE_BOOST
-#define gpgpu_concurrent_kernel_sm true
+#define gpgpu_concurrent_kernel_sm false
 /* User define End. */
 
 
