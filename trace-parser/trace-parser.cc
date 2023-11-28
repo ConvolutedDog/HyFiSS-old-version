@@ -190,7 +190,7 @@ bool inst_trace_t::parse_from_string(std::string trace,
   assert(reg_dsts_num <= MAX_DST);
   for (unsigned i = 0; i < reg_dsts_num; ++i) {
     ss >> temp;
-    sscanf(temp.c_str(), "R%d", &reg_dest[i]);
+    sscanf(temp.c_str(), "R%u", &reg_dest[i]);
   }
 
   ss >> opcode;
@@ -199,7 +199,7 @@ bool inst_trace_t::parse_from_string(std::string trace,
   assert(reg_srcs_num <= MAX_SRC);
   for (unsigned i = 0; i < reg_srcs_num; ++i) {
     ss >> temp;
-    sscanf(temp.c_str(), "R%d", &reg_src[i]);
+    sscanf(temp.c_str(), "R%u", &reg_src[i]);
   }
 
   if (!count(have_readed_insn_pcs.begin(), have_readed_insn_pcs.end(), m_pc)) {
@@ -292,17 +292,11 @@ kernel_trace_t::kernel_trace_t() {
 }
 
 void app_config::init(std::string config_path, bool PRINT_LOG) {
-    // named app config options (unordered)
-    // option_parser_t app_config_opp = option_parser_create();
-    
-    // option_parser_register(
-    //   app_config_opp, "-app_kernels_id", OPT_CSTR, &app_kernels_id_string,
-    //   "kernels ID list (default=1)", "1");
     
     std::stringstream ss;
 
-    // read the "-app_kernels_id" config in the app config file
-    // and register the kernel config options
+    /* Read the "-app_kernels_id" config in the app config file and register the 
+     * kernel config options. */
     std::ifstream inputFile;
     inputFile.open(config_path);
     if (!inputFile.good()) {
@@ -311,7 +305,8 @@ void app_config::init(std::string config_path, bool PRINT_LOG) {
       exit(1);
     }
 
-    std::string target = "-app_kernels_id";
+    std::string target_app_kernels_id = "-app_kernels_id";
+    std::string target_concurrentKernels = "-device_concurrentKernels";
     
     std::string line;
     size_t commentStart;
@@ -322,16 +317,25 @@ void app_config::init(std::string config_path, bool PRINT_LOG) {
       getline(inputFile, line);
       commentStart = line.find_first_of("#");
       if (commentStart != line.npos) continue;
-      found = line.find(target);
+      found = line.find(target_app_kernels_id);
       if (found != std::string::npos) {
-        result = line.substr(found + target.length());
+        result = line.substr(found + target_app_kernels_id.length());
         comma_count = std::count(result.begin(), result.end(), ',');
         kernels_num = comma_count + 1;
         // std::cout << ">>>" << result << "<<<" << std::endl;
-        app_kernels_id_string = line.substr(found + target.length() + 1);
+        app_kernels_id_string = line.substr(found + target_app_kernels_id.length() + 1);
       }
+      found = line.find(target_concurrentKernels);
+      if (found != std::string::npos) {
+        result = line.substr(found + target_concurrentKernels.length());
+        // std::cout << ">>>" << result << "<<<" << std::endl;
+        concurrentKernels = std::stoi(result);
+      }
+
     }
-    inputFile.close();
+    inputFile.clear();
+    inputFile.seekg(0, std::ios::beg);
+    // inputFile.close();
 
     kernel_name.resize(kernels_num);
     kernel_num_registers.resize(kernels_num);
@@ -349,15 +353,12 @@ void app_config::init(std::string config_path, bool PRINT_LOG) {
     kernel_shmem_base_addr.resize(kernels_num);
     kernel_local_base_addr.resize(kernels_num);
     
-    /*************************************************************/
-    inputFile.open(config_path);
+    // inputFile.open(config_path);
     for (int j = 0; j < kernels_num; ++j) {
       while (inputFile.good()) {
         getline(inputFile, line);
         commentStart = line.find_first_of("#");
         if (commentStart != line.npos) continue;
-
-        std::stringstream ss;
 
         ss.str("");
         ss << "-kernel_" << j + 1 << "_kernel_name";
@@ -474,97 +475,8 @@ void app_config::init(std::string config_path, bool PRINT_LOG) {
       inputFile.clear();
       inputFile.seekg(0, std::ios::beg);
     }
-    /*************************************************************/
 
-    // for (int j = 0; j < kernels_num; ++j) {
-    //   ss.str("");
-    //   ss << "-kernel_" << j + 1 << "_kernel_name";
-    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_CSTR,
-    //                          &kernel_name[j],
-    //                          "kernel name",
-    //                          "None");
-    //   ss.str("");
-    //   ss << "-kernel_" << j + 1 << "_num_registers";
-    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-    //                          &kernel_num_registers[j],
-    //                          "number of registers used by kernel",
-    //                          "0");
-    //   ss.str("");
-    //   ss << "-kernel_" << j + 1 << "_shared_mem_bytes";
-    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-    //                          &kernel_shared_mem_bytes[j],
-    //                          "number of bytes of shared memory used by kernel",
-    //                          "0");
-    //   ss.str("");
-    //   ss << "-kernel_" << j + 1 << "_grid_size";
-    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-    //                          &kernel_grid_size[j],
-    //                          "grid size of kernel",
-    //                          "0");
-    //   ss.str("");
-    //   ss << "-kernel_" << j + 1 << "_block_size";
-    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-    //                          &kernel_block_size[j],
-    //                          "block size of kernel",
-    //                          "0");
-    //   ss.str("");
-    //   ss << "-kernel_" << j + 1 << "_cuda_stream_id";
-    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-    //                          &kernel_cuda_stream_id[j],
-    //                          "cuda stream id of kernel",
-    //                          "0");
-    //   ss.str("");
-    //   ss << "-kernel_" << j + 1 << "_grid_dim_x";
-    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-    //                          &kernel_grid_dim_x[j],
-    //                          "grid dim x of kernel",
-    //                          "0");
-    //   ss.str("");
-    //   ss << "-kernel_" << j + 1 << "_grid_dim_y";
-    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-    //                          &kernel_grid_dim_y[j],
-    //                          "grid dim y of kernel",
-    //                          "0");
-    //   ss.str("");
-    //   ss << "-kernel_" << j + 1 << "_grid_dim_z";
-    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-    //                          &kernel_grid_dim_z[j],
-    //                          "grid dim z of kernel",
-    //                          "0");
-    //   ss.str("");
-    //   ss << "-kernel_" << j + 1 << "_tb_dim_x";
-    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-    //                          &kernel_tb_dim_x[j],
-    //                          "tb dim x of kernel",
-    //                          "0");
-    //   ss.str("");
-    //   ss << "-kernel_" << j + 1 << "_tb_dim_y";
-    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-    //                          &kernel_tb_dim_y[j],
-    //                          "tb dim y of kernel",
-    //                          "0");
-    //   ss.str("");
-    //   ss << "-kernel_" << j + 1 << "_tb_dim_z";
-    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_INT32,
-    //                          &kernel_tb_dim_z[j],
-    //                          "tb dim z of kernel",
-    //                          "0");
-    //   ss.str("");
-    //   ss << "-kernel_" << j + 1 << "_shmem_base_addr";
-    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_UINT64,
-    //                          &kernel_shmem_base_addr[j],
-    //                          "shmem base addr of kernel",
-    //                          "0");
-    //   ss.str("");
-    //   ss << "-kernel_" << j + 1 << "_local_base_addr";
-    //   option_parser_register(app_config_opp, ss.str().c_str(), OPT_UINT64,
-    //                          &kernel_local_base_addr[j],
-    //                          "local base addr of kernel",
-    //                          "0");
-    //   ss.str("");
-    // }
-
-    // option_parser_cfgfile(app_config_opp, config_path.c_str());
+    inputFile.close();
 
     char *toks = new char[2048];
     char *tokd = toks;
@@ -575,7 +487,6 @@ void app_config::init(std::string config_path, bool PRINT_LOG) {
     toks = strtok(toks, ",");
 
     for (int i = 0; i < kernels_num; i++) {
-      // std::cout << "=> " << " " << toks << std::endl;
       assert(toks);
       int ntok = sscanf(toks, "%d", &app_kernels_id[i]);
       assert(ntok == 1);
@@ -586,16 +497,14 @@ void app_config::init(std::string config_path, bool PRINT_LOG) {
     delete[] toks;
 
     if (PRINT_LOG) fprintf(stdout, ">>> APP config Options <<<:\n");
-    // if (PRINT_LOG) option_parser_print(app_config_opp, stdout); //BUG: del this will cause fault
-    // option_parser_destroy(app_config_opp);
 
     m_valid = true;
 }
 
 void instn_config::init(std::string config_path, bool PRINT_LOG) {
   std::ifstream inputFile;
-  // open config file, stream every line into a continuous buffer
-  // get rid of comments in the process
+  /* Open config file, stream every line into a continuous buffer and 
+   * get rid of comments in the process. */
   inputFile.open(config_path);
   if (!inputFile.good()) {
     fprintf(stderr, "\n\nOptionParser ** ERROR: Cannot open config file '%s'\n",
@@ -644,13 +553,15 @@ void instn_config::init(std::string config_path, bool PRINT_LOG) {
 
   if (PRINT_LOG) fprintf(stdout, ">>> INSTN config Options <<<:\n");
   // traversal instn_info_vector
-  for (unsigned i = 0; i < instn_info_vector.size() && PRINT_LOG; ++i) {
-    std::cout << "-instn " << std::setw(5) << std::right 
-              << std::dec << instn_info_vector[i].kernel_id << std::dec;
-    std::cout << " " << std::setw(8) << std::left 
-              << std::hex << instn_info_vector[i].pc << std::dec;
-    std::cout << " " << std::setw(55) << std::left 
-              << instn_info_vector[i].instn_str << std::endl;
+  if (PRINT_LOG) {
+    for (unsigned i = 0; i < instn_info_vector.size() && PRINT_LOG; ++i) {
+      std::cout << "-instn " << std::setw(5) << std::right 
+                << std::dec << instn_info_vector[i].kernel_id << std::dec;
+      std::cout << " " << std::setw(8) << std::left 
+                << std::hex << instn_info_vector[i].pc << std::dec;
+      std::cout << " " << std::setw(55) << std::left 
+                << instn_info_vector[i].instn_str << std::endl;
+    }
   }
 }
 
@@ -713,14 +624,8 @@ std::vector<block_info_t> issue_config::parse_blocks_info(const std::string& blo
 }
 
 void issue_config::init(std::string config_path, bool PRINT_LOG) {
-    // named issue config options (unordered)
-    // option_parser_t issue_config_opp = option_parser_create();
-
     std::stringstream ss;
 
-    /****************************************************************/
-    // read the "-app_kernels_id" config in the app config file
-    // and register the kernel config options
     std::ifstream inputFile;
     inputFile.open(config_path);
     if (!inputFile.good()) {
@@ -757,49 +662,36 @@ void issue_config::init(std::string config_path, bool PRINT_LOG) {
         }
       }
     }
-    inputFile.close();
-    /****************************************************************/
+    inputFile.clear();
+    inputFile.seekg(0, std::ios::beg);
+
     trace_issued_sm_id_blocks_str.resize(trace_issued_sms_num);
 
-    // int tmp1;
-    // std::string tmp2;
-    // option_parser_register(issue_config_opp, "-trace_issued_sms_num", OPT_INT32,
-    //                        &tmp1, "number of SMs that have been issued blocks (default=1)", "1");
-    // option_parser_register(issue_config_opp, "-trace_issued_sms_vector", OPT_CSTR,
-    //                        &tmp2, "vector of SMs id that have been issued blocks (default=None)", "");
-    
-    inputFile.open(config_path);
-    for (int j = 0; j < trace_issued_sms_num; ++j) {
-      int sm_num = trace_issued_sms_vector[j];
+    std::vector<int> has_found_j;
+    while (inputFile.good()) {
+      getline(inputFile, line);
+      commentStart = line.find_first_of("#");
+      if (commentStart != line.npos) continue;
 
-      ss.str("");
-      ss << "-trace_issued_sm_id_" << std::to_string(sm_num);
-      // option_parser_register(issue_config_opp, ss.str().c_str(), OPT_CSTR,
-      //                        &trace_issued_sm_id_blocks_str[j],
-      //                        "issued blocks list on i-th SM (default=None)", "None");
-
-      while (inputFile.good()) {
-        getline(inputFile, line);
-        commentStart = line.find_first_of("#");
-        if (commentStart != line.npos) continue;
-
-        size_t found = line.find(ss.str());
-        if (found != std::string::npos) {
-          trace_issued_sm_id_blocks_str[j] = line.substr(found + ss.str().length() + 1);
+      for (int j = 0; j < trace_issued_sms_num; ++j) {
+        if (std::find(has_found_j.begin(), has_found_j.end(), j) == has_found_j.end()) {
+          int sm_num = trace_issued_sms_vector[j];
+          ss.str("");
+          ss << "-trace_issued_sm_id_" << std::to_string(sm_num);
+          size_t found = line.find(ss.str());
+          if (found != std::string::npos) {
+            has_found_j.push_back(j);
+            trace_issued_sm_id_blocks_str[j] = line.substr(found + ss.str().length() + 1);
+            break;
+          }
         }
       }
-
-      inputFile.clear();
-      inputFile.seekg(0, std::ios::beg);
     }
+    inputFile.close();
 
-    // option_parser_cfgfile(issue_config_opp, config_path.c_str());
-    
     if (PRINT_LOG) fprintf(stdout, ">>> ISSUE config Options <<<:\n");
-    // if (PRINT_LOG) option_parser_print(issue_config_opp, stdout); //BUG: del this will cause fault
-    // option_parser_destroy(issue_config_opp);
 
-    /****************************************************************/
+    
     /* parse the issued blocks list on each SM */
     std::string blocks_info_str;
     trace_issued_sm_id_blocks.resize(trace_issued_sms_num);
@@ -807,8 +699,7 @@ void issue_config::init(std::string config_path, bool PRINT_LOG) {
       // std::cout << "trace_issued_sm_id_blocks_str[" << j << "]: " 
       //           << trace_issued_sm_id_blocks_str[j].c_str() << std::endl;
       blocks_info_str = trace_issued_sm_id_blocks_str[j].c_str();
-      std::vector<block_info_t> result = parse_blocks_info(blocks_info_str);
-      trace_issued_sm_id_blocks[j] = result;
+      trace_issued_sm_id_blocks[j] = parse_blocks_info(blocks_info_str);
     }
     
     // for (int j = 0; j < trace_issued_sms_num; ++j) {
@@ -818,7 +709,6 @@ void issue_config::init(std::string config_path, bool PRINT_LOG) {
     //     std::cout << "  block_id: " << trace_issued_sm_id_blocks[j][k].block_id << std::endl;
     //   }
     // }
-    /****************************************************************/
     m_valid = true;
 }
 
@@ -890,32 +780,32 @@ kernel_trace_t* trace_parser::parse_kernel_info(const std::string &kerneltraces_
         const size_t equal_idx = line.find('=');
         kernel_info->kernel_name = line.substr(equal_idx + 2);
       } else if (string1 == "kernel" && string2 == "id") {
-        sscanf(line.c_str(), "-kernel id = %d", &kernel_info->kernel_id);
+        sscanf(line.c_str(), "-kernel id = %u", &kernel_info->kernel_id);
       } else if (string1 == "grid" && string2 == "dim") {
-        sscanf(line.c_str(), "-grid dim = (%d,%d,%d)", &kernel_info->grid_dim_x,
+        sscanf(line.c_str(), "-grid dim = (%u,%u,%u)", &kernel_info->grid_dim_x,
                &kernel_info->grid_dim_y, &kernel_info->grid_dim_z);
       } else if (string1 == "block" && string2 == "dim") {
-        sscanf(line.c_str(), "-block dim = (%d,%d,%d)", &kernel_info->tb_dim_x,
+        sscanf(line.c_str(), "-block dim = (%u,%u,%u)", &kernel_info->tb_dim_x,
                &kernel_info->tb_dim_y, &kernel_info->tb_dim_z);
       } else if (string1 == "shmem" && string2 == "=") {
-        sscanf(line.c_str(), "-shmem = %d", &kernel_info->shmem);
+        sscanf(line.c_str(), "-shmem = %u", &kernel_info->shmem);
       } else if (string1 == "nregs") {
-        sscanf(line.c_str(), "-nregs = %d", &kernel_info->nregs);
+        sscanf(line.c_str(), "-nregs = %u", &kernel_info->nregs);
       } else if (string1 == "cuda" && string2 == "stream") {
         sscanf(line.c_str(), "-cuda stream id = %lu",
                &kernel_info->cuda_stream_id);
       } else if (string1 == "binary" && string2 == "version") {
-        sscanf(line.c_str(), "-binary version = %d",
+        sscanf(line.c_str(), "-binary version = %u",
                &kernel_info->binary_verion);
       } else if (string1 == "enable" && string2 == "lineinfo") {
-        sscanf(line.c_str(), "-enable lineinfo = %d",
+        sscanf(line.c_str(), "-enable lineinfo = %u",
                &kernel_info->enable_lineinfo);
       } else if (string1 == "nvbit" && string2 == "version") {
         const size_t equal_idx = line.find('=');
         kernel_info->nvbit_verion = line.substr(equal_idx + 1);
 
       } else if (string1 == "accelsim" && string2 == "tracer") {
-        sscanf(line.c_str(), "-accelsim tracer version = %d",
+        sscanf(line.c_str(), "-accelsim tracer version = %u",
                &kernel_info->trace_verion);
 
       } else if (string1 == "shmem" && string2 == "base_addr") {
@@ -952,7 +842,7 @@ trace_parser::trace_parser(const char *input_configs_filepath) {
 #include <unistd.h>
 #include <limits.h>
 
-void trace_parser::process_configs_file(std::string config_path, int config_type, bool PRINT_LOG) {
+void trace_parser::process_configs_file(const std::string config_path, int config_type, bool PRINT_LOG) {
   std::ifstream fs;
   
   char cwd[PATH_MAX];
@@ -984,6 +874,96 @@ void trace_parser::process_configs_file(std::string config_path, int config_type
   }
 }
 
+void trace_parser::judge_concurrent_issue() {
+  /* Judge if kernels can be issued concurrently, the condition for concurrency is that 
+   * it must be satisfied.
+   * 1. the GPU device must support concurrent execution, we can check this through CUDA 
+   *    device query, we have report '-device_concurrentKernels x' in the tracing tool.
+   * 2. two kernels have different stream id, we also report the stream id of each kernel
+   *    in the tracing tool.
+   * 3. even if the device supports concurrent execution, if one of the kernels use too 
+   *    many resources (such as registers, shared memory, etc.), they may not be able to 
+   *    execute concurrently, we also report the resource usage of all the kernels in the 
+   *    tracing tool.
+   * 4. if one kernel depends on the result of another kernel, then these two kernels can
+   *    not execute concurrently, the check of data dependency is hard, because CUDA does 
+   *    not inherently offer a direct mechanism to ascertain the existence of such depen-
+   *    dencies, thereby necessitating developers to manually manage and track these during 
+   *    code development, what we should do is to judge the stream id. */
+  // if (get_appcfg()->get_concurrentKernels() == 1) {
+  //   /* The GPU device supports concurrent execution. */
+  //   // concurrent_kernels
+  //   /* Now we must know how many stream id can not be concurrently issued. */
+  //   std::vector<int> remaining_kernels;
+  //   for (int i = 0; i < get_appcfg()->get_kernels_num(); ++i) {
+  //     remaining_kernels.push_back(i);
+  //   }
+
+  //   while (!remaining_kernels.empty()) {
+  //     int kernel_id = remaining_kernels[0];
+  //     remaining_kernels.erase(remaining_kernels.begin());
+  //     std::vector<int> tmp = {kernel_id};
+  //     concurrent_kernels.push_back(tmp);
+  //     int stream_id = get_appcfg()->get_kernel_cuda_stream_id(kernel_id);
+  //     for (int i = 0; i < remaining_kernels.size(); ++i) {
+  //       if (get_appcfg()->get_kernel_cuda_stream_id(remaining_kernels[i]) != stream_id) {
+  //         concurrent_kernels.back().push_back(remaining_kernels[i]);
+  //         remaining_kernels.erase(remaining_kernels.begin() + i);
+  //         i--;
+  //       }
+  //     }
+  //   }
+    
+  //   // int last_add_to_stream_idx;
+  //   // int last_stream_id;
+
+  //   // int i = 0;
+  //   // while(i < get_appcfg()->get_kernels_num()) {
+  //   //     if (i == 0) {
+  //   //       // just add kid-0 to the first stream id
+  //   //       last_add_to_stream_idx = 0;
+  //   //       std::vector<int> tmp = {0};
+  //   //       concurrent_kernels.push_back(tmp);
+  //   //       last_stream_id = get_appcfg()->get_kernel_cuda_stream_id(0);
+  //   //       i++;
+  //   //     } else {
+  //   //       // check if the current kernel can be added to the last stream id
+  //   //       std::cout << "last_stream_id: " << last_stream_id << std::endl;
+  //   //       std::cout << "get_appcfg()->get_kernel_cuda_stream_id(i): " << get_appcfg()->get_kernel_cuda_stream_id(i) << std::endl;
+  //   //       if (get_appcfg()->get_kernel_cuda_stream_id(i) != last_stream_id) {
+  //   //         // can add to the last stream id
+  //   //         concurrent_kernels[last_add_to_stream_idx].push_back(i);
+  //   //         i++;
+  //   //       } else {
+  //   //         // cannot add to current stream id, just add to the next stream id, and
+  //   //         // the remaining kernels should also add to the next stream id.
+            
+  //   //         last_add_to_stream_idx += 1;
+  //   //         std::cout << "last_add_to_stream_idx: " << last_add_to_stream_idx << std::endl;
+  //   //         std::vector<int> tmp = {i};
+  //   //         concurrent_kernels.push_back(tmp);
+  //   //         last_stream_id = get_appcfg()->get_kernel_cuda_stream_id(i);
+  //   //         i++;
+  //   //       }
+  //   //     }
+  //   // }
+
+  //   // int idx = 0;
+  //   // for (auto x : concurrent_kernels) {
+  //   //   std::cout << "@@@ x-" << idx++ << "  ";
+  //   //   for (auto y : x) {
+  //   //     std::cout << y << " ";
+  //   //   }
+  //   //   std::cout << std::endl;
+  //   // }
+  // } else {
+  //   /* The GPU device does not support concurrent execution. */
+  //   for (int i = 0; i < get_appcfg()->get_kernels_num(); ++i) {
+  //     concurrent_kernels[i].push_back(i);
+  //   }
+  // }
+}
+
 void trace_parser::parse_configs_file(bool PRINT_LOG) {
   
   if (configs_filepath.back() == '/') {
@@ -1005,12 +985,15 @@ void trace_parser::parse_configs_file(bool PRINT_LOG) {
 
   /* process issue.config */
   process_configs_file(issue_config_path, ISSUE_CONFIG, PRINT_LOG);
+
+  /* process whether kernels can be issue concurrently */
+  judge_concurrent_issue();
 }
 
 #include <dirent.h>
 #include <regex>
 
-void trace_parser::process_mem_instns(std::string mem_instns_dir, bool PRINT_LOG) {
+void trace_parser::process_mem_instns(const std::string mem_instns_dir, bool PRINT_LOG) {
   mem_instns.resize(appcfg.get_kernels_num());
   for (int kid = 0; kid < appcfg.get_kernels_num(); ++kid)
     mem_instns[kid].resize(appcfg.get_kernel_grid_size(kid));
@@ -1184,7 +1167,7 @@ void trace_parser::parse_memcpy_info(const std::string &memcpy_command,
 
 std::vector<std::vector<inst_trace_t> *> trace_parser::get_next_threadblock_traces(
     unsigned trace_version, unsigned enable_lineinfo, std::ifstream *ifs,
-    std::string kernel_name,
+    const std::string kernel_name,
     unsigned kernel_id,
     unsigned num_warps_per_thread_block) {
   std::vector<std::vector<inst_trace_t> *> threadblock_traces;
@@ -1220,16 +1203,16 @@ std::vector<std::vector<inst_trace_t> *> trace_parser::get_next_threadblock_trac
         break;  // end of TB stream
       } else if (string1 == "thread" && string2 == "block") {
         assert(start_of_tb_stream_found);
-        sscanf(line.c_str(), "thread block = %d,%d,%d", &block_id_x,
+        sscanf(line.c_str(), "thread block = %u,%u,%u", &block_id_x,
                &block_id_y, &block_id_z);
         std::cout << "Parsing trace of " << line << "..." << std::endl;
       } else if (string1 == "warp") {
         // the start of new warp stream
         assert(start_of_tb_stream_found);
-        sscanf(line.c_str(), "warp = %d", &warp_id);
+        sscanf(line.c_str(), "warp = %u", &warp_id);
       } else if (string1 == "insts") {
         assert(start_of_tb_stream_found);
-        sscanf(line.c_str(), "insts = %d", &insts_num);
+        sscanf(line.c_str(), "insts = %u", &insts_num);
         threadblock_traces[warp_id] = new std::vector<inst_trace_t>();
         threadblock_traces[warp_id]->resize(insts_num);  // allocate all the space at once
         inst_count = 0;
