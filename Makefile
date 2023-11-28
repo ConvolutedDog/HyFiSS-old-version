@@ -15,10 +15,10 @@ else
 CXX = g++
 endif
 
-CXXFLAGS = -Wall
+CXXFLAGS = -Wall 
 
 # Detect Support for C++11 (C++0x) from GCC Version 
-GNUC_CPP0X := $(shell g++ --version | perl -ne 'if (/g++\s+\(.*\)\s+([0-9.]+)/){ if($$1 >= 4.3) {$$n=1} else {$$n=0;} } END { print $$n; }')
+GNUC_CPP0X := $(shell mpic++ --version | perl -ne 'if (/g++\s+\(.*\)\s+([0-9.]+)/){ if($$1 >= 4.3) {$$n=1} else {$$n=0;} } END { print $$n; }')
 
 ifeq ($(GNUC_CPP0X), 1)
 	CXXFLAGS += -std=c++11
