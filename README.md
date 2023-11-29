@@ -1,10 +1,10 @@
 
 
-### Speed
+### ***Simulation Speed***
 
 In the case of using *10* processes, the memory analysis of the `vectoradd` program tested by PPT-GPU takes about *16.26* seconds, while our model only takes *2.64* seconds, achieving a speedup of ***6.16***$\times$.
 
-### Valgrind
+### ***Use Valgrind to Analyze Code***
 
 The following describes how to compile and use `Valgrind` to detect potential problems with the simulator.
 
@@ -18,7 +18,7 @@ make DEBUG=1
 valgrind --leak-check=full --show-leak-kinds=all --allow-mismatched-debuginfo=yes --read-inline-info=yes --read-var-info=yes --quiet --verbose -v --log-file=valgrind.log ./memory_model.x --configs ./traces/vectoradd-2/configs/ --sort 0 --log 0 --tmp 0 > tmp.txt
 ```
 
-### perf
+### ***Use Perf to Analyze Code***
 
 Both of the following commands are running an MPI program, which requires 6 processes to run. The difference between these two commands is how they collect the program's performance data.
 
