@@ -44,7 +44,6 @@
 #include "../ISA-Def/turing_opcode.h"
 #include "../ISA-Def/volta_opcode.h"
 #include "../ISA-Def/accelwattch_component_mapping.h"
-#include "../common/common_def.h"
 #include "trace-driven.h"
 
 
