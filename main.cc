@@ -18,7 +18,6 @@
 #include "./trace-parser/trace-parser.h"
 #include "./trace-driven/trace-driven.h"
 #include "./common/CLI/CLI.hpp"
-#include "./common/common_def.h"
 #include "./parda/parda.h"
 
 #include <chrono>
@@ -46,30 +45,6 @@ void print_SM_traces(std::vector<mem_instn>* traces) {
     std::cout << std::hex << mem_ins.addr[0] << std::endl;
   }
 }
-
-
-#ifdef USE_BOOST
-void simple_mpi_test(int argc, char **argv) {
-
-  boost::mpi::environment env(argc, argv);
-  boost::mpi::communicator world;
-
-  if (world.rank() == 0) {
-    /* Send data in rank 0. */
-    int data = 123;
-    for (int i = 1; i < world.size(); i++) {
-      world.send(i, i, data);
-      std::cout << "rank " << 0 << " send data: " << data << " to rank: " << i << std::endl;
-    }
-  } else {
-    /* Recieve data in rank > 0. */
-    int recv_data;
-    world.recv(0, world.rank(), recv_data);
-    std::cout << "rank " << world.rank() << " recv data: " << recv_data << " from rank: " << 0 << std::endl;
-  }
-
-}
-#endif
 
 
 #ifdef USE_BOOST
@@ -229,16 +204,16 @@ void private_L1_cache_hit_rate_evaluate_boost_no_concurrent(int argc, char **arg
         pdt = &pdt_c;
         pdt->histogram[B_INF] += narray_get_len(pdt->ga);
 
-        // if (configs_dir.back() == '/') {
-        //   parda_histogram_filepath = configs_dir + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
-        // } else {
-        //   parda_histogram_filepath = configs_dir + "/" + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
-        // }
-        // file = fopen(parda_histogram_filepath.c_str(), "w");
-        // if (file != NULL) {
-          // parda_fprintf_histogram(pdt->histogram, file);
-        //   fclose(file);
-        // }
+        if (configs_dir.back() == '/') {
+          parda_histogram_filepath = configs_dir + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
+        } else {
+          parda_histogram_filepath = configs_dir + "/" + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
+        }
+        file = fopen(parda_histogram_filepath.c_str(), "w");
+        if (file != NULL) {
+          parda_fprintf_histogram(pdt->histogram, file);
+          fclose(file);
+        }
         parda_free(pdt);
       }
 
@@ -281,7 +256,8 @@ void private_L1_cache_hit_rate_evaluate(int argc, char **argv, std::map<int, std
 #endif
 
 int main(int argc, char **argv) {
-  
+
+START_TIMER(0);
 
 #ifdef USE_BOOST
   boost::mpi::environment env(argc, argv);
@@ -312,7 +288,7 @@ int main(int argc, char **argv) {
 
   tracer.parse_configs_file(PRINT_LOG);
 
-auto start = std::chrono::system_clock::now();
+START_TIMER(1);
 
   std::vector<int> need_to_read_mem_instns_sms;
 
@@ -340,15 +316,8 @@ auto start = std::chrono::system_clock::now();
 
   auto issuecfg = tracer.get_issuecfg();
 
-auto end = std::chrono::system_clock::now();
-auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-auto cost = double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den;
-std::cout << "Cost 1-" << cost << std::endl;
-
-
+STOP_AND_REPORT_TIMER_pass(-1, 1);
     
-
-  
   /* V100 schedules 128 kernels for concurrent execution at a time, thus requiring (all_kernels_num + 127)/128 schedules. */
   passnum_concurrent_issue_to_sm = int((tracer.get_appcfg()->get_kernels_num() + 
                                        (gpgpu_concurrent_kernel_sm ? gpu_config[V100].max_concurrent_kernels_num : 1) - 1) / 
@@ -364,11 +333,13 @@ std::cout << "Cost 1-" << cost << std::endl;
   
   SM_traces_all_passes.resize(passnum_concurrent_issue_to_sm);
 
-  
+START_TIMER(3);
 
     for (int pass = 0; pass < passnum_concurrent_issue_to_sm; pass++) {
       if (PRINT_LOG) std::cout << "Schedule pass: " << pass << std::endl;
-auto start6 = std::chrono::system_clock::now();
+
+START_TIMER(2);
+
       std::vector<trace_kernel_info_t*> single_pass_kernels_info;
       
       if (pass == passnum_concurrent_issue_to_sm - 1) {
@@ -496,18 +467,14 @@ auto start6 = std::chrono::system_clock::now();
       single_pass_kernels_info.clear();
       // single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? std::min(tracer.get_appcfg()->get_kernels_num(), 
       //                                                                        gpu_config[V100].max_concurrent_kernels_num) : 1);
-auto end6 = std::chrono::system_clock::now();
-auto duration6 = std::chrono::duration_cast<std::chrono::microseconds>(end6 - start6);
-auto cost6 = double(duration6.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den;
-std::cout << "pass-" << pass << " Cost 6-" << cost6 << std::endl;
+
+STOP_AND_REPORT_TIMER_pass(pass, 2);
 
     }
 
+STOP_AND_REPORT_TIMER_pass(-1, 3);
 
 #ifdef USE_BOOST
-  /* Just a simple test for MPI. */
-  /* simple_mpi_test(argc, argv); */
-  
   /* Set a barrier here to ensure all processes have received the data before proceeding. */
   world.barrier();
 
@@ -602,16 +569,12 @@ std::cout << "pass-" << pass << " Cost 6-" << cost6 << std::endl;
      * memory addrs from SM-curr_process_idx. We should sort the addrs by the time_stamp to simulator 
      * the order they are issued to L1 Cache. */
 
-auto start5 = std::chrono::system_clock::now();
+START_TIMER(4);
 
 
     private_L1_cache_hit_rate_evaluate_boost_no_concurrent(argc, argv, &SM_traces_all_passes,  _tmp_print_, configs);
 
-auto end5 = std::chrono::system_clock::now();
-auto duration5 = std::chrono::duration_cast<std::chrono::microseconds>(end5 - start5);
-auto cost5 = double(duration5.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den;
-std::cout << "L1 rank-" << world.rank() << " Cost 5-" << cost5 << std::endl;
-
+STOP_AND_REPORT_TIMER_rank(world.rank(), 4)
 
   // }
 
@@ -628,6 +591,8 @@ std::cout << "L1 rank-" << world.rank() << " Cost 5-" << cost5 << std::endl;
 #endif
 
   fflush(stdout);
-  
+
+STOP_AND_REPORT_TIMER_pass(-1, 0)
+
   return 0;
 }
