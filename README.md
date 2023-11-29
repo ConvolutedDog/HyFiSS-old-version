@@ -20,7 +20,7 @@ Both of the following commands are running an MPI program, which requires 6 proc
 
 `perf stat`: This command uses perf stat to collect performance statistics such as CPU usage, number of context switches, etc. These statistics will be displayed on the terminal after the end of the program.
 
-`perf record`: This command uses perf record to collect performance events such as CPU task-clock, branch prediction errors, etc. These events will be logged in a file called perf.data, and you can view them using the perf report command.
+`perf record`: This command uses perf record to collect performance events such as CPU task-clock, branch prediction errors, etc. These events will be logged in a file called ***perf.data***, and you can view them using the perf report command.
 
 
 ```shell
