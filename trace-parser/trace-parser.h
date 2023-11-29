@@ -321,9 +321,12 @@ struct mem_instn {
   mem_instn() {}
   mem_instn(unsigned _pc, unsigned long long _addr_start1, 
             unsigned _time_stamp, int addr_groups, 
-            unsigned long long _addr_start2) {
+            unsigned long long _addr_start2,
+            unsigned _mask, std::string _opcode) {
     pc = _pc;
     time_stamp = _time_stamp;
+    mask = _mask;
+    opcode = _opcode;
     for (unsigned i = 0; i < 32; i++)
       addr.push_back(_addr_start1 + i*8);
     if (addr_groups == 2) 
@@ -335,6 +338,8 @@ struct mem_instn {
   std::vector<unsigned long long> addr;
   unsigned time_stamp;
   bool valid = false;
+  unsigned mask;
+  std::string opcode;
 
 #ifdef USE_BOOST
   friend class boost::serialization::access;
@@ -343,6 +348,8 @@ struct mem_instn {
     ar & pc;
     ar & addr;
     ar & time_stamp;
+    ar & mask;
+    ar & opcode;
   }
 #endif
 };
