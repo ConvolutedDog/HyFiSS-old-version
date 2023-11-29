@@ -284,7 +284,20 @@ class issue_config {
             return &(*iter2);                                                // fixed
 
     return NULL;
-  } 
+  }
+
+  std::vector<std::pair<int, int>> get_kernel_block_by_smid(int smid) {
+    std::vector<std::pair<int, int>> result;
+    for (auto iter = trace_issued_sm_id_blocks.begin();
+              iter != trace_issued_sm_id_blocks.end(); ++iter) {
+      if ((*iter)[0].sm_id == (unsigned)smid) {
+        for (auto iter2 = iter->begin(); iter2 != iter->end(); ++iter2) {
+          result.push_back(std::make_pair(iter2->kernel_id, iter2->block_id));      
+        }
+      }
+    }
+    return result;
+  }
 
   int get_trace_issued_sms_num() { return trace_issued_sms_num; }
 
@@ -345,8 +358,8 @@ class trace_parser {
   void process_configs_file(std::string config_path, int config_type, bool PRINT_LOG);
   void judge_concurrent_issue();
 
-  void read_mem_instns(bool PRINT_LOG);
-  void process_mem_instns(std::string mem_instns_filepath, bool PRINT_LOG);
+  void read_mem_instns(bool PRINT_LOG, std::vector<std::pair<int, int>>* x);
+  void process_mem_instns(std::string mem_instns_filepath, bool PRINT_LOG, std::vector<std::pair<int, int>>* x);
 
   // kerneltraces_filepath is path to kernel-1.traceg et al.
   kernel_trace_t* parse_kernel_info(const std::string &kerneltraces_filepath);
