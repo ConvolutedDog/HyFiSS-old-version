@@ -1058,30 +1058,47 @@ void trace_parser::process_mem_instns(const std::string mem_instns_dir, bool PRI
           if (line.empty())
             continue;
           else {
-            // line: b0 969b38d6 7f60a5750000
-            int addr_groups;
+            // pos      1             2        3        4            5
+            // line  pc  opcode        mask     tstamp   addr_start1  addr_start2
+            // line: da0 LDG.E.U16.SYS 11111111 e4da28c9 7fbc157fe660 ____________
+            int _addr_groups;
             unsigned _pc, _time_stamp;
+            std::string _opcode;
+            unsigned _mask;
             unsigned long long _addr_start1, _addr_start2;
             // get above parameters from line
             std::stringstream ss;
             ss.str(line);
-            ss >> std::hex >> _pc >> _time_stamp;
+            ss >> std::hex >> _pc;
+            ss >> _opcode;
+            ss >> std::hex >> _mask;
+            ss >> std::hex >> _time_stamp;
             ss >> std::hex >> _addr_start1;
             size_t pos1 = line.find(' ');
             size_t pos2 = line.find(' ', pos1 + 1);
             size_t pos3 = line.find(' ', pos2 + 1);
             size_t pos4 = line.find(' ', pos3 + 1);
+            size_t pos5 = line.find(' ', pos4 + 1);
+            size_t pos6 = line.find(' ', pos5 + 1);
 
-            if (pos4 != std::string::npos) {
-              addr_groups = 2;
+            if (pos6 != std::string::npos) {
+              _addr_groups = 2;
               ss >> std::hex >> _addr_start2;
-            } else addr_groups = 1;
+            } else _addr_groups = 1;
 
-            // std::cout << "  " << line << " ";
-            // std::cout << "  pc: " << std::hex << _pc << " " << _time_stamp << " " 
-            //           << addr_groups << " " << _addr_start1 << std::endl;
-            mem_instns[kernel_id-1][block_id].push_back(mem_instn(_pc, _addr_start1, _time_stamp, addr_groups, _addr_start2));
-            // auto a = mem_instn(_pc, _addr_start1, _time_stamp, addr_groups, _addr_start2);
+            /* 
+            std::cout << "  " << line << " " << std::endl;
+            std::cout << "  pc: " << std::hex << _pc << " " << _opcode << " " << _mask << " " << _time_stamp << " " 
+                      << _addr_groups << " " << _addr_start1 << std::endl; 
+            */
+            mem_instns[kernel_id-1][block_id].push_back(mem_instn(_pc, 
+                                                                  _addr_start1, 
+                                                                  _time_stamp, 
+                                                                  _addr_groups, 
+                                                                  _addr_start2,
+                                                                  _mask,
+                                                                  _opcode));
+            // auto a = mem_instn(_pc, _addr_start1, _time_stamp, _addr_groups, _addr_start2);
             // mem_instns[kernel_id-1][block_id].push_back(a);
           }
         }
