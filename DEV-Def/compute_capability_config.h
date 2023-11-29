@@ -20,11 +20,13 @@ enum COMPUTE_CAPABILITY_CONFIG {
 };
 
 struct cc_config_t {
-  cc_config_t(int _warp_size, int _max_block_size, int _smem_allocation_size, 
+  cc_config_t(int _num_sm,
+              int _warp_size, int _max_block_size, int _smem_allocation_size, 
               int _max_registers_per_SM, int _max_registers_per_block, 
               int _max_registers_per_thread, int _register_allocation_size, 
               int _max_active_blocks_per_SM, int _max_active_threads_per_SM,
               int _max_concurrent_kernels_num) {
+    num_sm = _num_sm;
     warp_size = _warp_size;
     max_block_size = _max_block_size;
     smem_allocation_size = _smem_allocation_size;
@@ -37,6 +39,7 @@ struct cc_config_t {
     max_concurrent_kernels_num = _max_concurrent_kernels_num;
   }
   
+  int num_sm;
   int warp_size;
   int max_block_size;
   int smem_allocation_size;
@@ -61,15 +64,23 @@ enum SM_COMPUTE_CAPACITY {
 };
 
 /* store the device config of devices of compute capacity 50,52,53,60,61,70,75 */
-std::vector<struct cc_config_t> cc_config {
-  cc_config_t(32, 1024, 256,  65536, 65536, 255, 256, 32, 2048,  32), // sm50
-  cc_config_t(32, 1024, 256,  65536, 65536, 255, 256, 32, 2048,  32), // sm52
-  cc_config_t(32, 1024, 256,  65536, 32768, 255, 256, 32, 2048,  16), // sm53
-  cc_config_t(32, 1024, 256,  65536, 65536, 255, 256, 32, 2048, 128), // sm60
-  cc_config_t(32, 1024, 256,  65536, 65536, 255, 256, 32, 2048,  32), // sm61
-  // cc_config_t(32, 1024, 256,  65536, 65536, 255, 256, 32, 2048, 128), // sm70 // true
-  cc_config_t(32, 1024, 256,  65536, 65536, 255, 256, 32, 2048, 40), // debug // false
-  cc_config_t(32, 1024, 256,  65536, 65536, 255, 256, 32, 1024, 128), // sm75
+// std::vector<struct cc_config_t> cc_config {
+//   cc_config_t(32, 1024, 256,  65536, 65536, 255, 256, 32, 2048,  32), // sm50
+//   cc_config_t(32, 1024, 256,  65536, 65536, 255, 256, 32, 2048,  32), // sm52
+//   cc_config_t(32, 1024, 256,  65536, 32768, 255, 256, 32, 2048,  16), // sm53
+//   cc_config_t(32, 1024, 256,  65536, 65536, 255, 256, 32, 2048, 128), // sm60
+//   cc_config_t(32, 1024, 256,  65536, 65536, 255, 256, 32, 2048,  32), // sm61
+//   cc_config_t(32, 1024, 256,  65536, 65536, 255, 256, 32, 2048, 128), // sm70
+//   cc_config_t(32, 1024, 256,  65536, 65536, 255, 256, 32, 1024, 128), // sm75
+// };
+
+enum GPU_ARCH {
+  V100 = 0, 
+  NUM_GPU_ARCH,
+};
+
+std::vector<struct cc_config_t> gpu_config {
+  cc_config_t(80, 32, 1024, 256,  65536, 65536, 255, 256, 32, 2048, 128), // V100
 };
 
 #endif /* !COMPUTE_CAPABILITY_CONFIG_H */
