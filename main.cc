@@ -183,8 +183,8 @@ void private_L1_cache_hit_rate_evaluate_boost_no_concurrent(int argc, char **arg
   boost::mpi::communicator world;
 
 
-  /* 80 is the number of the SMs that have been used during the execution. */
-  const int pass_num = int((80 + world.size() - 1)/world.size());
+  /* gpu_config[V100].num_sm is the number of the SMs that have been used during the execution. */
+  const int pass_num = int((gpu_config[V100].num_sm + world.size() - 1)/world.size());
 
   unsigned l1_cache_line_size = 32; // BUG: need configure
 
@@ -193,7 +193,7 @@ void private_L1_cache_hit_rate_evaluate_boost_no_concurrent(int argc, char **arg
   for (int pass = 0; pass < pass_num; pass++) {
     int curr_process_idx_rank = world.rank() + pass * world.size();
     int curr_process_idx;
-    if (curr_process_idx_rank < 80) {
+    if (curr_process_idx_rank < gpu_config[V100].num_sm) {
       curr_process_idx = curr_process_idx_rank;
     } else continue;
 
@@ -236,7 +236,7 @@ void private_L1_cache_hit_rate_evaluate_boost_no_concurrent(int argc, char **arg
         // }
         // file = fopen(parda_histogram_filepath.c_str(), "w");
         // if (file != NULL) {
-        //   parda_fprintf_histogram(pdt->histogram, file);
+          // parda_fprintf_histogram(pdt->histogram, file);
         //   fclose(file);
         // }
         parda_free(pdt);
@@ -316,12 +316,12 @@ auto start = std::chrono::system_clock::now();
 
   std::vector<int> need_to_read_mem_instns_sms;
 
-  const int pass_num = int((80 + world.size() - 1)/world.size());
+  const int pass_num = int((gpu_config[V100].num_sm + world.size() - 1)/world.size());
   for (int _pass = 0; _pass < pass_num; _pass++) {
     int curr_process_idx_rank = world.rank() + _pass * world.size();
     /* curr_process_idx is the SM id that should be processed */
     int curr_process_idx = curr_process_idx_rank;
-    if (curr_process_idx < 80)
+    if (curr_process_idx < gpu_config[V100].num_sm)
     need_to_read_mem_instns_sms.push_back(curr_process_idx);
   }
 
@@ -351,10 +351,10 @@ std::cout << "Cost 1-" << cost << std::endl;
   
   /* V100 schedules 128 kernels for concurrent execution at a time, thus requiring (all_kernels_num + 127)/128 schedules. */
   passnum_concurrent_issue_to_sm = int((tracer.get_appcfg()->get_kernels_num() + 
-                                       (gpgpu_concurrent_kernel_sm ? cc_config[SM70].max_concurrent_kernels_num : 1) - 1) / 
-                                       (gpgpu_concurrent_kernel_sm ? cc_config[SM70].max_concurrent_kernels_num : 1));
+                                       (gpgpu_concurrent_kernel_sm ? gpu_config[V100].max_concurrent_kernels_num : 1) - 1) / 
+                                       (gpgpu_concurrent_kernel_sm ? gpu_config[V100].max_concurrent_kernels_num : 1));
   // std::cout << "get_kernels_num:" << tracer.get_appcfg()->get_kernels_num() << std::endl;
-  // std::cout << "max_concurrent_kernels_num:" << cc_config[SM70].max_concurrent_kernels_num << std::endl;
+  // std::cout << "max_concurrent_kernels_num:" << gpu_config[V100].max_concurrent_kernels_num << std::endl;
   // std::cout << std::endl;
 
 
@@ -373,12 +373,12 @@ auto start6 = std::chrono::system_clock::now();
       
       if (pass == passnum_concurrent_issue_to_sm - 1) {
         single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? tracer.get_appcfg()->get_kernels_num() - 
-                                                                      cc_config[SM70].max_concurrent_kernels_num * pass : 1);
+                                                                      gpu_config[V100].max_concurrent_kernels_num * pass : 1);
       } else if (pass == 0) {
         single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? std::min(tracer.get_appcfg()->get_kernels_num(), 
-                                                                               cc_config[SM70].max_concurrent_kernels_num) : 1);
+                                                                               gpu_config[V100].max_concurrent_kernels_num) : 1);
       } else {
-        single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? cc_config[SM70].max_concurrent_kernels_num : 1);
+        single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? gpu_config[V100].max_concurrent_kernels_num : 1);
       }
 
       /* for the pass-th scheduling process, V100 will schedule min(128,tracer.kernels_num) kernels to SMs,
@@ -386,8 +386,8 @@ auto start6 = std::chrono::system_clock::now();
        * and then to evaluate every L1D cache in SMs, and also will interleave their missed address to L2D cache,
        * and evaluate L2D cache. Here start_kernel_id and end_kernel_id is the range  of kernels that should be 
        * executed during this pass. */
-      int start_kernel_id = pass * (gpgpu_concurrent_kernel_sm ? cc_config[SM70].max_concurrent_kernels_num : 1);
-      int end_kernel_id = (pass + 1) * (gpgpu_concurrent_kernel_sm ? cc_config[SM70].max_concurrent_kernels_num : 1) - 1;
+      int start_kernel_id = pass * (gpgpu_concurrent_kernel_sm ? gpu_config[V100].max_concurrent_kernels_num : 1);
+      int end_kernel_id = (pass + 1) * (gpgpu_concurrent_kernel_sm ? gpu_config[V100].max_concurrent_kernels_num : 1) - 1;
       
       /* Here we traversal all the kernels that should be executed during this pass, to create their kernel-info 
        * object. And then the kernels that belong to the same SM will to be used to evaluate L1D cache. */
@@ -408,12 +408,12 @@ auto start6 = std::chrono::system_clock::now();
       
 
       /* pass_num is the SMs that the current rank should process */
-      const int pass_num = int((80 + world.size() - 1)/world.size());
+      const int pass_num = int((gpu_config[V100].num_sm + world.size() - 1)/world.size());
       for (int _pass = 0; _pass < pass_num; _pass++) {
         int curr_process_idx_rank = world.rank() + _pass * world.size();
         /* curr_process_idx is the SM id that should be processed */
         int curr_process_idx = curr_process_idx_rank;
-        if (curr_process_idx < 80)
+        if (curr_process_idx < gpu_config[V100].num_sm)
         for (auto k : single_pass_kernels_info) {
 
           if (PRINT_LOG) std::cout << "      kernel_id[" << k->get_trace_info()->kernel_id 
@@ -495,7 +495,7 @@ auto start6 = std::chrono::system_clock::now();
       }
       single_pass_kernels_info.clear();
       // single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? std::min(tracer.get_appcfg()->get_kernels_num(), 
-      //                                                                        cc_config[SM70].max_concurrent_kernels_num) : 1);
+      //                                                                        gpu_config[V100].max_concurrent_kernels_num) : 1);
 auto end6 = std::chrono::system_clock::now();
 auto duration6 = std::chrono::duration_cast<std::chrono::microseconds>(end6 - start6);
 auto cost6 = double(duration6.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den;
