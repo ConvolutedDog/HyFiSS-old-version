@@ -1,5 +1,9 @@
 
 
+### Speed
+
+In the case of using *10* processes, the memory analysis of the `vectoradd` program tested by PPT-GPU takes about *16.26* seconds, while our model only takes *2.64* seconds, achieving a speedup of ***6.16***$\times$.
+
 ### Valgrind
 
 The following describes how to compile and use `Valgrind` to detect potential problems with the simulator.
