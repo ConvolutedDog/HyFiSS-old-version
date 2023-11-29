@@ -992,8 +992,30 @@ void trace_parser::parse_configs_file(bool PRINT_LOG) {
 
 #include <dirent.h>
 #include <regex>
+#include <algorithm>
 
-void trace_parser::process_mem_instns(const std::string mem_instns_dir, bool PRINT_LOG) {
+
+bool judge_format(char* d_name, std::vector<std::pair<int, int>>* x) {
+  std::string name = d_name;
+  std::regex pattern("kernel_(\\d+)_block_(\\d+).mem");
+  std::smatch match;
+
+  if (std::regex_match(name, match, pattern)) {
+    int xx = std::stoi(match[1]);
+    int yy = std::stoi(match[2]);
+
+    if (std::find((*x).begin(), (*x).end(), std::make_pair(xx, yy)) != (*x).end()) {
+      return true;
+    } else {
+      return false;
+    }
+  } else {
+    return false;
+  }
+}
+
+
+void trace_parser::process_mem_instns(const std::string mem_instns_dir, bool PRINT_LOG, std::vector<std::pair<int, int>>* x) {
   mem_instns.resize(appcfg.get_kernels_num());
   for (int kid = 0; kid < appcfg.get_kernels_num(); ++kid)
     mem_instns[kid].resize(appcfg.get_kernel_grid_size(kid));
@@ -1010,6 +1032,7 @@ void trace_parser::process_mem_instns(const std::string mem_instns_dir, bool PRI
   
   while ((entry = readdir(dir)) != nullptr) {
     if (entry->d_type == DT_REG && 
+        judge_format(entry->d_name, x) &&
         entry->d_name[strlen(entry->d_name) - 4] == '.' && 
         entry->d_name[strlen(entry->d_name) - 3] == 'm' && 
         entry->d_name[strlen(entry->d_name) - 2] == 'e' && 
@@ -1072,7 +1095,7 @@ void trace_parser::process_mem_instns(const std::string mem_instns_dir, bool PRI
   closedir(dir);
 }
 
-void trace_parser::read_mem_instns(bool PRINT_LOG) {
+void trace_parser::read_mem_instns(bool PRINT_LOG, std::vector<std::pair<int, int>>* x) {
   if (configs_filepath.back() == '/') {
     mem_instns_dir = configs_filepath + "../memory_traces";
   } else {
@@ -1094,7 +1117,7 @@ void trace_parser::read_mem_instns(bool PRINT_LOG) {
   // }
 
   // process mem_instns
-  process_mem_instns(mem_instns_dir, PRINT_LOG);
+  process_mem_instns(mem_instns_dir, PRINT_LOG, x);
 }
 
 std::pair<std::vector<trace_command>, int> trace_parser::parse_commandlist_file() {
