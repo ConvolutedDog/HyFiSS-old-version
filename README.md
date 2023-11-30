@@ -15,7 +15,7 @@ The following describes how to compile and use `Valgrind` to detect potential pr
 ```shell
 make DEBUG=1
 
-valgrind --leak-check=full --show-leak-kinds=all --allow-mismatched-debuginfo=yes --read-inline-info=yes --read-var-info=yes --quiet --verbose -v --log-file=valgrind.log ./memory_model.x --configs ./traces/vectoradd-2/configs/ --sort 0 --log 0 --tmp 0 > tmp.txt
+valgrind --leak-check=full --show-leak-kinds=all --allow-mismatched-debuginfo=yes --read-inline-info=yes --read-var-info=yes --quiet --verbose -v --log-file=valgrind.log ./memory_model.x --configs ./traces/vectoradd/configs/ --sort 0 --log 0 --tmp 0 --dump_histogram 0 > tmp.txt
 ```
 
 ### ***Use Perf to Analyze Code***
@@ -28,6 +28,6 @@ Both of the following commands are running an MPI program, which requires 6 proc
 
 
 ```shell
-perf stat mpirun -np 6 ./memory_model.x --configs ./traces/vectoradd-3/configs/ --sort 0 --log 0 --tmp 0 > tmp.txt
-perf record mpirun -np 6 ./memory_model.x --configs ./traces/vectoradd-3/configs/ --sort 0 --log 0 --tmp 0 > tmp.txt
+perf stat mpirun -np 6 ./memory_model.x --configs ./traces/vectoradd/configs/ --sort 0 --log 0 --tmp 0 --dump_histogram 0 > tmp.txt
+perf record mpirun -np 6 ./memory_model.x --configs ./traces/vectoradd/configs/ --sort 0 --log 0 --tmp 0 --dump_histogram 0 > tmp.txt
 ```
