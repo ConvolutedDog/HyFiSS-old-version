@@ -317,6 +317,18 @@ class issue_config {
   std::vector<std::vector<block_info_t>> trace_issued_sm_id_blocks;
 };
 
+/* enum of 'RED'/'ATOM'/'LDG'/'STG'/'LDL'/'STL' */
+enum mem_instn_type {
+  UNKOWN_TYPE = 0,
+  RED,
+  ATOM,
+  LDG,
+  STG,
+  LDL,
+  STL,
+  num_mem_instn_types,
+};
+
 struct mem_instn {
   mem_instn() {}
   mem_instn(unsigned _pc, unsigned long long _addr_start1, 
@@ -326,13 +338,19 @@ struct mem_instn {
     pc = _pc;
     time_stamp = _time_stamp;
     mask = _mask;
+    std::bitset<32> active_mask(mask);
     opcode = _opcode;
     for (unsigned i = 0; i < 32; i++)
-      addr.push_back(_addr_start1 + i*8);
+      if (active_mask.test(i))
+        addr.push_back(_addr_start1 + i*8);
     if (addr_groups == 2) 
       for (unsigned i = 0; i < 32; i++) 
-        addr.push_back(_addr_start2 + i*8);
+        if (active_mask.test(i))
+          addr.push_back(_addr_start2 + i*8);
     valid = true;
+    mem_access_type = has_mem_instn_type();
+
+    distance.resize(addr.size());
   }
   unsigned pc;
   std::vector<unsigned long long> addr;
@@ -340,6 +358,26 @@ struct mem_instn {
   bool valid = false;
   unsigned mask;
   std::string opcode;
+  enum mem_instn_type mem_access_type;
+
+  std::vector<int> distance;
+
+  /* Here we will judge if or not the opcode has 'RED'/'ATOM'/'LDG'/'STG'/'LDL'/'STL'.
+   * 1. RED: global reduction operations, Reduction Operation on generic Memory.
+   * 2. ATOM: global atomic operations, Atomic Operation on generic Memory.
+   * 3. LDG: load from global memory access.
+   * 4. STG: store to global memory access.
+   * 5. LDL: load from local memory access.
+   * 6. STL: store to local memory access. */
+  enum mem_instn_type has_mem_instn_type() {
+    if (opcode.find("RED") != std::string::npos) return RED;
+    else if (opcode.find("ATOM") != std::string::npos) return ATOM;
+    else if (opcode.find("LDG") != std::string::npos) return LDG;
+    else if (opcode.find("STG") != std::string::npos) return STG;
+    else if (opcode.find("LDL") != std::string::npos) return LDL;
+    else if (opcode.find("STL") != std::string::npos) return STL;
+    else return UNKOWN_TYPE;
+  }
 
 #ifdef USE_BOOST
   friend class boost::serialization::access;
@@ -350,6 +388,8 @@ struct mem_instn {
     ar & time_stamp;
     ar & mask;
     ar & opcode;
+    ar & valid;
+    ar & mem_access_type;
   }
 #endif
 };
