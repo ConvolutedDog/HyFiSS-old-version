@@ -66,33 +66,6 @@ enum mem_operation_t { NOT_TEX, TEX };
 typedef enum mem_operation_t mem_operation;
 
 
-// Let's just upgrade to C++11 so we can use constexpr here...
-// start allocating from this address (lower values used for allocating globals
-// in .ptx file)
-const unsigned long long GLOBAL_HEAP_START = 0xC0000000;
-// Volta max shmem size is 96kB
-const unsigned long long SHARED_MEM_SIZE_MAX = 96 * (1 << 10);
-// Volta max local mem is 16kB
-const unsigned long long LOCAL_MEM_SIZE_MAX = 1 << 14;
-// Volta Titan V has 80 SMs
-const unsigned MAX_STREAMING_MULTIPROCESSORS = 80;
-// Max 2048 threads / SM
-const unsigned MAX_THREAD_PER_SM = 1 << 11;
-// MAX 64 warps / SM
-const unsigned MAX_WARP_PER_SM = 1 << 6;
-const unsigned long long TOTAL_LOCAL_MEM_PER_SM =
-    MAX_THREAD_PER_SM * LOCAL_MEM_SIZE_MAX;
-const unsigned long long TOTAL_SHARED_MEM =
-    MAX_STREAMING_MULTIPROCESSORS * SHARED_MEM_SIZE_MAX;
-const unsigned long long TOTAL_LOCAL_MEM =
-    MAX_STREAMING_MULTIPROCESSORS * MAX_THREAD_PER_SM * LOCAL_MEM_SIZE_MAX;
-const unsigned long long SHARED_GENERIC_START =
-    GLOBAL_HEAP_START - TOTAL_SHARED_MEM;
-const unsigned long long LOCAL_GENERIC_START =
-    SHARED_GENERIC_START - TOTAL_LOCAL_MEM;
-const unsigned long long STATIC_ALLOC_LIMIT =
-    GLOBAL_HEAP_START - (TOTAL_LOCAL_MEM + TOTAL_SHARED_MEM);
-
 // enum uarch_operand_type_t { UN_OP = -1, INT_OP, FP_OP };
 // typedef enum uarch_operand_type_t types_of_operands;
 
@@ -597,5 +570,19 @@ class trace_kernel_info_t : public kernel_info_t{
 
 
 types_of_operands get_oprnd_type(op_type op, special_ops sp_op);
+
+class mem_stat_t {
+ public:
+  mem_stat_t();
+
+
+
+
+
+
+
+
+};
+
 
 #endif
