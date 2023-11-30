@@ -152,8 +152,12 @@ void private_L1_cache_hit_rate_evaluate_boost(int argc, char **argv, std::map<in
   }
 }
 
-void private_L1_cache_hit_rate_evaluate_boost_no_concurrent(int argc, char **argv, std::vector<std::map<int, std::vector<mem_instn>>>* SM_traces_all_passes, 
-                                                            int _tmp_print_, std::string configs_dir) {
+void private_L1_cache_hit_rate_evaluate_boost_no_concurrent(int argc, 
+                                                            char **argv, 
+                                                            std::vector<std::map<int, std::vector<mem_instn>>>* SM_traces_all_passes, 
+                                                            int _tmp_print_, 
+                                                            std::string configs_dir,
+                                                            bool dump_histogram) {
   boost::mpi::environment env(argc, argv);
   boost::mpi::communicator world;
 
@@ -185,7 +189,10 @@ void private_L1_cache_hit_rate_evaluate_boost_no_concurrent(int argc, char **arg
       for (unsigned kid = 0; kid < (*SM_traces_all_passes).size() ; kid++) {
         tim = 0;
         pdt_c = parda_init();
-        for (auto mem_ins : (*SM_traces_all_passes)[kid][curr_process_idx]) { // ONLY USE curr_process_idx !!!
+        /* Here we ONLY USE the curr_process_idx-th items of SM_traces_all_passes, so for every rank, 
+         * we only load the curr_process_idx-th items for all kernels into SM_traces_all_passes, which 
+         * significantly accelerate the simulation speed. */
+        for (auto mem_ins : (*SM_traces_all_passes)[kid][curr_process_idx]) { 
           // if (world.rank() == 0) {
           //   std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_idx << " " << "kid-" << kid << " ";
           //   std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
@@ -193,30 +200,40 @@ void private_L1_cache_hit_rate_evaluate_boost_no_concurrent(int argc, char **arg
           //   std::cout << std::hex << mem_ins.addr[0] << std::endl;
           // }
           // HKEY input should be char* of addr
-          for (unsigned j = 0; j < (mem_ins.addr).size(); j++) { // BUG: mask + merge
-            sprintf(input, "0x%llx", mem_ins.addr[j] >> int(log2(l1_cache_line_size)));
-            // std::cout << input << std::endl;
-            process_one_access(input, &pdt_c, tim);
-            tim++;
+          std::vector<unsigned long long> have_got_line_addr;
+          for (unsigned j = 0; j < (mem_ins.addr).size(); j++) {
+            unsigned long long cache_line_addr = mem_ins.addr[j] >> int(log2(l1_cache_line_size));
+            if(std::find(have_got_line_addr.begin(), have_got_line_addr.end(), cache_line_addr) != have_got_line_addr.end()) {
+              sprintf(input, "0x%llx", cache_line_addr);
+              // process_one_access(input, &pdt_c, tim);
+              mem_ins.distance[j] = process_one_access_and_get_distance(input, &pdt_c, tim);
+              tim++;
+            } else {
+              have_got_line_addr.push_back(cache_line_addr);
+              mem_ins.distance[j] = 0;
+            }
           }
         }
 
         pdt = &pdt_c;
         pdt->histogram[B_INF] += narray_get_len(pdt->ga);
 
-        if (configs_dir.back() == '/') {
-          parda_histogram_filepath = configs_dir + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
-        } else {
-          parda_histogram_filepath = configs_dir + "/" + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
+        if (dump_histogram) {
+          if (configs_dir.back() == '/')
+            parda_histogram_filepath = configs_dir + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
+          else
+            parda_histogram_filepath = configs_dir + "/" + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
+          
+          file = fopen(parda_histogram_filepath.c_str(), "w");
+          
+          if (file != NULL) {
+            parda_fprintf_histogram(pdt->histogram, file);
+            fclose(file);
+          }
         }
-        file = fopen(parda_histogram_filepath.c_str(), "w");
-        if (file != NULL) {
-          parda_fprintf_histogram(pdt->histogram, file);
-          fclose(file);
-        }
+        
         parda_free(pdt);
       }
-
   }
 }
 #else
@@ -269,12 +286,15 @@ START_TIMER(0);
   std::string configs;
   bool PRINT_LOG = true;
   bool sort = false;
+  bool dump_histogram = false;
 
   app.add_option("--configs", configs, "The configs path, which is generated from our NVBit tool, "
                                        "e.g., \"./traces/vectoradd/configs\"");
   app.add_option("--sort", sort, "Simulate the order in which instructions are issued based on their "
                                  "timestamps");
   app.add_option("--log", PRINT_LOG, "Print the traces processing log or not");
+  app.add_option("--dump_histogram", dump_histogram, "Dump the histogram of the private L1 cache hit "
+                                                     "rate");
 
   int _tmp_print_;
 
@@ -571,8 +591,7 @@ STOP_AND_REPORT_TIMER_pass(-1, 3);
 
 START_TIMER(4);
 
-
-    private_L1_cache_hit_rate_evaluate_boost_no_concurrent(argc, argv, &SM_traces_all_passes,  _tmp_print_, configs);
+    private_L1_cache_hit_rate_evaluate_boost_no_concurrent(argc, argv, &SM_traces_all_passes,  _tmp_print_, configs, dump_histogram);
 
 STOP_AND_REPORT_TIMER_rank(world.rank(), 4)
 
