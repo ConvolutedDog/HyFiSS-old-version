@@ -267,38 +267,97 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
   }
 }
 #else
-void private_L1_cache_stack_distance_evaluate(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int pass_issue) { // BUG， have not modified
-  const int SM_traces_ptr_size = (int)(*SM_traces_ptr).size();
-  /* Every rank process one *(SM_traces_ptr)[i], it will have pass_num passes to complete, 
-   * which also means that every rank should process at most pass_num traces. */
-  const int pass_num = SM_traces_ptr_size;
-
-  HKEY input;
-  long tim = 0;
-  program_data_t pdt_c = parda_init();
+void private_L1_cache_stack_distance_evaluate_no_boost_no_concurrent(int argc, 
+                                                                  char **argv, 
+                                                                  std::vector<std::map<int, std::vector<mem_instn>>>* SM_traces_all_passes, 
+                                                                  int _tmp_print_, 
+                                                                  std::string configs_dir,
+                                                                  bool dump_histogram) {
+  /* gpu_config[V100].num_sm is the number of the SMs that have been used during the execution. */
+  const int pass_num = int(gpu_config[V100].num_sm);
 
   unsigned l1_cache_line_size = 32; // BUG: need configure
+  unsigned l1_cache_size = 32 * 1024; // BUG: need configure
+  unsigned l1_cache_associativity = 64; // BUG: need configure
+  unsigned l1_cache_blocks = l1_cache_size / l1_cache_line_size; // BUG: need configure
+
+  std::cout << std::endl;
 
   for (int pass = 0; pass < pass_num; pass++) {
-    // TODO: implement the private cache hit rate evaluate.
-    int curr_process_sm_id = getIthKey(SM_traces_ptr, pass);
-    for (auto mem_ins : (*SM_traces_ptr)[curr_process_sm_id]) {
-      // std::cout << "SM-" << pass << " ";
-      // std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
-      // std::cout << std::hex << mem_ins.time_stamp << " ";
-      // std::cout << std::hex << mem_ins.addr[0] << std::endl;
-      for (unsigned j = 0; j < (mem_ins.addr).size(); j++) { // BUG: mask + merge
-        sprintf(input, "0x%llx", mem_ins.addr[j] >> int(log2(l1_cache_line_size)));
-        process_one_access(input, &pdt_c, tim);
-        tim++;
+    int curr_process_idx_rank = pass;
+    int curr_process_idx;
+    if (curr_process_idx_rank < gpu_config[V100].num_sm) {
+      curr_process_idx = curr_process_idx_rank;
+    } else continue;
+
+    /* HKEY input should be char* of addr */
+    HKEY input;
+    long tim;
+    program_data_t pdt_c;
+    program_data_t* pdt;
+    FILE* file;
+    std::string parda_histogram_filepath;
+    for (unsigned kid = 0; kid < (*SM_traces_all_passes).size() ; kid++) {
+      unsigned miss_num_all_acc = 0;
+      unsigned num_all_acc = 0;
+
+      tim = 0;
+      pdt_c = parda_init();
+      /* Here we ONLY USE the curr_process_idx-th items of SM_traces_all_passes, so for every rank, 
+       * we only load the curr_process_idx-th items for all kernels into SM_traces_all_passes, which 
+       * significantly accelerate the simulation speed. */
+      for (auto mem_ins : (*SM_traces_all_passes)[kid][curr_process_idx]) { 
+        std::vector<unsigned long long> have_got_line_addr; // use have_got_line_addr will cause not accurate hit rate 
+        for (unsigned j = 0; j < (mem_ins.addr).size(); j++) {
+          unsigned long long cache_line_addr = mem_ins.addr[j] >> int(log2(l1_cache_line_size));
+          /**/ // use have_got_line_addr will cause not accurate hit rate
+          if(std::find(have_got_line_addr.begin(), have_got_line_addr.end(), cache_line_addr) != have_got_line_addr.end()) {
+            mem_ins.distance[j] = 0;
+            // num_all_acc++;
+          } else {
+          /**/ // use have_got_line_addr will cause not accurate hit rate 
+            sprintf(input, "0x%llx", cache_line_addr);
+            /* If you only want to dump the histogram of each SM for every kernel, you can also use: 
+             *     process_one_access(input, &pdt_c, tim); */
+            mem_ins.distance[j] = process_one_access_and_get_distance(input, &pdt_c, tim);
+            if (mem_ins.distance[j] > (int)l1_cache_blocks) {
+              miss_num_all_acc++;
+            }
+            num_all_acc++;
+            
+            tim++;
+            have_got_line_addr.push_back(cache_line_addr); // use have_got_line_addr will cause not accurate hit rate 
+          /**/ // use have_got_line_addr will cause not accurate hit rate 
+          }
+          /**/ // use have_got_line_addr will cause not accurate hit rate 
+        }
       }
+
+      // if (num_all_acc > 0) if (kid==0)
+      // std::cout << "SM-" << curr_process_idx << " kid-" << kid
+      //           << " num_all_acc-" << num_all_acc << " miss_num_all_acc-" << miss_num_all_acc 
+      //           << " miss rate-" << (double)miss_num_all_acc / num_all_acc << std::endl;
+
+      pdt = &pdt_c;
+      pdt->histogram[B_INF] += narray_get_len(pdt->ga);
+
+      if (dump_histogram) {
+        if (configs_dir.back() == '/')
+          parda_histogram_filepath = configs_dir + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
+        else
+          parda_histogram_filepath = configs_dir + "/" + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
+          
+        file = fopen(parda_histogram_filepath.c_str(), "w");
+          
+        if (file != NULL) {
+          parda_fprintf_histogram(pdt->histogram, file);
+          fclose(file);
+        }
+      }
+        
+      parda_free(pdt);
     }
   }
-
-  program_data_t* pdt = &pdt_c;
-  pdt->histogram[B_INF] += narray_get_len(pdt->ga);
-  parda_print_histogram(pdt->histogram);
-  parda_free(pdt);
 }
 #endif
 
