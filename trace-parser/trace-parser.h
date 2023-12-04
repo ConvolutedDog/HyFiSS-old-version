@@ -335,6 +335,7 @@ struct mem_instn {
             unsigned _time_stamp, int addr_groups, 
             unsigned long long _addr_start2,
             unsigned _mask, std::string _opcode) {
+    /* This function has been deprecated. */
     pc = _pc;
     time_stamp = _time_stamp;
     mask = _mask;
@@ -352,6 +353,44 @@ struct mem_instn {
 
     distance.resize(addr.size());
   }
+  mem_instn(unsigned _pc, unsigned long long _addr_start1, 
+            unsigned _time_stamp, int addr_groups, 
+            unsigned long long _addr_start2,
+            unsigned _mask, std::string _opcode, 
+            std::vector<long long>* _stride_num) {
+    pc = _pc;
+    time_stamp = _time_stamp;
+    mask = _mask;
+    std::bitset<32> active_mask(mask);
+    opcode = _opcode;
+    valid = true;
+    mem_access_type = has_mem_instn_type();
+
+    unsigned long long last_addr;
+    for (unsigned i = 0; i < 32; i++) {
+      if (i == 0) {
+        last_addr = _addr_start1;
+      } else {
+        last_addr += (*_stride_num)[i-1];
+      }
+      if (active_mask.test(i))
+        addr.push_back(last_addr);
+    }
+    if (addr_groups == 2) {
+      for (unsigned i = 0; i < 32; i++) {
+        if (i == 0) {
+          last_addr = _addr_start2;
+        } else {
+          last_addr += (*_stride_num)[31 + i-1];
+        }
+        if (active_mask.test(i))
+          addr.push_back(last_addr);
+      }
+    }
+
+    distance.resize(addr.size());
+  }
+
   unsigned pc;
   std::vector<unsigned long long> addr;
   unsigned time_stamp;
