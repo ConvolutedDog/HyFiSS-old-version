@@ -1058,48 +1058,83 @@ void trace_parser::process_mem_instns(const std::string mem_instns_dir, bool PRI
           if (line.empty())
             continue;
           else {
-            // pos      1             2        3        4            5
-            // line  pc  opcode        mask     tstamp   addr_start1  addr_start2
-            // line: da0 LDG.E.U16.SYS 11111111 e4da28c9 7fbc157fe660 ____________
+            // origin format: pos      1             2        3        4            5
+            //                line  pc  opcode        mask     tstamp   addr_start1  addr_start2
+            //                line: da0 LDG.E.U16.SYS 11111111 e4da28c9 7fbc157fe660 ____________
+            // new format: pos      1                      2        3        4              5   6     7   8     9   10    11  12 ...
+            //             line  pc  opcode                 mask     tstamp   x addr_start1    y stride:num                        z addr_start2  stride:num
+            //             line: a00 LDG.E.U16.CONSTANT.GPU ffffffff dbf2ab7a 1 0x7ff3c3721600 7 2:7 3f2:1 2:7 3f2:1 2:7 3f2:1 2:7 _ ____________ ____________
+            //                   x : if has addr_start2, x=2, else x=1. x == _addr_groups
+            //                   y : num of addr_start1's stride-num pairs, y == stride_num_pairs_1
+            //                   z : num of addr_start2's stride-num pairs, z == stride_num_pairs_2
+
             int _addr_groups;
             unsigned _pc, _time_stamp;
             std::string _opcode;
             unsigned _mask;
             unsigned long long _addr_start1, _addr_start2;
+            unsigned stride_num_pairs_1, stride_num_pairs_2;
             // get above parameters from line
             std::stringstream ss;
             ss.str(line);
+            // std::cout << "line: " << line << std::endl;
             ss >> std::hex >> _pc;
             ss >> _opcode;
             ss >> std::hex >> _mask;
             ss >> std::hex >> _time_stamp;
+            ss >> std::hex >> _addr_groups;
             ss >> std::hex >> _addr_start1;
-            size_t pos1 = line.find(' ');
-            size_t pos2 = line.find(' ', pos1 + 1);
-            size_t pos3 = line.find(' ', pos2 + 1);
-            size_t pos4 = line.find(' ', pos3 + 1);
-            size_t pos5 = line.find(' ', pos4 + 1);
-            size_t pos6 = line.find(' ', pos5 + 1);
+            ss >> std::hex >> stride_num_pairs_1;
 
-            if (pos6 != std::string::npos) {
-              _addr_groups = 2;
+            std::vector<long long> _stride_num;
+            std::string tmp_stride_num;
+            // std::cout << "stride_num_pairs_1: " << stride_num_pairs_1 << std::endl;
+            for (unsigned _i = 0; _i < stride_num_pairs_1; _i++) {
+              ss >> tmp_stride_num;
+              size_t pos = tmp_stride_num.find(':');
+              // std::cout << "tmp_stride_num: " << tmp_stride_num << std::endl;
+              long long stride = std::stoll(tmp_stride_num.substr(0, pos), nullptr, 10);
+              int num = std::stoi(tmp_stride_num.substr(pos + 1), nullptr, 10);
+              // std::cout << "stride: " << stride << " num: " << num 
+              //           << " tmp_stride_num.length(): " << tmp_stride_num.length() << std::endl;
+              for (int _j = 0; _j < num; _j++) {
+                _stride_num.push_back(stride);
+              }
+            }
+
+            if (_addr_groups == 2) {
               ss >> std::hex >> _addr_start2;
-            } else _addr_groups = 1;
+              ss >> std::hex >> stride_num_pairs_2;
+              for (unsigned _i = 0; _i < stride_num_pairs_2; _i++) {
+                ss >> tmp_stride_num;
+                size_t pos = tmp_stride_num.find(':');
+                long long stride = std::stoll(tmp_stride_num.substr(0, pos), nullptr, 10);
+                int num = std::stoi(tmp_stride_num.substr(pos + 1), nullptr, 10);
+                for (int _j = 0; _j < num; _j++) {
+                  _stride_num.push_back(stride);
+                }
+              }
+            }
 
-            /* 
+            /*
+            std::cout << mem_instns_filepath << std::endl;
             std::cout << "  " << line << " " << std::endl;
-            std::cout << "  pc: " << std::hex << _pc << " " << _opcode << " " << _mask << " " << _time_stamp << " " 
-                      << _addr_groups << " " << _addr_start1 << std::endl; 
+            std::cout << "  pc: " << std::hex << _pc << " " << _opcode << " " << _mask << " " << _time_stamp << " " << std::endl; 
+            std::cout << _addr_groups << " " << _addr_start1 << std::endl; 
+            for (auto x: _stride_num) {
+              std::cout << "  |" << std::hex << x << "| ";
+            }
             */
+            // if (_opcode.find("LD") != std::string::npos)
             mem_instns[kernel_id-1][block_id].push_back(mem_instn(_pc, 
                                                                   _addr_start1, 
                                                                   _time_stamp, 
                                                                   _addr_groups, 
                                                                   _addr_start2,
                                                                   _mask,
-                                                                  _opcode));
-            // auto a = mem_instn(_pc, _addr_start1, _time_stamp, _addr_groups, _addr_start2);
-            // mem_instns[kernel_id-1][block_id].push_back(a);
+                                                                  _opcode,
+                                                                  &_stride_num));
+            
           }
         }
         fs.close();
