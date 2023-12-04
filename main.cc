@@ -32,10 +32,10 @@ trace_kernel_info_t *create_kernel_info(kernel_trace_t* kernel_trace_info,
   return kernel_info;
 }
 
-bool compare_stamp(const mem_instn &a, const mem_instn &b) {
+bool compare_stamp(const mem_instn a, const mem_instn b) {
   // std::cout << "    a.time_stamp: " << a.time_stamp << " ";
   // std::cout << "    b.time_stamp: " << b.time_stamp << " pc-" << b.pc << std::endl;
-  return a.time_stamp <= b.time_stamp;
+  return a.time_stamp < b.time_stamp;
 }
 
 void print_SM_traces(std::vector<mem_instn>* traces) {
@@ -82,8 +82,12 @@ int getIthKey(std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int i) {
 }
 
 #ifdef USE_BOOST
-void private_L1_cache_hit_rate_evaluate_boost(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_all_passes_merged, 
-                                              int SM_traces_ptr_size, std::vector<int>* SM_traces_sm_id, int _tmp_print_, std::string configs_dir) {
+void private_L1_cache_stack_distance_evaluate_boost(int argc, char **argv, 
+                                                    std::map<int, std::vector<mem_instn>>* SM_traces_all_passes_merged, 
+                                                    int SM_traces_ptr_size, 
+                                                    std::vector<int>* SM_traces_sm_id, 
+                                                    int _tmp_print_, 
+                                                    std::string configs_dir) {
   boost::mpi::environment env(argc, argv);
   boost::mpi::communicator world;
 
@@ -152,20 +156,23 @@ void private_L1_cache_hit_rate_evaluate_boost(int argc, char **argv, std::map<in
   }
 }
 
-void private_L1_cache_hit_rate_evaluate_boost_no_concurrent(int argc, 
-                                                            char **argv, 
-                                                            std::vector<std::map<int, std::vector<mem_instn>>>* SM_traces_all_passes, 
-                                                            int _tmp_print_, 
-                                                            std::string configs_dir,
-                                                            bool dump_histogram) {
+
+void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc, 
+                                                                  char **argv, 
+                                                                  std::vector<std::map<int, std::vector<mem_instn>>>* SM_traces_all_passes, 
+                                                                  int _tmp_print_, 
+                                                                  std::string configs_dir,
+                                                                  bool dump_histogram) {
   boost::mpi::environment env(argc, argv);
   boost::mpi::communicator world;
-
 
   /* gpu_config[V100].num_sm is the number of the SMs that have been used during the execution. */
   const int pass_num = int((gpu_config[V100].num_sm + world.size() - 1)/world.size());
 
   unsigned l1_cache_line_size = 32; // BUG: need configure
+  unsigned l1_cache_size = 32 * 1024; // BUG: need configure
+  unsigned l1_cache_associativity = 64; // BUG: need configure
+  unsigned l1_cache_blocks = l1_cache_size / l1_cache_line_size; // BUG: need configure
 
   std::cout << std::endl;
 
@@ -176,68 +183,91 @@ void private_L1_cache_hit_rate_evaluate_boost_no_concurrent(int argc,
       curr_process_idx = curr_process_idx_rank;
     } else continue;
 
-    // if (_tmp_print_ == world.rank()) std::cout << "rank-" << std::dec << world.rank() << ", " << "pass-" << pass << ", ";
-    // if (_tmp_print_ == world.rank()) std::cout << "curr_process_idx_rank: " << curr_process_idx_rank << std::endl;
-    // if (_tmp_print_ == world.rank()) std::cout << "curr_process_sm_id: " << curr_process_idx << " " << (*SM_traces_all_passes_merged).size() << std::endl;
+    /* HKEY input should be char* of addr */
+    HKEY input;
+    long tim;
+    program_data_t pdt_c;
+    program_data_t* pdt;
+    FILE* file;
+    std::string parda_histogram_filepath;
+    for (unsigned kid = 0; kid < (*SM_traces_all_passes).size() ; kid++) {
+      unsigned miss_num_all_acc = 0;
+      unsigned num_all_acc = 0;
 
-      HKEY input;
-      long tim;
-      program_data_t pdt_c;
-      program_data_t* pdt;
-      FILE* file;
-      std::string parda_histogram_filepath;
-      for (unsigned kid = 0; kid < (*SM_traces_all_passes).size() ; kid++) {
-        tim = 0;
-        pdt_c = parda_init();
-        /* Here we ONLY USE the curr_process_idx-th items of SM_traces_all_passes, so for every rank, 
-         * we only load the curr_process_idx-th items for all kernels into SM_traces_all_passes, which 
-         * significantly accelerate the simulation speed. */
-        for (auto mem_ins : (*SM_traces_all_passes)[kid][curr_process_idx]) { 
-          // if (world.rank() == 0) {
-          //   std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_idx << " " << "kid-" << kid << " ";
-          //   std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
-          //   std::cout << std::hex << mem_ins.time_stamp << " ";
-          //   std::cout << std::hex << mem_ins.addr[0] << std::endl;
-          // }
-          // HKEY input should be char* of addr
-          std::vector<unsigned long long> have_got_line_addr;
-          for (unsigned j = 0; j < (mem_ins.addr).size(); j++) {
-            unsigned long long cache_line_addr = mem_ins.addr[j] >> int(log2(l1_cache_line_size));
-            if(std::find(have_got_line_addr.begin(), have_got_line_addr.end(), cache_line_addr) != have_got_line_addr.end()) {
-              sprintf(input, "0x%llx", cache_line_addr);
-              // process_one_access(input, &pdt_c, tim);
-              mem_ins.distance[j] = process_one_access_and_get_distance(input, &pdt_c, tim);
-              tim++;
-            } else {
-              have_got_line_addr.push_back(cache_line_addr);
-              mem_ins.distance[j] = 0;
-            }
-          }
-        }
-
-        pdt = &pdt_c;
-        pdt->histogram[B_INF] += narray_get_len(pdt->ga);
-
-        if (dump_histogram) {
-          if (configs_dir.back() == '/')
-            parda_histogram_filepath = configs_dir + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
-          else
-            parda_histogram_filepath = configs_dir + "/" + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
-          
-          file = fopen(parda_histogram_filepath.c_str(), "w");
-          
-          if (file != NULL) {
-            parda_fprintf_histogram(pdt->histogram, file);
-            fclose(file);
-          }
-        }
+      tim = 0;
+      pdt_c = parda_init();
+      /* Here we ONLY USE the curr_process_idx-th items of SM_traces_all_passes, so for every rank, 
+       * we only load the curr_process_idx-th items for all kernels into SM_traces_all_passes, which 
+       * significantly accelerate the simulation speed. */
+      for (auto mem_ins : (*SM_traces_all_passes)[kid][curr_process_idx]) { 
+        // if (world.rank() == 0) {
+        //   std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_idx << " " << "kid-" << kid << " ";
+        //   std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
+        //   std::cout << std::hex << mem_ins.time_stamp << " ";
+        //   std::cout << std::hex << mem_ins.addr[0] << std::endl;
+        // }
         
-        parda_free(pdt);
+        std::vector<unsigned long long> have_got_line_addr; // use have_got_line_addr will cause not accurate hit rate 
+        for (unsigned j = 0; j < (mem_ins.addr).size(); j++) {
+          unsigned long long cache_line_addr = mem_ins.addr[j] >> int(log2(l1_cache_line_size));
+          /**/ // use have_got_line_addr will cause not accurate hit rate
+          if(std::find(have_got_line_addr.begin(), have_got_line_addr.end(), cache_line_addr) != have_got_line_addr.end()) {
+            mem_ins.distance[j] = 0;
+            // num_all_acc++;
+          } else {
+          /**/ // use have_got_line_addr will cause not accurate hit rate 
+            sprintf(input, "0x%llx", cache_line_addr);
+            /* If you only want to dump the histogram of each SM for every kernel, you can also use: 
+             *     process_one_access(input, &pdt_c, tim); */
+            mem_ins.distance[j] = process_one_access_and_get_distance(input, &pdt_c, tim);
+            if (curr_process_idx == 0 && kid == 0) if ((cache_line_addr & 3) == 0)
+              // std::cout << "###SM-" << curr_process_idx << " " 
+              //                       << std::hex << (mem_ins.addr[j]) << " " 
+              //                       << std::hex << (mem_ins.addr[j] >> 7) << " " 
+              //                       << std::hex << (mem_ins.addr[j] >> 5) << " " 
+              //                       << input << " " 
+              //                       << (cache_line_addr & 3) << std::dec << std::endl;
+            if (mem_ins.distance[j] > (int)l1_cache_blocks) {
+              miss_num_all_acc++;
+            }
+            num_all_acc++;
+            
+            tim++;
+            have_got_line_addr.push_back(cache_line_addr); // use have_got_line_addr will cause not accurate hit rate 
+          /**/ // use have_got_line_addr will cause not accurate hit rate 
+          }
+          /**/ // use have_got_line_addr will cause not accurate hit rate 
+        }
       }
+
+      // if (num_all_acc > 0) if (kid==0)
+      // std::cout << "SM-" << curr_process_idx << " kid-" << kid
+      //           << " num_all_acc-" << num_all_acc << " miss_num_all_acc-" << miss_num_all_acc 
+      //           << " miss rate-" << (double)miss_num_all_acc / num_all_acc << std::endl;
+
+      pdt = &pdt_c;
+      pdt->histogram[B_INF] += narray_get_len(pdt->ga);
+
+      if (dump_histogram) {
+        if (configs_dir.back() == '/')
+          parda_histogram_filepath = configs_dir + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
+        else
+          parda_histogram_filepath = configs_dir + "/" + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
+          
+        file = fopen(parda_histogram_filepath.c_str(), "w");
+          
+        if (file != NULL) {
+          parda_fprintf_histogram(pdt->histogram, file);
+          fclose(file);
+        }
+      }
+        
+      parda_free(pdt);
+    }
   }
 }
 #else
-void private_L1_cache_hit_rate_evaluate(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int pass_issue) { // BUG， have not modified
+void private_L1_cache_stack_distance_evaluate(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int pass_issue) { // BUG， have not modified
   const int SM_traces_ptr_size = (int)(*SM_traces_ptr).size();
   /* Every rank process one *(SM_traces_ptr)[i], it will have pass_num passes to complete, 
    * which also means that every rank should process at most pass_num traces. */
@@ -321,7 +351,7 @@ START_TIMER(1);
     need_to_read_mem_instns_sms.push_back(curr_process_idx);
   }
 
-  if (world.rank() == 29) for (auto x : need_to_read_mem_instns_sms) std::cout << "@@@ " << x << std::endl;
+  // if (world.rank() == 29) for (auto x : need_to_read_mem_instns_sms) std::cout << "@@@ " << x << std::endl;
 
   std::vector<std::pair<int, int>> need_to_read_mem_instns_kernel_block_pair;
   /* Get pair<kernel_id, block_id> from tracer.get_issuecfg(), using need_to_read_mem_instns_sms. */
@@ -454,10 +484,13 @@ START_TIMER(2);
       
 
       
-
-      // for (auto iter : (*SM_traces)) {
-      //   std::cout << "###SM-" << iter.first << " " << iter.second.size() << std::endl;
+      // if (pass == 0 && world.rank() == 0)
+      // for (auto iter : (*SM_traces)) { if (iter.first == 0)
+      //   for (int _i = 0; _i < iter.second.size(); _i++)
+      //     std::cout << "###SM-" << iter.first << " " << std::hex << iter.second[_i].time_stamp << " " 
+      //               << std::hex << (iter.second[_i].addr[0] >> 5) << std::dec << std::endl;
       // }
+      // std::cout << "=================" << std::endl;
       
       /* Traversal the SM_traces, theoretically, SM_traces.size() is the total usage amount of SM. */
       // assert((int)(*SM_traces).size() == issuecfg->get_trace_issued_sms_num()); // BUG: only pass_num = 1 will be true
@@ -467,13 +500,20 @@ START_TIMER(2);
         if (PRINT_LOG) std::cout << std::dec << "        SM[" << i << "] | traces_num[" << (*SM_traces)[i].size() << "]:" << std::endl;
         /* Reorder SM_trace[i] by timestamp, from smallest to largest, so as to simulate the issue order 
          * of memory instructions. */
-        if (sort) std::sort((*SM_traces)[i].begin(), (*SM_traces)[i].end(), compare_stamp); // BUG: vector-add will be wrong
-        
+        if (sort) std::sort(iter.second.begin(), iter.second.end(), compare_stamp); // BUG: vector-add will be wrong
         /* Output the traces. */
         if (PRINT_LOG) print_SM_traces(&(*SM_traces)[i]);
 
         /* Now we can evaluate the hit rate of L1D cache of SM[i]. */
       }
+
+
+
+      // if (pass == 0 && world.rank() == 0)
+      // for (auto iter : (*SM_traces)) { if (iter.first == 0)
+      //   for (int _i = 0; _i < iter.second.size(); _i++)
+      //     std::cout << "###SM-" << iter.first << " " << iter.second[_i].time_stamp << " " << iter.second[_i].addr[0] << std::endl;
+      // }
 
       // for (unsigned i = 0; i < SM_traces_all_passes.size(); i++) {
       //   for (auto& pair : SM_traces_all_passes[i]) {
@@ -496,12 +536,12 @@ STOP_AND_REPORT_TIMER_pass(-1, 3);
 
 #ifdef USE_BOOST
   /* Set a barrier here to ensure all processes have received the data before proceeding. */
-  world.barrier();
+  // world.barrier();
 
   /* Print the SM_traces of every MPI rank. &SM_traces_all_passes[0] is the first pass. */
   /* std::vector<std::map<int, std::vector<mem_instn>>> SM_traces_all_passes; */
   for(int i = 0 ; i < passnum_concurrent_issue_to_sm; i++) { // BUG: need to merge all the SM_traces of all the passes.
-    // private_L1_cache_hit_rate_evaluate_boost(argc, argv, &SM_traces_all_passes[i], i);
+    // private_L1_cache_stack_distance_evaluate_boost(argc, argv, &SM_traces_all_passes[i], i);
   }
   // std::cout << "###" << passnum_concurrent_issue_to_sm << std::endl;
 
@@ -581,7 +621,7 @@ STOP_AND_REPORT_TIMER_pass(-1, 3);
   //   }
 
   //   /* Process L1 Cache Hit rate. */
-  //   private_L1_cache_hit_rate_evaluate_boost(argc, argv, &SM_traces_all_passes_merged, SM_traces_ptr_size, &SM_traces_sm_id, _tmp_print_, configs);
+  //   private_L1_cache_stack_distance_evaluate_boost(argc, argv, &SM_traces_all_passes_merged, SM_traces_ptr_size, &SM_traces_sm_id, _tmp_print_, configs);
   // } else {
     /* In this case, passnum_concurrent_issue_to_sm == 1 */
     /* We have merged SM_traces_all_passes[i=1...passnum_concurrent_issue_to_sm][curr_process_idx] to
@@ -591,7 +631,7 @@ STOP_AND_REPORT_TIMER_pass(-1, 3);
 
 START_TIMER(4);
 
-    private_L1_cache_hit_rate_evaluate_boost_no_concurrent(argc, argv, &SM_traces_all_passes,  _tmp_print_, configs, dump_histogram);
+    private_L1_cache_stack_distance_evaluate_boost_no_concurrent(argc, argv, &SM_traces_all_passes,  _tmp_print_, configs, dump_histogram);
 
 STOP_AND_REPORT_TIMER_rank(world.rank(), 4)
 
@@ -600,13 +640,13 @@ STOP_AND_REPORT_TIMER_rank(world.rank(), 4)
 #else
   /* Print the SM_traces of every MPI rank. &SM_traces_all_passes[0] is the first pass. */
   for(int i = 0 ; i < passnum_concurrent_issue_to_sm; i++) {
-    //private_L1_cache_hit_rate_evaluate(argc, argv, &SM_traces_all_passes[i], i);
+    //private_L1_cache_stack_distance_evaluate(argc, argv, &SM_traces_all_passes[i], i);
   }
 #endif
 
 #ifdef USE_BOOST
   // std::cout << "END: " << world.rank() << std::endl;
-  world.barrier();
+  // world.barrier();
 #endif
 
   fflush(stdout);
