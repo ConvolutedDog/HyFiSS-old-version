@@ -636,13 +636,14 @@ STOP_AND_REPORT_TIMER_rank(world.rank(), 4);
   // world.barrier();
 #endif
 
-
-
-
-
 START_TIMER(5);
 
   tracer.read_compute_instns(PRINT_COMPUTE_LOG, &need_to_read_mem_instns_kernel_block_pair);
+  if (world.rank() == 0) {
+    std::cout << std::dec << tracer.get_one_kernel_one_warp_one_instn(45, 2, 3) -> inst_trace -> kernel_id << std::endl;
+    std::cout << std::hex << tracer.get_one_kernel_one_warp_one_instn(45, 2, 3) -> inst_trace -> m_pc << std::endl;
+    std::cout << tracer.get_one_kernel_one_warp_one_instn(45, 2, 3) -> inst_trace -> instn_str << std::endl;
+  }
 
 STOP_AND_REPORT_TIMER_rank(world.rank(), 5);
 
