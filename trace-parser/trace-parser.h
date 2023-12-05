@@ -309,6 +309,8 @@ class instn_config {
   }
   void init(std::string config_path, bool PRINT_LOG);
 
+  std::map<std::pair<int, int>, _inst_trace_t*>* get_instn_info_vector() { return &instn_info_vector; }
+
  private:
   bool m_valid;
 
@@ -532,14 +534,43 @@ struct compute_instn {
     mask = _mask;
     std::bitset<32> active_mask(mask);
     gwarp_id = _gwarp_id;
+    // need to point to _inst_trace_t.
+    inst_trace = NULL;
 
+    valid = true;
+  }
+  compute_instn(unsigned _kernel_id, unsigned _pc,
+                unsigned _mask, unsigned _gwarp_id,
+                _inst_trace_t* _inst_trace) {
+    kernel_id = _kernel_id;
+    pc = _pc;
+    mask = _mask;
+    std::bitset<32> active_mask(mask);
+    gwarp_id = _gwarp_id;
+    // need to point to _inst_trace_t.
+    inst_trace = _inst_trace;
+    
+    
+    // if (kernel_id == 2 && pc != 0) {
+    //   // compute_instn's kernel_id starts from 0
+    //   std::cout << "compute_instn: " << std::dec << kernel_id << " " 
+    //             << std::hex << pc << " " << std::hex << mask << " " 
+    //             << std::dec << gwarp_id << std::endl;
+    //   // inst_trace's kernel_id starts from 0
+    //   std::cout << "instn_str: " << std::dec << inst_trace->kernel_id << " " 
+    //             << std::hex << inst_trace->m_pc << " " 
+    //             << inst_trace->instn_str << std::endl;
+    //   exit(0);
+    // }
+    
+    
     valid = true;
   }
 
   bool valid = false;
   unsigned kernel_id, pc;
   unsigned mask;
-  
+
   unsigned cta_id_x;
   unsigned cta_id_y;
   unsigned cta_id_z;
@@ -548,6 +579,8 @@ struct compute_instn {
   unsigned sm_id;
 
   unsigned gwarp_id;
+
+  _inst_trace_t* inst_trace;
 
 #ifdef USE_BOOST
   friend class boost::serialization::access;
@@ -583,6 +616,7 @@ class trace_parser {
 
   void read_compute_instns(bool PRINT_LOG, std::vector<std::pair<int, int>>* x);
   void process_compute_instns(std::string compute_instns_dir, bool PRINT_LOG, std::vector<std::pair<int, int>>* x);
+  void process_compute_instns_new(std::string compute_instns_dir, bool PRINT_LOG, std::vector<std::pair<int, int>>* x);
 
   // kerneltraces_filepath is path to kernel-1.traceg et al.
   kernel_trace_t* parse_kernel_info(const std::string &kerneltraces_filepath);
@@ -612,6 +646,10 @@ class trace_parser {
 
   /* get concurrent_kernels */
   std::vector<std::vector<int>>& get_concurrent_kernels() { return concurrent_kernels; }
+
+  compute_instn* get_one_kernel_one_warp_one_instn(int kernel_id, int warp_id, int next_instn_id) {
+    return &conpute_instns[kernel_id][warp_id][next_instn_id];
+  }
 
  private:
   /* configs_filepath is path to kernelslist.g */
