@@ -648,13 +648,14 @@ void instn_config::init(std::string config_path, bool PRINT_LOG) {
       // std::cout << "pc: " << std::hex << pc << std::dec << std::endl;
       // std::cout << "instn_str: " << instn_str << std::endl << std::endl;
 
-      _inst_trace_t* instn_info = new _inst_trace_t(kernel_id, pc, instn_str);
+      _inst_trace_t* instn_info = new _inst_trace_t(kernel_id - 1, pc, instn_str);
       // instn_info.kernel_id = kernel_id;
       // instn_info.pc = pc;
       // instn_info.instn_str = instn_str;
 
       // instn_info_vector.push_back(instn_info);
-      instn_info_vector[std::make_pair(kernel_id, pc)] = instn_info;
+      // kernel_id starts from 1
+      instn_info_vector[std::make_pair(kernel_id - 1, pc)] = instn_info;
     }
   }
   inputFile.close();
@@ -1149,6 +1150,15 @@ bool judge_format_compute_kernel_id(char* d_name, std::vector<std::pair<int, int
   }
 }
 
+bool judge_format_compute_kernel_id_new(int kernel_id, int block_id, std::vector<std::pair<int, int>>* x) {
+  // check if xx is in need_processed_kernel_ids
+  if (std::find((*x).begin(), (*x).end(), std::make_pair(kernel_id, block_id)) != (*x).end()) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 bool judge_format_compute_block_id(int kernel_id, int block_id, std::vector<std::pair<int, int>>* x) {
   std::pair<int, int> target = std::make_pair(kernel_id, block_id);
   if (std::find(x->begin(), x->end(), target) != x->end())
@@ -1328,12 +1338,12 @@ void trace_parser::process_compute_instns(std::string compute_instns_dir, bool P
   
   while ((entry = readdir(dir)) != nullptr) {
     if (entry->d_type == DT_REG && 
-        judge_format_compute_kernel_id(entry->d_name, x) &&
+        judge_format_compute_kernel_id(entry->d_name, x) /* &&
         entry->d_name[strlen(entry->d_name) - 5] == '.' && 
         entry->d_name[strlen(entry->d_name) - 4] == 's' && 
         entry->d_name[strlen(entry->d_name) - 3] == 'a' && 
         entry->d_name[strlen(entry->d_name) - 2] == 's' &&
-        entry->d_name[strlen(entry->d_name) - 1] == 's') {
+        entry->d_name[strlen(entry->d_name) - 1] == 's' */) {
       auto search = std::string(entry->d_name);
       std::string compute_instns_filepath = compute_instns_dir + "/" + entry->d_name;
       if (PRINT_LOG) std::cout << "Reading mem instns file : " 
@@ -1342,7 +1352,7 @@ void trace_parser::process_compute_instns(std::string compute_instns_dir, bool P
       if (std::regex_search(search, match, pattern)) {
         int kernel_id = std::stoi(match[1]);
         int num_warps_per_block = get_appcfg()->get_num_warp_per_block(kernel_id - 1);
-
+START_TIMER(6);
         // int block_id = std::stoi(match[2]);
         // std::cout << "x: " << kernel_id << " y: " << block_id << std::endl;
         std::ifstream fs;
@@ -1394,17 +1404,112 @@ void trace_parser::process_compute_instns(std::string compute_instns_dir, bool P
                 else {
                   _mask = std::stoi(_mask_str, nullptr, 16);
                 }
-                conpute_instns[kernel_id-1][_gwarp_id].push_back(compute_instn(kernel_id, _pc, _mask, _gwarp_id));
+                // kernel_id, pc
+                _inst_trace_t* _inst_trace = (*get_instncfg()->get_instn_info_vector())[std::make_pair(kernel_id-1, _pc)]; // ?????
+                // inst_trace's kernel_id starts from 0
+                // compute_instn's kernel_id starts from 0
+                conpute_instns[kernel_id-1][_gwarp_id].push_back(compute_instn(kernel_id - 1, _pc, _mask, _gwarp_id, _inst_trace));
               }
             }
           }
         }
         fs.close();
+STOP_AND_REPORT_TIMER_pass(-1, 6);
       } else {
         std::cerr << "Wrong name format of memory trace file: "<< entry->d_name << std::endl;
       }
     }
   }
+
+  closedir(dir);
+}
+
+
+void trace_parser::process_compute_instns_new(std::string compute_instns_dir, bool PRINT_LOG, std::vector<std::pair<int, int>>* x) {
+  // read all the mem instns from memory_traces dir
+  DIR *dir;
+  struct dirent *entry;
+  
+  if ((dir = opendir(compute_instns_dir.c_str())) == nullptr)
+    std::cerr << "Not exist directory " << compute_instns_dir << ", please check." << std::endl;
+
+  static const std::regex pattern(R"(kernel_(\d+)_gwarp_id_(\d+)\.split\.sass)");
+  std::smatch match;
+  
+  while ((entry = readdir(dir)) != nullptr) {
+    
+    if (entry->d_type == DT_REG && 
+        entry->d_name[strlen(entry->d_name) - 6] == 't' /*&&
+        entry->d_name[strlen(entry->d_name) - 5] == '.' && 
+        entry->d_name[strlen(entry->d_name) - 4] == 's' && 
+        entry->d_name[strlen(entry->d_name) - 3] == 'a' && 
+        entry->d_name[strlen(entry->d_name) - 2] == 's' &&
+        entry->d_name[strlen(entry->d_name) - 1] == 's'*/) {
+      
+      auto search = std::string(entry->d_name);
+      
+      if (std::regex_search(search, match, pattern)) {
+        int kernel_id = std::stoi(match[1]);
+        int gwarp_id = std::stoi(match[2]);
+        int num_warps_per_block = get_appcfg()->get_num_warp_per_block(kernel_id - 1);
+        
+        int block_id = (int)(gwarp_id / num_warps_per_block);
+        // std::cout << "kernel_id: " << kernel_id << " " << "gwarp_id: " << gwarp_id << "num_warps_per_block: " << num_warps_per_block << std::endl;
+        if (!judge_format_compute_kernel_id_new(kernel_id, block_id, x)) continue;
+        
+        
+        std::string compute_instns_filepath = compute_instns_dir + "/" + entry->d_name;
+        if (PRINT_LOG) std::cout << "Reading mem instns file : " 
+                                << compute_instns_filepath << "..." << std::endl;
+
+// START_TIMER(6);
+        // int block_id = std::stoi(match[2]);
+        // std::cout << "x: " << kernel_id << " y: " << block_id << std::endl;
+        std::ifstream fs;
+        fs.open(compute_instns_filepath);
+        if (!fs.is_open()) {
+          std::cout << "Unable to open file: " << compute_instns_filepath << std::endl;
+          exit(1);
+        }
+        std::string line;
+        while (!fs.eof()) {
+          getline(fs, line);
+          if (line.empty())
+            continue;
+          else {
+            unsigned _pc;
+
+            std::string _mask_str;
+            unsigned _mask;
+            
+            // get above parameters from line
+            std::stringstream ss;
+            ss.str(line);
+            // std::cout << "line: " << line << std::endl;
+            ss >> std::hex >> _pc;
+            ss >> std::hex >> _mask_str;
+            
+                if (_mask_str == "!") _mask = 0xffffffff;
+                else {
+                  _mask = std::stoi(_mask_str, nullptr, 16);
+                }
+                // kernel_id, pc
+                _inst_trace_t* _inst_trace = (*get_instncfg()->get_instn_info_vector())[std::make_pair(kernel_id-1, _pc)]; // ?????
+                // inst_trace's kernel_id starts from 0
+                // compute_instn's kernel_id starts from 0
+                conpute_instns[kernel_id-1][gwarp_id].push_back(compute_instn(kernel_id - 1, _pc, _mask, gwarp_id, _inst_trace));
+          }
+        }
+        fs.close();
+// STOP_AND_REPORT_TIMER_pass(-1, 6);
+      } else {
+        std::cerr << "Wrong name format of memory trace file: "<< entry->d_name << std::endl;
+      }
+    }
+  }
+
+  // traverse conpute_instns
+  std::cout << conpute_instns.size() << " | " << conpute_instns[0].size() << std::endl;
 
   closedir(dir);
 }
@@ -1427,7 +1532,8 @@ void trace_parser::read_compute_instns(bool PRINT_LOG, std::vector<std::pair<int
     conpute_instns[kid].resize(appcfg.get_num_global_warps(kid));
   
   // process mem_instns
-  process_compute_instns(compute_instns_dir, PRINT_LOG, x);
+  // process_compute_instns(compute_instns_dir, PRINT_LOG, x); // the speed is too low
+  process_compute_instns_new(compute_instns_dir, PRINT_LOG, x); // the speed is very fast
 }
 
 std::pair<std::vector<trace_command>, int> trace_parser::parse_commandlist_file() {
