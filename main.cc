@@ -640,18 +640,26 @@ START_TIMER(5);
 
   tracer.read_compute_instns(PRINT_COMPUTE_LOG, &need_to_read_mem_instns_kernel_block_pair);
   if (world.rank() == 0) {
-    std::cout << std::dec << tracer.get_one_kernel_one_warp_one_instn(45, 2, 3) -> inst_trace -> kernel_id << std::endl;
-    std::cout << std::hex << tracer.get_one_kernel_one_warp_one_instn(45, 2, 3) -> inst_trace -> m_pc << std::endl;
-    std::cout << tracer.get_one_kernel_one_warp_one_instn(45, 2, 3) -> inst_trace -> instn_str << std::endl;
+    std::cout << "kernel_id: " << std::dec << tracer.get_one_kernel_one_warp_one_instn(45, 2, 3) -> inst_trace -> kernel_id << std::endl;
+    std::cout << "m_pc: " << std::hex << tracer.get_one_kernel_one_warp_one_instn(45, 2, 3) -> inst_trace -> m_pc << std::endl;
+    std::cout << "instn_str: " << tracer.get_one_kernel_one_warp_one_instn(45, 2, 3) -> inst_trace -> instn_str << std::endl;
   }
 
+  /* Dueing the read_compute_instns process, we split the conpute traces into several parts by the 
+   * global warp id, and every rank only read the traces whose global warp id equals to the SM id
+   * that the rank corresponds to. For computation simulation, we also need to transfer the simple 
+   * traces to trace_warp_inst_t objects, for the reason that in real conputation simulation, the 
+   * class trace_warp_inst_t will provide more instruction details that are what we need. */
+
+  
+
   /**********************************************************************************************/
-  /***                       Now start the computation simulation.                            ***/
+  /***                                                                                        ***/
+  /***                              The computation simulation.                               ***/
+  /***                                                                                        ***/
   /**********************************************************************************************/
-  /**********************************************************************************************/
-  /***                       Now start the computation simulation.                            ***/
-  /**********************************************************************************************/
-  /*
+  /**********************************************************************************************
+  The following events that may cause stalls:
   1      Issue: ibuffer_empty
   2      Issue: waiting for barrier
   3      Issue: ibuffer_empty and also waiting for barrier
@@ -691,7 +699,7 @@ START_TIMER(5);
   37     ReadOperands: bank\[\d+\] reg-\d+ \(order:\d+\) belonged to was allocated for other regs
   38     ReadOperands: port_num-\d+/m_in_ports\[\d+\].m_in\[\d+\] fails as not found free cu
   39     Writeback: bank-\d+ of reg-\d+ is not idle
-  */
+  **********************************************************************************************/
   
   
   
