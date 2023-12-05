@@ -98,6 +98,64 @@ struct inst_trace_t {
   ~inst_trace_t();
 };
 
+
+struct _inst_trace_t {
+  _inst_trace_t();
+  _inst_trace_t(const _inst_trace_t &b);
+  _inst_trace_t(unsigned _kernel_id, unsigned _pc, std::string _instn_str) {
+    kernel_id = _kernel_id;
+    m_pc = _pc;
+    instn_str = _instn_str;
+    memadd_info = NULL;
+    parse_from_string(_instn_str, _kernel_id);
+
+    /* print out the instn_str */
+    // std::cout << kernel_id << " " << m_pc << " " << instn_str << std::endl;
+    // if (pred_str != "") std::cout << pred_str << " ";
+    // std::cout << opcode << " " << reg_dsts_num << " ";
+    // for (unsigned i = 0; i < reg_dsts_num; i++) {
+    //   std::cout << "R" << reg_dest[i] << " ";
+    // }
+    // std::cout << reg_srcs_num << " ";
+    // for (unsigned i = 0; i < reg_srcs_num; i++) {
+    //   std::cout << "R" << reg_src[i] << " ";
+    // }
+    // std::cout << std::endl;
+
+    opcode_tokens = get_opcode_tokens();
+    memadd_info->width = get_datawidth_from_opcode(opcode_tokens);
+  };
+
+  // unsigned line_num;
+  unsigned kernel_id;
+  unsigned m_pc;
+  unsigned mask;
+  unsigned reg_dsts_num;
+  unsigned reg_dest[MAX_DST];
+  std::string opcode;
+  unsigned reg_srcs_num;
+  unsigned reg_src[MAX_SRC];
+  inst_memadd_info_t *memadd_info;
+  std::string instn_str;
+
+  std::vector<std::string> opcode_tokens;
+
+  std::string pred_str = "";
+
+  bool parse_from_string(std::string trace,
+                         unsigned kernel_id);
+
+  bool check_opcode_contain(const std::vector<std::string> &opcode,
+                            std::string param) const;
+
+  unsigned get_datawidth_from_opcode(
+      const std::vector<std::string> &opcode) const;
+
+  std::vector<std::string> get_opcode_tokens() const;
+
+  ~_inst_trace_t();
+};
+
 struct kernel_trace_t {
   kernel_trace_t();
 
@@ -152,6 +210,18 @@ class app_config {
   int get_kernel_grid_dim_y(int kernel_id) { return kernel_grid_dim_y[kernel_id]; }
   std::vector<int>* get_kernels_grid_dim_z() { return &kernel_grid_dim_z; }
   int get_kernel_grid_dim_z(int kernel_id) { return kernel_grid_dim_z[kernel_id]; }
+  /* get the total number of global warps */
+  int get_num_global_warps(int kernel_id) {
+    return (int)(get_kernel_grid_dim_x(kernel_id) * get_kernel_grid_dim_y(kernel_id) * 
+                 get_kernel_grid_dim_z(kernel_id) * get_kernel_tb_dim_x(kernel_id) * 
+                 get_kernel_tb_dim_y(kernel_id) * get_kernel_tb_dim_z(kernel_id) / WARP_SIZE);
+  }
+  /* get the total number of warps per block */
+  int get_num_warp_per_block(int kernel_id) {
+    return (int)(get_kernel_tb_dim_x(kernel_id) * get_kernel_tb_dim_y(kernel_id) * 
+                 get_kernel_tb_dim_z(kernel_id) / WARP_SIZE);
+  }
+
   /* get kernel_tb_dim_x,  kernel_tb_dim_y,  kernel_tb_dim_z */
   std::vector<int>* get_kernels_tb_dim_x() { return &kernel_tb_dim_x; }
   int get_kernel_tb_dim_x(int kernel_id) { return kernel_tb_dim_x[kernel_id]; }
@@ -210,25 +280,44 @@ class app_config {
   std::vector<unsigned long long> kernel_local_base_addr;
 };
 
+class instn_info_t {
+ public:
+  instn_info_t() {}
+  instn_info_t(unsigned _kernel_id, unsigned _pc, std::string _instn_str) {
+    kernel_id = _kernel_id;
+    pc = _pc;
+    instn_str = _instn_str;
+
+
+  }
+
+ private:
+  unsigned kernel_id;
+  unsigned pc;
+  std::string instn_str;
+};
+
 class instn_config {
  public:
   instn_config() {
     m_valid = false;
   }
+  ~instn_config() {
+    for (auto iter = instn_info_vector.begin(); iter != instn_info_vector.end(); ++iter) {
+      delete iter->second;
+    }
+  }
   void init(std::string config_path, bool PRINT_LOG);
 
  private:
   bool m_valid;
-  
-  struct instn_info_t {
-    unsigned kernel_id;
-    unsigned pc;
-    std::string instn_str;
-  };
+
   // instn format:
   // kernel_id  pc  instn_str
   //     2      c0  DSETP.GTU.AND P0 P7 R2 R4 P7
-  std::vector<instn_info_t> instn_info_vector;
+  // std::vector<instn_info_t> instn_info_vector;
+  // std::map<std::pair<int, int>, instn_info_t*> instn_info_vector;
+  std::map<std::pair<int, int>, _inst_trace_t*> instn_info_vector;
 };
 
 /* -trace_issued_sm_id_0 4,(1,0),(1,80),(2,80),(2,0), */
@@ -434,6 +523,51 @@ struct mem_instn {
 };
 
 
+struct compute_instn {
+  compute_instn() {}
+  compute_instn(unsigned _kernel_id, unsigned _pc,
+                unsigned _mask, unsigned _gwarp_id) {
+    kernel_id = _kernel_id;
+    pc = _pc;
+    mask = _mask;
+    std::bitset<32> active_mask(mask);
+    gwarp_id = _gwarp_id;
+
+    valid = true;
+  }
+
+  bool valid = false;
+  unsigned kernel_id, pc;
+  unsigned mask;
+  
+  unsigned cta_id_x;
+  unsigned cta_id_y;
+  unsigned cta_id_z;
+
+  unsigned warp_id;
+  unsigned sm_id;
+
+  unsigned gwarp_id;
+
+#ifdef USE_BOOST
+  friend class boost::serialization::access;
+  template<class Archive>
+  void serialize(Archive & ar, const unsigned int version) {
+    ar & pc;
+    ar & kernel_id;
+    ar & cta_id_x;
+    ar & cta_id_y;
+    ar & cta_id_z;
+    ar & warp_id;
+    ar & sm_id;
+    ar & mask;
+    ar & gwarp_id;
+    ar & valid;
+  }
+#endif
+};
+
+
 class trace_parser {
  public:
   trace_parser(const char *input_configs_filepath);
@@ -446,6 +580,9 @@ class trace_parser {
 
   void read_mem_instns(bool PRINT_LOG, std::vector<std::pair<int, int>>* x);
   void process_mem_instns(std::string mem_instns_filepath, bool PRINT_LOG, std::vector<std::pair<int, int>>* x);
+
+  void read_compute_instns(bool PRINT_LOG, std::vector<std::pair<int, int>>* x);
+  void process_compute_instns(std::string compute_instns_dir, bool PRINT_LOG, std::vector<std::pair<int, int>>* x);
 
   // kerneltraces_filepath is path to kernel-1.traceg et al.
   kernel_trace_t* parse_kernel_info(const std::string &kerneltraces_filepath);
@@ -477,19 +614,22 @@ class trace_parser {
   std::vector<std::vector<int>>& get_concurrent_kernels() { return concurrent_kernels; }
 
  private:
-  // configs_filepath is path to kernelslist.g
+  /* configs_filepath is path to kernelslist.g */
   std::string configs_filepath;
   std::string app_config_path;
   std::string instn_config_path;
   std::string issue_config_path;
 
   std::string mem_instns_dir;
+  std::string compute_instns_dir;
 
   app_config appcfg;
   instn_config instncfg; 
   issue_config issuecfg;
   /* kernel_id -> block_id -> mem_instn */
   std::vector<std::vector<std::vector<mem_instn>>> mem_instns;
+  /* kernel_id -> warp_id -> compute_instn */
+  std::vector<std::vector<std::vector<compute_instn>>> conpute_instns;
 
   /* concurrent idx -> vector<kernel_id> */
   std::vector<std::vector<int>> concurrent_kernels;
