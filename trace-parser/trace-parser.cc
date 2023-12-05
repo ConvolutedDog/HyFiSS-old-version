@@ -1150,7 +1150,7 @@ bool judge_format_compute_kernel_id(char* d_name, std::vector<std::pair<int, int
   }
 }
 
-bool judge_format_compute_kernel_id_new(int kernel_id, int block_id, std::vector<std::pair<int, int>>* x) {
+bool judge_format_compute_kernel_id_fast(int kernel_id, int block_id, std::vector<std::pair<int, int>>* x) {
   // check if xx is in need_processed_kernel_ids
   if (std::find((*x).begin(), (*x).end(), std::make_pair(kernel_id, block_id)) != (*x).end()) {
     return true;
@@ -1351,7 +1351,7 @@ void trace_parser::process_compute_instns(std::string compute_instns_dir, bool P
       
       if (std::regex_search(search, match, pattern)) {
         int kernel_id = std::stoi(match[1]);
-        int num_warps_per_block = get_appcfg()->get_num_warp_per_block(kernel_id - 1);
+        // int num_warps_per_block = get_appcfg()->get_num_warp_per_block(kernel_id - 1);
 START_TIMER(6);
         // int block_id = std::stoi(match[2]);
         // std::cout << "x: " << kernel_id << " y: " << block_id << std::endl;
@@ -1425,7 +1425,7 @@ STOP_AND_REPORT_TIMER_pass(-1, 6);
 }
 
 
-void trace_parser::process_compute_instns_new(std::string compute_instns_dir, bool PRINT_LOG, std::vector<std::pair<int, int>>* x) {
+void trace_parser::process_compute_instns_fast(std::string compute_instns_dir, bool PRINT_LOG, std::vector<std::pair<int, int>>* x) {
   // read all the mem instns from memory_traces dir
   DIR *dir;
   struct dirent *entry;
@@ -1455,7 +1455,7 @@ void trace_parser::process_compute_instns_new(std::string compute_instns_dir, bo
         
         int block_id = (int)(gwarp_id / num_warps_per_block);
         // std::cout << "kernel_id: " << kernel_id << " " << "gwarp_id: " << gwarp_id << "num_warps_per_block: " << num_warps_per_block << std::endl;
-        if (!judge_format_compute_kernel_id_new(kernel_id, block_id, x)) continue;
+        if (!judge_format_compute_kernel_id_fast(kernel_id, block_id, x)) continue;
         
         
         std::string compute_instns_filepath = compute_instns_dir + "/" + entry->d_name;
@@ -1509,7 +1509,7 @@ void trace_parser::process_compute_instns_new(std::string compute_instns_dir, bo
   }
 
   // traverse conpute_instns
-  std::cout << conpute_instns.size() << " | " << conpute_instns[0].size() << std::endl;
+  // std::cout << conpute_instns.size() << " | " << conpute_instns[0].size() << std::endl;
 
   closedir(dir);
 }
@@ -1533,7 +1533,7 @@ void trace_parser::read_compute_instns(bool PRINT_LOG, std::vector<std::pair<int
   
   // process mem_instns
   // process_compute_instns(compute_instns_dir, PRINT_LOG, x); // the speed is too low
-  process_compute_instns_new(compute_instns_dir, PRINT_LOG, x); // the speed is very fast
+  process_compute_instns_fast(compute_instns_dir, PRINT_LOG, x); // the speed is very fast
 }
 
 std::pair<std::vector<trace_command>, int> trace_parser::parse_commandlist_file() {
