@@ -645,6 +645,57 @@ START_TIMER(5);
     std::cout << tracer.get_one_kernel_one_warp_one_instn(45, 2, 3) -> inst_trace -> instn_str << std::endl;
   }
 
+  /**********************************************************************************************/
+  /***                       Now start the computation simulation.                            ***/
+  /**********************************************************************************************/
+  /**********************************************************************************************/
+  /***                       Now start the computation simulation.                            ***/
+  /**********************************************************************************************/
+  /*
+  1      Issue: ibuffer_empty
+  2      Issue: waiting for barrier
+  3      Issue: ibuffer_empty and also waiting for barrier
+  4      Issue: control hazard
+  5      Issue: m_mem_out has no free slot
+  6      Issue: previous_issued_inst_exec_type is MEM
+  7      Issue: m_int_out has no free slot
+  8      Issue: previous_issued_inst_exec_type is INT
+  9      Issue: m_sp_out has no free slot
+  10     Issue: previous_issued_inst_exec_type is SP
+  11     Issue: m_dp_out has no free slot
+  12     Issue: previous_issued_inst_exec_type is DP
+  13     Issue: m_sfu_out has no free slot
+  14     Issue: previous_issued_inst_exec_type is SFU
+  15     Issue: m_tensor_core_out has no free slot
+  16     Issue: previous_issued_inst_exec_type is TENSOR
+  17     Issue: m_spec_cores_out has no free slot
+  18     Issue: previous_issued_inst_exec_type is SPECIALIZED
+  19     Issue: scoreboard
+  20     Fetch: read miss an insn from L1I
+  21     Fetch: reservation fail an insn from L1I
+  22     Execute: m_memport of L1D is not free
+  23     Execute: m_dispatch_reg of fu\[\d+\]-\w+\s is not empty
+  24     Execute: result_bus has no slot for latency-\d+
+  25     Execute: dispatch delay of insn is \d+ > 0
+  26     Execute: l1_latency_queue\[\d+\]\[\d+\] is not free
+  27     Execute: COAL_STALL occurs
+  28     Execute: mf_next->get_inst()'s out_reg\[R\d+\] has \d+ pending writes
+  29     Execute: icnt_injection_buffer is full
+  30     Execute: m_next_wb's out_reg\[R\d+\] has \d+ pending writes
+  31     Execute: m_next_global of ldst unit is not free
+  32     Execute: fill_port of L1D is not free
+  33     Execute: m_pipeline_reg\[\d+\] is not empty
+  34     Execute: m_dispatch_reg has pending writes
+  35     Execute: bank-\d+ of reg-\d+ is not idle
+  36     ReadOperands: bank\[\d+\] reg-\d+ \(order:\d+\) belonged to was allocated for write
+  37     ReadOperands: bank\[\d+\] reg-\d+ \(order:\d+\) belonged to was allocated for other regs
+  38     ReadOperands: port_num-\d+/m_in_ports\[\d+\].m_in\[\d+\] fails as not found free cu
+  39     Writeback: bank-\d+ of reg-\d+ is not idle
+  */
+  
+  
+  
+
 STOP_AND_REPORT_TIMER_rank(world.rank(), 5);
 
   fflush(stdout);
