@@ -302,6 +302,8 @@ START_TIMER(0);
   bool sort = false;
   bool dump_histogram = false;
 
+  bool PRINT_COMPUTE_LOG = false;
+
   app.add_option("--configs", configs, "The configs path, which is generated from our NVBit tool, "
                                        "e.g., \"./traces/vectoradd/configs\"");
   app.add_option("--sort", sort, "Simulate the order in which instructions are issued based on their "
@@ -309,6 +311,7 @@ START_TIMER(0);
   app.add_option("--log", PRINT_LOG, "Print the traces processing log or not");
   app.add_option("--dump_histogram", dump_histogram, "Dump the histogram of the private L1 cache hit "
                                                      "rate");
+  app.add_option("--clog", PRINT_COMPUTE_LOG, "Print the computation traces processing log or not");
 
   int _tmp_print_;
 
@@ -615,9 +618,9 @@ STOP_AND_REPORT_TIMER_pass(-1, 3);
 
 START_TIMER(4);
 
-    private_L1_cache_stack_distance_evaluate_boost_no_concurrent(argc, argv, &SM_traces_all_passes,  _tmp_print_, configs, dump_histogram);
+  private_L1_cache_stack_distance_evaluate_boost_no_concurrent(argc, argv, &SM_traces_all_passes,  _tmp_print_, configs, dump_histogram);
 
-STOP_AND_REPORT_TIMER_rank(world.rank(), 4)
+STOP_AND_REPORT_TIMER_rank(world.rank(), 4);
 
   // }
 
@@ -633,9 +636,19 @@ STOP_AND_REPORT_TIMER_rank(world.rank(), 4)
   // world.barrier();
 #endif
 
+
+
+
+
+START_TIMER(5);
+
+  tracer.read_compute_instns(PRINT_COMPUTE_LOG, &need_to_read_mem_instns_kernel_block_pair);
+
+STOP_AND_REPORT_TIMER_rank(world.rank(), 5);
+
   fflush(stdout);
 
-STOP_AND_REPORT_TIMER_pass(-1, 0)
+STOP_AND_REPORT_TIMER_pass(-1, 0);
 
   return 0;
 }
