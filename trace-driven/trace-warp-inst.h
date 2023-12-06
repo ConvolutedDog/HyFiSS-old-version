@@ -40,13 +40,20 @@ class trace_warp_inst_t {
     memset(in, 0, sizeof(unsigned));
     incount = 0;
 
-    is_vectorin = 0;
-    is_vectorout = 0;
+    is_vectorin = false;
+    is_vectorout = false;
+
+    pred = 0;
+    ar1 = 0;
+    ar2 = 0;
 
     for (unsigned i = 0; i < MAX_REG_OPERANDS; i++) {
       arch_reg.src[i] = -1;
       arch_reg.dst[i] = -1;
     }
+
+    memory_op = no_memory_op;
+    data_size = 0;
 
     op = NO_OP;
     sp_op = OTHER_OP;
@@ -56,15 +63,19 @@ class trace_warp_inst_t {
 
     oprnd_type = UN_OP;
 
-    m_per_scalar_thread_valid = false;
-    m_mem_accesses_created = false;
+    // m_per_scalar_thread_valid = false;
+    // m_mem_accesses_created = false;
     m_is_printf = false;
     should_do_atomic = false;
 
-    m_mem_accesses_created = false;
+    m_gwarp_id = 0;
+    m_warp_id = 0;
+    m_dynamic_warp_id = 0;
 
     space = memory_space_t();
     cache_op = CACHE_UNDEFINED;
+
+    // active_mask_t m_warp_active_mask(0);
   }
 
   // trace_warp_inst_t(const class core_config *config) : warp_inst_t(config) {
@@ -72,35 +83,88 @@ class trace_warp_inst_t {
   //   should_do_atomic = false;
   // }
 
+  // bool parse_from_trace_struct(
+  //     const inst_trace_t &trace,
+  //     const std::unordered_map<std::string, OpcodeChar> *OpcodeMap,
+  //   //   const class trace_config *tconfig,
+  //     const class kernel_trace_t *kernel_trace_info);
+  
+  // bool parse_from_trace_struct(
+  //     const _inst_trace_t* trace,
+  //     const std::unordered_map<std::string, OpcodeChar> *OpcodeMap);
+  
   bool parse_from_trace_struct(
-      const inst_trace_t &trace,
+      const _inst_trace_t* trace,
       const std::unordered_map<std::string, OpcodeChar> *OpcodeMap,
-    //   const class trace_config *tconfig,
-      const class kernel_trace_t *kernel_trace_info);
-  
-  bool parse_from_trace_struct(
-      const _inst_trace_t &trace,
-      const std::unordered_map<std::string, OpcodeChar> *OpcodeMap);
-  
+      unsigned gwarp_id);
+
   void set_active(const active_mask_t &active);
 
-  void set_addr(unsigned n, new_addr_type addr) {
-    if (!m_per_scalar_thread_valid) {
-      m_per_scalar_thread.resize(MAX_WARP_SIZE);
-      m_per_scalar_thread_valid = true;
-    }
-    m_per_scalar_thread[n].memreqaddr[0] = addr;
-  }
+  // void set_addr(unsigned n, new_addr_type addr) {
+  //   if (!m_per_scalar_thread_valid) {
+  //     m_per_scalar_thread.resize(MAX_WARP_SIZE);
+  //     m_per_scalar_thread_valid = true;
+  //   }
+  //   m_per_scalar_thread[n].memreqaddr[0] = addr;
+  // }
 
-  void set_addr(unsigned n, new_addr_type *addr, unsigned num_addrs) {
-    if (!m_per_scalar_thread_valid) {
-      m_per_scalar_thread.resize(MAX_WARP_SIZE);
-      m_per_scalar_thread_valid = true;
-    }
-    assert(num_addrs <= MAX_ACCESSES_PER_INSN_PER_THREAD);
-    for (unsigned i = 0; i < num_addrs; i++)
-      m_per_scalar_thread[n].memreqaddr[i] = addr[i];
+  // void set_addr(unsigned n, new_addr_type *addr, unsigned num_addrs) {
+  //   if (!m_per_scalar_thread_valid) {
+  //     m_per_scalar_thread.resize(MAX_WARP_SIZE);
+  //     m_per_scalar_thread_valid = true;
+  //   }
+  //   assert(num_addrs <= MAX_ACCESSES_PER_INSN_PER_THREAD);
+  //   for (unsigned i = 0; i < num_addrs; i++)
+  //     m_per_scalar_thread[n].memreqaddr[i] = addr[i];
+  // }
+
+  /***************************************************************************/
+  unsigned get_opcode() const { return m_opcode; }
+  unsigned get_uid() const { return m_uid; }
+  bool isempty() const { return m_empty; }
+  bool isatomic() const { return m_isatomic; }
+  bool isdecoded() const { return m_decoded; }
+  address_type get_pc() const { return pc; }
+  unsigned get_isize() const { return isize; }
+  unsigned get_outcount() const { return outcount; }
+  unsigned get_incount() const { return incount; }
+  unsigned get_in(unsigned i) const {
+    assert(i < incount);
+    return in[i];
   }
+  unsigned get_out(unsigned i) const {
+    assert(i < outcount);
+    return out[i];
+  }
+  bool get_is_vectorin() const { return is_vectorin; }
+  bool get_is_vectorout() const { return is_vectorout; }
+  int get_pred() const { return pred; }
+  int get_ar1() const { return ar1; }
+  int get_ar2() const { return ar2; }
+  int get_arch_reg_dst(unsigned i) const {
+    assert(i < outcount);
+    return arch_reg.dst[i];
+  }
+  int get_arch_reg_src(unsigned i) const {
+    assert(i < incount);
+    return arch_reg.src[i];
+  }
+  _memory_op_t get_memory_op() const { return memory_op; }
+  unsigned get_num_operands() const { return num_operands; }
+  unsigned get_num_regs() const { return num_regs; }
+  unsigned get_data_size() const { return data_size; }
+  op_type get_op() const { return op; }
+  special_ops get_sp_op() const { return sp_op; }
+  mem_operation get_mem_op() const { return mem_op; }
+  bool get_const_cache_operand() const { return const_cache_operand; }
+  types_of_operands get_oprnd_type_() const { return oprnd_type; }
+  bool get_should_do_atomic() const { return should_do_atomic; }
+  bool get_is_printf() const { return m_is_printf; }
+  unsigned get_gwarp_id() const { return m_gwarp_id; }
+  unsigned get_warp_id() const { return m_warp_id; }
+  unsigned get_dynamic_warp_id() const { return m_dynamic_warp_id; }
+  active_mask_t get_active_mask() const { return m_warp_active_mask; }
+  /***************************************************************************/
 
  private:
   unsigned m_opcode;
@@ -121,9 +185,10 @@ class trace_warp_inst_t {
   //记录了当前指令的所有源操作数寄存器总数。
   unsigned incount;
 
-  unsigned char is_vectorin;
-  unsigned char is_vectorout;
+  bool is_vectorin;
+  bool is_vectorout;
 
+  // TODO
   int pred;  // predicate register number
   int ar1, ar2;
   // register number for bank conflict evaluation
@@ -151,32 +216,35 @@ class trace_warp_inst_t {
 
   bool should_do_atomic;
   bool m_is_printf;
+  // TODO
+  unsigned m_gwarp_id;
   unsigned m_warp_id;
+  // TODO
   unsigned m_dynamic_warp_id;
   // const core_config *m_config;
   active_mask_t m_warp_active_mask;  // dynamic active mask for timing model
                                      // (after predication)
   
-  struct per_thread_info {
-    per_thread_info() {
-      for (unsigned i = 0; i < MAX_ACCESSES_PER_INSN_PER_THREAD; i++)
-        memreqaddr[i] = 0;
-    }
-    //MAX_ACCESSES_PER_INSN_PER_THREAD为单个线程中允许的最大访存次数。设置为8。
-    //memreqaddr[]存储了单条指令的所有访存地址。
-    new_addr_type
-        memreqaddr[MAX_ACCESSES_PER_INSN_PER_THREAD];  // effective address,
-                                                       // upto 8 different
-                                                       // requests (to support
-                                                       // 32B access in 8 chunks
-                                                       // of 4B each)
-  };
-  bool m_per_scalar_thread_valid;
+  // struct per_thread_info {
+  //   per_thread_info() {
+  //     for (unsigned i = 0; i < MAX_ACCESSES_PER_INSN_PER_THREAD; i++)
+  //       memreqaddr[i] = 0;
+  //   }
+  //   //MAX_ACCESSES_PER_INSN_PER_THREAD为单个线程中允许的最大访存次数。设置为8。
+  //   //memreqaddr[]存储了单条指令的所有访存地址。
+  //   new_addr_type
+  //       memreqaddr[MAX_ACCESSES_PER_INSN_PER_THREAD];  // effective address,
+  //                                                      // upto 8 different
+  //                                                      // requests (to support
+  //                                                      // 32B access in 8 chunks
+  //                                                      // of 4B each)
+  // };
+  // bool m_per_scalar_thread_valid;
   //m_per_scalar_thread是线程信息的向量，每个warp有一个m_per_scalar_thread。
-  std::vector<per_thread_info> m_per_scalar_thread;
-  bool m_mem_accesses_created;
+  // std::vector<per_thread_info> m_per_scalar_thread;
+  // bool m_mem_accesses_created;
   //当前指令的访存操作的列表。
-  std::list<mem_access_t> m_accessq;
+  // std::list<mem_access_t> m_accessq;
 
   memory_space_t space;
   cache_operator_type cache_op;
