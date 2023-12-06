@@ -10,6 +10,7 @@
 #include <map>
 #include <list>
 #include <string.h>
+#include <unordered_map>
 
 // #include "option_parser.h"
 
@@ -31,23 +32,8 @@
 #ifndef TRACE_PARSER_H
 #define TRACE_PARSER_H
 
-
-
-
-struct trace_command {
-  std::string command_string;
-  command_type m_type;
-};
-
-
-
-
-
-
-
 // type of the config files
 enum config_type { APP_CONFIG, INSTN_CONFIG, ISSUE_CONFIG, CONFIGS_TYPE_NUM };
-
 
 class app_config {
  public:
@@ -258,11 +244,14 @@ class issue_config {
   int get_trace_issued_sms_num() { return trace_issued_sms_num; }
 
   int get_sm_id_of_one_block(unsigned kernel_id, unsigned block_id);
+  int get_sm_id_of_one_block_fast(unsigned kernel_id, unsigned block_id);
 
  private:
   bool m_valid;
   int trace_issued_sms_num;
   
+  /* Store the <kernel_id, block_id> -> sm_id pair. */
+  std::map<std::pair<unsigned, unsigned>, int> trace_issued_sm_id_blocks_map;
 
   std::vector<block_info_t> parse_blocks_info(const std::string& blocks_info_str);
   std::vector<int> trace_issued_sms_vector = {};
@@ -503,8 +492,6 @@ class trace_parser {
  public:
   trace_parser(const char *input_configs_filepath);
   
-  std::pair<std::vector<trace_command>, int> parse_commandlist_file();
-
   void parse_configs_file(bool PRINT_LOG);
   void process_configs_file(std::string config_path, int config_type, bool PRINT_LOG);
   void judge_concurrent_issue();
