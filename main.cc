@@ -454,7 +454,7 @@ START_TIMER(2);
           for (unsigned i = 0; i < num_threadblocks_current_kernel; i++) {
             /* Calculate the allocated SM index of current thread block i. */
             
-            int sm_id = issuecfg->get_sm_id_of_one_block(unsigned(kernel_id + 1), unsigned(i));
+            int sm_id = issuecfg->get_sm_id_of_one_block_fast(unsigned(kernel_id + 1), unsigned(i));
             if (sm_id == curr_process_idx) {
               /* The threadblock_traces[i] stores the memory traces that belong to k->get_trace_info()->kernel_id 
                * and thread block i. */
@@ -660,7 +660,7 @@ START_TIMER(5);
   if (world.rank() == 0) {
     std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" << std::endl;
 
-    compute_instn* tmp = tracer.get_one_kernel_one_warp_one_instn(1, 2, 3);
+    compute_instn* tmp = tracer.get_one_kernel_one_warp_one_instn(42, 2, 3);
     _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
     trace_warp_inst_t* tmp_trace_warp_inst = &(tmp->trace_warp_inst);
 
