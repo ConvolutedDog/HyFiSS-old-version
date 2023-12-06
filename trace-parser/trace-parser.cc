@@ -310,6 +310,10 @@ int issue_config::get_sm_id_of_one_block(unsigned kernel_id, unsigned block_id) 
   return -1;
 }
 
+int issue_config::get_sm_id_of_one_block_fast(unsigned kernel_id, unsigned block_id) {
+  return trace_issued_sm_id_blocks_map[std::make_pair(kernel_id, block_id)];
+}
+
 std::vector<block_info_t> issue_config::parse_blocks_info(const std::string& blocks_info_str) {
     std::vector<block_info_t> result;
     size_t start = 0;
@@ -341,6 +345,8 @@ std::vector<block_info_t> issue_config::parse_blocks_info(const std::string& blo
         unsigned long long time_stamp = std::stoull(blocks_info_str.substr(end + 1, comma - end - 1), 0, 16);
         // std::cout << "       time_stamp: " << std::hex << time_stamp << std::dec << std::endl;
         end = comma + 1;
+
+        trace_issued_sm_id_blocks_map[std::make_pair(kernel_id, block_id)] = sm_id;
 
         block_info_t info = block_info_t(kernel_id, block_id, time_stamp, sm_id);
         // std::cout << info.kernel_id << " " << info.block_id << " " << std::hex << info.time_stamp << std::dec << " " << info.sm_id << std::endl;
@@ -1160,52 +1166,6 @@ void trace_parser::read_compute_instns(bool PRINT_LOG, std::vector<std::pair<int
   // process mem_instns
   // process_compute_instns(compute_instns_dir, PRINT_LOG, x); // the speed is too low
   process_compute_instns_fast(compute_instns_dir, PRINT_LOG, x); // the speed is very fast
-}
-
-std::pair<std::vector<trace_command>, int> trace_parser::parse_commandlist_file() {
-  std::ifstream fs;
-  fs.open(configs_filepath);
-
-  std::cout << "Processing kernel list file : " << configs_filepath
-            << std::endl;
-
-  if (!fs.is_open()) {
-    std::cout << "Unable to open file: " << configs_filepath << std::endl;
-    exit(1);
-  }
-
-  std::string directory(configs_filepath);
-  const size_t last_slash_idx = directory.rfind('/');
-  if (std::string::npos != last_slash_idx) {
-    directory = directory.substr(0, last_slash_idx);
-  }
-
-  std::string line, filepath;
-  std::vector<trace_command> commandlist;
-  int concurrent_kernel_kernel_nums = 0;
-
-  while (!fs.eof()) {
-    getline(fs, line);
-    if (line.empty())
-      continue;
-    else if (line.substr(0, 10) == "MemcpyHtoD") {
-      trace_command command;
-      command.command_string = line;
-      command.m_type = command_type::cpu_gpu_mem_copy;
-      commandlist.push_back(command);
-    } else if (line.substr(0, 6) == "kernel") {
-      trace_command command;
-      command.m_type = command_type::kernel_launch;
-      filepath = directory + "/" + line;
-      command.command_string = filepath;
-      commandlist.push_back(command);
-      concurrent_kernel_kernel_nums++;
-    }
-    // ignore gpu_to_cpu_memory_cpy
-  }
-
-  fs.close();
-  return std::make_pair(commandlist, concurrent_kernel_kernel_nums);
 }
 
 void split(const std::string &str, std::vector<std::string> &cont,
