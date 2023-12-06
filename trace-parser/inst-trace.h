@@ -73,7 +73,7 @@ struct _inst_trace_t {
   // unsigned line_num;
   unsigned kernel_id;
   unsigned m_pc;
-  unsigned mask;
+  unsigned mask; // invalid
   unsigned reg_dsts_num;
   unsigned reg_dest[MAX_DST];
   std::string opcode;
