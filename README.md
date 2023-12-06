@@ -30,4 +30,5 @@ Both of the following commands are running an MPI program, which requires 6 proc
 ```shell
 perf stat mpirun -np 6 ./memory_model.x --configs ./traces/vectoradd/configs/ --sort 0 --log 0 --tmp 0 --dump_histogram 0 > tmp.txt
 perf record mpirun -np 6 ./memory_model.x --configs ./traces/vectoradd/configs/ --sort 0 --log 0 --tmp 0 --dump_histogram 0 > tmp.txt
+perf report > perf.report
 ```
