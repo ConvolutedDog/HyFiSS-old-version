@@ -25,7 +25,7 @@
 #include "inst-memadd-info.h"
 #include "inst-trace.h"
 #include "memory-space.h"
-
+#include "../trace-driven/kernel-trace.h"
 
 #ifndef TRACE_PARSER_H
 #define TRACE_PARSER_H
@@ -43,29 +43,6 @@ struct trace_command {
 
 
 
-struct kernel_trace_t {
-  kernel_trace_t();
-
-  std::string kernel_name;
-  unsigned kernel_id;
-  unsigned grid_dim_x;
-  unsigned grid_dim_y;
-  unsigned grid_dim_z;
-  unsigned tb_dim_x;
-  unsigned tb_dim_y;
-  unsigned tb_dim_z;
-  unsigned shmem;
-  unsigned nregs;
-  unsigned long cuda_stream_id;
-  unsigned binary_verion;
-  unsigned enable_lineinfo;
-  unsigned trace_verion;
-  std::string nvbit_verion;
-  unsigned long long shmem_base_addr;
-  unsigned long long local_base_addr;
-  // Reference to open filestream
-  std::ifstream *ifs;
-};
 
 // type of the config files
 enum config_type { APP_CONFIG, INSTN_CONFIG, ISSUE_CONFIG, CONFIGS_TYPE_NUM };
@@ -437,7 +414,6 @@ struct compute_instn {
     // need to point to _inst_trace_t.
     inst_trace = _inst_trace;
     
-    
     // if (kernel_id == 2 && pc != 0) {
     //   // compute_instn's kernel_id starts from 0
     //   std::cout << "compute_instn: " << std::dec << kernel_id << " " 
@@ -450,6 +426,33 @@ struct compute_instn {
     //   exit(0);
     // }
     
+    valid = true;
+  }
+
+  compute_instn(unsigned _kernel_id, unsigned _pc,
+                unsigned _mask, unsigned _gwarp_id,
+                _inst_trace_t* _inst_trace,
+                trace_warp_inst_t* _trace_warp_inst) {
+    kernel_id = _kernel_id;
+    pc = _pc;
+    mask = _mask;
+    std::bitset<32> active_mask(mask);
+    gwarp_id = _gwarp_id;
+    // need to point to _inst_trace_t.
+    inst_trace = _inst_trace;
+    trace_warp_inst = _trace_warp_inst;
+    
+    // if (kernel_id == 2 && pc != 0) {
+    //   // compute_instn's kernel_id starts from 0
+    //   std::cout << "compute_instn: " << std::dec << kernel_id << " " 
+    //             << std::hex << pc << " " << std::hex << mask << " " 
+    //             << std::dec << gwarp_id << std::endl;
+    //   // inst_trace's kernel_id starts from 0
+    //   std::cout << "instn_str: " << std::dec << inst_trace->kernel_id << " " 
+    //             << std::hex << inst_trace->m_pc << " " 
+    //             << inst_trace->instn_str << std::endl;
+    //   exit(0);
+    // }
     
     valid = true;
   }
@@ -468,6 +471,7 @@ struct compute_instn {
   unsigned gwarp_id;
 
   _inst_trace_t* inst_trace;
+  trace_warp_inst_t* trace_warp_inst;
 
 #ifdef USE_BOOST
   friend class boost::serialization::access;
