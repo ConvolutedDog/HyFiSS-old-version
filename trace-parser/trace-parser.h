@@ -26,6 +26,7 @@
 #include "inst-trace.h"
 #include "memory-space.h"
 #include "../trace-driven/kernel-trace.h"
+#include "../trace-driven/trace-warp-inst.h"
 
 #ifndef TRACE_PARSER_H
 #define TRACE_PARSER_H
@@ -413,6 +414,7 @@ struct compute_instn {
     gwarp_id = _gwarp_id;
     // need to point to _inst_trace_t.
     inst_trace = _inst_trace;
+    inst_trace->mask = _mask;
     
     // if (kernel_id == 2 && pc != 0) {
     //   // compute_instn's kernel_id starts from 0
@@ -428,7 +430,7 @@ struct compute_instn {
     
     valid = true;
   }
-
+  ~compute_instn(){ /*delete trace_warp_inst;*/ }
   compute_instn(unsigned _kernel_id, unsigned _pc,
                 unsigned _mask, unsigned _gwarp_id,
                 _inst_trace_t* _inst_trace,
@@ -440,7 +442,11 @@ struct compute_instn {
     gwarp_id = _gwarp_id;
     // need to point to _inst_trace_t.
     inst_trace = _inst_trace;
-    trace_warp_inst = _trace_warp_inst;
+    inst_trace->mask = _mask;
+    // trace_warp_inst = _trace_warp_inst;
+    // trace_warp_inst = new trace_warp_inst_t();
+    // trace_warp_inst->parse_from_trace_struct(_inst_trace, &Volta_OpcodeMap, gwarp_id);
+    trace_warp_inst.parse_from_trace_struct(_inst_trace, &Volta_OpcodeMap, gwarp_id);
     
     // if (kernel_id == 2 && pc != 0) {
     //   // compute_instn's kernel_id starts from 0
@@ -471,7 +477,8 @@ struct compute_instn {
   unsigned gwarp_id;
 
   _inst_trace_t* inst_trace;
-  trace_warp_inst_t* trace_warp_inst;
+  // trace_warp_inst_t* trace_warp_inst;
+  trace_warp_inst_t trace_warp_inst;
 
 #ifdef USE_BOOST
   friend class boost::serialization::access;
