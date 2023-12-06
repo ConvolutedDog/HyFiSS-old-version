@@ -1070,6 +1070,7 @@ void trace_parser::process_compute_instns_fast(std::string compute_instns_dir, b
       if (std::regex_search(search, match, pattern)) {
         int kernel_id = std::stoi(match[1]);
         int gwarp_id = std::stoi(match[2]);
+        
         int num_warps_per_block = get_appcfg()->get_num_warp_per_block(kernel_id - 1);
         
         int block_id = (int)(gwarp_id / num_warps_per_block);
@@ -1110,15 +1111,19 @@ void trace_parser::process_compute_instns_fast(std::string compute_instns_dir, b
             
                 if (_mask_str == "!") _mask = 0xffffffff;
                 else {
-                  _mask = std::stoi(_mask_str, nullptr, 16);
+                  _mask = (unsigned)std::stoul(_mask_str, nullptr, 16);
                 }
                 // kernel_id, pc
                 _inst_trace_t* _inst_trace = (*get_instncfg()->get_instn_info_vector())[std::make_pair(kernel_id-1, _pc)]; // ?????
-                // trace_warp_inst_t* _trace_warp_inst = trace_warp_inst_t();
-                // _trace_warp_inst.parse_from_trace_struct(_inst_trace, &Volta_OpcodeMap, )
+                // trace_warp_inst_t* _trace_warp_inst = new trace_warp_inst_t();
+                // _trace_warp_inst->parse_from_trace_struct(_inst_trace, &Volta_OpcodeMap);
+                // _trace_warp_inst->parse_from_trace_struct(_inst_trace, &Volta_OpcodeMap, gwarp_id);
                 // inst_trace's kernel_id starts from 0
                 // compute_instn's kernel_id starts from 0
-                conpute_instns[kernel_id-1][gwarp_id].push_back(compute_instn(kernel_id - 1, _pc, _mask, gwarp_id, _inst_trace));
+                // conpute_instns[kernel_id-1][gwarp_id].push_back(compute_instn(kernel_id - 1, _pc, _mask, gwarp_id, _inst_trace));
+                conpute_instns[kernel_id-1][gwarp_id].push_back(compute_instn(kernel_id - 1, _pc, 
+                                                                              _mask, gwarp_id, _inst_trace, 
+                                                                              NULL));
           }
         }
         fs.close();
