@@ -338,7 +338,7 @@ struct _inst_trace_t {
   std::vector<std::string> get_opcode_tokens() const;
 
   ~_inst_trace_t();
-  /*********************************************************************/
+  /*********************************************************************/ // TODO
  private:
   unsigned m_opcode;
   unsigned m_uid;
