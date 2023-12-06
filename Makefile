@@ -53,6 +53,7 @@ endif
 
 OBJS = $(OBJ_PATH)/splay.o $(OBJ_PATH)/process_args.o $(OBJ_PATH)/parda_print.o $(OBJ_PATH)/narray.o $(OBJ_PATH)/parda.o
 OBJS += $(OBJ_PATH)/memory-space.o $(OBJ_PATH)/inst-memadd-info.o $(OBJ_PATH)/sass-inst.o $(OBJ_PATH)/inst-trace.o
+OBJS += $(OBJ_PATH)/kernel-trace.o $(OBJ_PATH)/mem-access.o $(OBJ_PATH)/kernel-info.o $(OBJ_PATH)/trace-warp-inst.o
 OBJS += $(OBJ_PATH)/common_def.o $(OBJ_PATH)/trace-parser.o $(OBJ_PATH)/trace-driven.o $(OBJ_PATH)/main.o
 
 ifeq ($(USE_OPTION_PARSER),1)
@@ -70,6 +71,18 @@ $(OBJ_PATH)/main.o: main.cc
 	$(MPICXX) $(CXXFLAGS) $(OPTFLAGS) $(LIBRARIES) -o $@ -c $^
 
 $(OBJ_PATH)/trace-parser.o: trace-parser/trace-parser.cc
+	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
+
+$(OBJ_PATH)/trace-warp-inst.o: trace-driven/trace-warp-inst.cc
+	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
+
+$(OBJ_PATH)/kernel-info.o: trace-driven/kernel-info.cc
+	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
+
+$(OBJ_PATH)/mem-access.o: trace-driven/mem-access.cc
+	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
+
+$(OBJ_PATH)/kernel-trace.o: trace-driven/kernel-trace.cc
 	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
 
 $(OBJ_PATH)/trace-driven.o: trace-driven/trace-driven.cc
