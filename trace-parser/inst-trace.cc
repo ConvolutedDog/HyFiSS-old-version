@@ -78,6 +78,9 @@ std::vector<std::string> _inst_trace_t::get_opcode_tokens() const {
   return opcode_tokens;
 }
 
+std::vector<std::string> _inst_trace_t::get_opcode_tokens_directly() const {
+  return opcode_tokens;
+}
 
 unsigned inst_trace_t::get_datawidth_from_opcode(
     const std::vector<std::string> &opcode) const {
