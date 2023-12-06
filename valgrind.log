@@ -1,223 +1,234 @@
-==47038== Memcheck, a memory error detector
-==47038== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
-==47038== Using Valgrind-3.13.0 and LibVEX; rerun with -h for copyright info
-==47038== Command: ./memory_model.x --configs ./traces/vectoradd/configs/ --sort 0 --log 0 --tmp 0 --dump_histogram 0
-==47038== Parent PID: 67540
-==47038== 
---47038-- 
---47038-- Valgrind options:
---47038--    --leak-check=full
---47038--    --show-leak-kinds=all
---47038--    --allow-mismatched-debuginfo=yes
---47038--    --read-inline-info=yes
---47038--    --read-var-info=yes
---47038--    --quiet
---47038--    --verbose
---47038--    -v
---47038--    --log-file=valgrind.log
---47038-- Contents of /proc/version:
---47038--   Linux version 3.10.0-1160.102.1.el7.x86_64 (mockbuild@kbuilder.bsys.centos.org) (gcc version 4.8.5 20150623 (Red Hat 4.8.5-44) (GCC) ) #1 SMP Tue Oct 17 15:42:21 UTC 2023
---47038-- 
---47038-- Arch and hwcaps: AMD64, LittleEndian, amd64-cx16-lzcnt-rdtscp-sse3-avx-avx2-bmi
---47038-- Page sizes: currently 4096, max supported 4096
---47038-- Valgrind library directory: /opt/rh/devtoolset-7/root/usr/lib64/valgrind
---47038-- Reading syms from /home/yangjianchao/Github/memory_model/memory_model.x
---47038-- Reading syms from /usr/lib64/ld-2.17.so
---47038-- Reading syms from /opt/rh/devtoolset-7/root/usr/lib64/valgrind/memcheck-amd64-linux
---47038--    object doesn't have a symbol table
---47038--    object doesn't have a dynamic symbol table
---47038-- Scheduler: using generic scheduler lock implementation.
---47038-- Reading suppressions file: /opt/rh/devtoolset-7/root/usr/lib64/valgrind/default.supp
-==47038== embedded gdbserver: reading from /tmp/vgdb-pipe-from-vgdb-to-47038-by-yangjianchao-on-localhost.localdomain
-==47038== embedded gdbserver: writing to   /tmp/vgdb-pipe-to-vgdb-from-47038-by-yangjianchao-on-localhost.localdomain
-==47038== embedded gdbserver: shared mem   /tmp/vgdb-pipe-shared-mem-vgdb-47038-by-yangjianchao-on-localhost.localdomain
-==47038== 
-==47038== TO CONTROL THIS PROCESS USING vgdb (which you probably
-==47038== don't want to do, unless you know exactly what you're doing,
-==47038== or are doing some strange experiment):
-==47038==   /opt/rh/devtoolset-7/root/usr/lib64/valgrind/../../bin/vgdb --pid=47038 ...command...
-==47038== 
-==47038== TO DEBUG THIS PROCESS USING GDB: start GDB like this
-==47038==   /path/to/gdb ./memory_model.x
-==47038== and then give GDB the following command
-==47038==   target remote | /opt/rh/devtoolset-7/root/usr/lib64/valgrind/../../bin/vgdb --pid=47038
-==47038== --pid is optional if only one valgrind process is running
-==47038== 
---47038-- REDIR: 0x4019e40 (ld-linux-x86-64.so.2:strlen) redirected to 0x58059d91 (???)
---47038-- REDIR: 0x4019c10 (ld-linux-x86-64.so.2:index) redirected to 0x58059dab (???)
---47038-- Reading syms from /opt/rh/devtoolset-7/root/usr/lib64/valgrind/vgpreload_core-amd64-linux.so
---47038-- Reading syms from /opt/rh/devtoolset-7/root/usr/lib64/valgrind/vgpreload_memcheck-amd64-linux.so
-==47038== WARNING: new redirection conflicts with existing -- ignoring it
---47038--     old: 0x04019e40 (strlen              ) R-> (0000.0) 0x58059d91 ???
---47038--     new: 0x04019e40 (strlen              ) R-> (2007.0) 0x04c2ca70 strlen
---47038-- REDIR: 0x4019dc0 (ld-linux-x86-64.so.2:strcmp) redirected to 0x4c2dbc0 (strcmp)
---47038-- REDIR: 0x401aa80 (ld-linux-x86-64.so.2:mempcpy) redirected to 0x4c30c40 (mempcpy)
---47038-- Reading syms from /usr/local/boost/lib/libboost_mpi.so.1.83.0
---47038-- Reading syms from /usr/local/boost/lib/libboost_serialization.so.1.83.0
---47038-- Reading syms from /usr/lib64/libglib-2.0.so.0.5600.1
---47038--    object doesn't have a symbol table
---47038-- Reading syms from /usr/local/mpich-3.3.2/lib/libmpicxx.so.12.1.8
---47038-- Reading syms from /usr/local/mpich-3.3.2/lib/libmpi.so.12.1.8
---47038-- Reading syms from /usr/lib64/libstdc++.so.6.0.19
---47038-- ELF section outside all mapped regions
---47038-- Reading syms from /usr/lib64/libm-2.17.so
---47038-- Reading syms from /usr/lib64/libgcc_s-4.8.5-20150702.so.1
---47038--    object doesn't have a symbol table
---47038-- Reading syms from /usr/lib64/libc-2.17.so
---47038-- Reading syms from /usr/lib64/librt-2.17.so
---47038-- Reading syms from /usr/lib64/libpthread-2.17.so
---47038-- Reading syms from /usr/lib64/libpcre.so.1.2.0
---47038--    object doesn't have a symbol table
---47038-- Reading syms from /usr/lib64/libgfortran.so.4.0.0
---47038--    object doesn't have a symbol table
---47038-- Reading syms from /usr/lib64/libquadmath.so.0.0.0
---47038--    object doesn't have a symbol table
---47038-- REDIR: 0x62c61d0 (libc.so.6:strcasecmp) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
---47038-- REDIR: 0x62c2f40 (libc.so.6:strnlen) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
---47038-- REDIR: 0x62c84d0 (libc.so.6:strncasecmp) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
---47038-- REDIR: 0x62c59a0 (libc.so.6:memset) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
---47038-- REDIR: 0x62c5950 (libc.so.6:memcpy@GLIBC_2.2.5) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
---47038-- REDIR: 0x62c2e10 (libc.so.6:strlen) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
---47038-- REDIR: 0x62c13c0 (libc.so.6:strcmp) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
---47038-- REDIR: 0x62cabc0 (libc.so.6:memcpy@@GLIBC_2.14) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
---47038-- REDIR: 0x62c5b00 (libc.so.6:mempcpy) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
---47038-- REDIR: 0x62c3020 (libc.so.6:strncmp) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
---47038-- REDIR: 0x62c2e60 (libc.so.6:__GI_strlen) redirected to 0x4c2c9d0 (__GI_strlen)
---47038-- REDIR: 0x62c4930 (libc.so.6:__GI_strrchr) redirected to 0x4c2c430 (__GI_strrchr)
---47038-- REDIR: 0x62bc160 (libc.so.6:calloc) redirected to 0x4c2b8bf (calloc)
---47038-- REDIR: 0x62bb740 (libc.so.6:malloc) redirected to 0x4c29b3c (malloc)
---47038-- REDIR: 0x62cac30 (libc.so.6:__GI_memcpy) redirected to 0x4c2e560 (__GI_memcpy)
---47038-- REDIR: 0xffffffffff600000 (???:???) redirected to 0x58059d73 (???)
---47038-- REDIR: 0x62c53c0 (libc.so.6:__GI_memcmp) redirected to 0x4c2f4b0 (__GI_memcmp)
---47038-- REDIR: 0x6374fc0 (libc.so.6:__strcmp_sse42) redirected to 0x4c2db70 (__strcmp_sse42)
---47038-- REDIR: 0x62c5a00 (libc.so.6:__GI_memset) redirected to 0x4c2fe60 (memset)
---47038-- REDIR: 0x63a58b0 (libc.so.6:__strlen_sse2_pminub) redirected to 0x4c2c9b0 (strlen)
---47038-- REDIR: 0x62bbc40 (libc.so.6:realloc) redirected to 0x4c2ba8e (realloc)
---47038-- REDIR: 0x62c5380 (libc.so.6:bcmp) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
---47038-- REDIR: 0x63a01e0 (libc.so.6:__memcmp_sse4_1) redirected to 0x4c2f5f0 (__memcmp_sse4_1)
---47038-- REDIR: 0x638ac70 (libc.so.6:__memcpy_ssse3_back) redirected to 0x4c2df80 (memcpy@@GLIBC_2.14)
---47038-- REDIR: 0x62c3060 (libc.so.6:__GI_strncmp) redirected to 0x4c2d200 (__GI_strncmp)
---47038-- REDIR: 0x62c2850 (libc.so.6:strcpy) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
---47038-- REDIR: 0x62d07d0 (libc.so.6:__strcpy_sse2_unaligned) redirected to 0x4c2ca90 (strcpy)
---47038-- REDIR: 0x62bbb60 (libc.so.6:free) redirected to 0x4c2ac36 (free)
---47038-- REDIR: 0x637d360 (libc.so.6:__strcasecmp_avx) redirected to 0x4c2d350 (strcasecmp)
---47038-- REDIR: 0x62c1300 (libc.so.6:index) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
---47038-- REDIR: 0x6374f10 (libc.so.6:__strchr_sse42) redirected to 0x4c2c620 (index)
---47038-- REDIR: 0xffffffffff600400 (???:???) redirected to 0x58059d7d (???)
---47038-- REDIR: 0x62c5030 (libc.so.6:memchr) redirected to 0x4c2dc60 (memchr)
---47038-- REDIR: 0x62c57c0 (libc.so.6:__GI_memmove) redirected to 0x4c301b0 (__GI_memmove)
---47038-- REDIR: 0x62c5b70 (libc.so.6:__GI_mempcpy) redirected to 0x4c30970 (__GI_mempcpy)
---47038-- REDIR: 0x62dba10 (libc.so.6:__GI_strstr) redirected to 0x4c30ed0 (__strstr_sse2)
---47038-- REDIR: 0x62c1340 (libc.so.6:__GI_strchr) redirected to 0x4c2c560 (__GI_strchr)
---47038-- REDIR: 0x62cc2a0 (libc.so.6:__GI___rawmemchr) redirected to 0x4c307c0 (__GI___rawmemchr)
---47038-- REDIR: 0x62cc4b0 (libc.so.6:strchrnul) redirected to 0x4c30760 (strchrnul)
---47038-- REDIR: 0x62dbfd0 (libc.so.6:strstr) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
---47038-- REDIR: 0x6376ef0 (libc.so.6:__strstr_sse42) redirected to 0x4c30f60 (__strstr_sse42)
---47038-- REDIR: 0x62c48b0 (libc.so.6:strncpy) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
---47038-- REDIR: 0x62d0e00 (libc.so.6:__strncpy_sse2_unaligned) redirected to 0x4c2d040 (__strncpy_sse2_unaligned)
---47038-- REDIR: 0x637e9d0 (libc.so.6:__strncasecmp_avx) redirected to 0x4c2d430 (strncasecmp)
---47038-- REDIR: 0x62c48f0 (libc.so.6:rindex) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
---47038-- REDIR: 0x6376d50 (libc.so.6:__strrchr_sse42) redirected to 0x4c2c4c0 (__strrchr_sse42)
---47038-- REDIR: 0x6375d70 (libc.so.6:__strncmp_sse42) redirected to 0x4c2d2e0 (__strncmp_sse42)
---47038-- REDIR: 0x6390210 (libc.so.6:__memmove_ssse3_back) redirected to 0x4c2dd20 (memcpy@GLIBC_2.2.5)
-==47038== 
-==47038== HEAP SUMMARY:
-==47038==     in use at exit: 18,604 bytes in 6 blocks
-==47038==   total heap usage: 57,636,286 allocs, 57,636,280 frees, 30,373,791,721 bytes allocated
-==47038== 
-==47038== Searching for pointers to 6 not-freed blocks
-==47038== Checked 492,400 bytes
-==47038== 
-==47038== 4 bytes in 1 blocks are still reachable in loss record 1 of 6
-==47038==    at 0x4C29BC3: malloc (vg_replace_malloc.c:299)
-==47038==    by 0x52B5E71: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x532AB5B: g_private_get (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x5302D4C: g_slice_alloc (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52D4C9D: g_hash_table_new_full (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52F6B4A: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52E1BB9: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x400F9C2: _dl_init (in /usr/lib64/ld-2.17.so)
-==47038==    by 0x4001179: ??? (in /usr/lib64/ld-2.17.so)
-==47038==    by 0xA: ???
-==47038==    by 0x1FFEFFF98E: ???
-==47038==    by 0x1FFEFFF99F: ???
-==47038== 
-==47038== 32 bytes in 1 blocks are still reachable in loss record 2 of 6
-==47038==    at 0x4C2B955: calloc (vg_replace_malloc.c:711)
-==47038==    by 0x52EB7B5: g_malloc0 (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52D4D04: g_hash_table_new_full (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52F6B4A: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52E1BB9: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x400F9C2: _dl_init (in /usr/lib64/ld-2.17.so)
-==47038==    by 0x4001179: ??? (in /usr/lib64/ld-2.17.so)
-==47038==    by 0xA: ???
-==47038==    by 0x1FFEFFF98E: ???
-==47038==    by 0x1FFEFFF99F: ???
-==47038==    by 0x1FFEFFF9A9: ???
-==47038==    by 0x1FFEFFF9C5: ???
-==47038== 
-==47038== 64 bytes in 1 blocks are still reachable in loss record 3 of 6
-==47038==    at 0x4C2B955: calloc (vg_replace_malloc.c:711)
-==47038==    by 0x52EB7B5: g_malloc0 (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52D4CEF: g_hash_table_new_full (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52F6B4A: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52E1BB9: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x400F9C2: _dl_init (in /usr/lib64/ld-2.17.so)
-==47038==    by 0x4001179: ??? (in /usr/lib64/ld-2.17.so)
-==47038==    by 0xA: ???
-==47038==    by 0x1FFEFFF98E: ???
-==47038==    by 0x1FFEFFF99F: ???
-==47038==    by 0x1FFEFFF9A9: ???
-==47038==    by 0x1FFEFFF9C5: ???
-==47038== 
-==47038== 88 bytes in 1 blocks are still reachable in loss record 4 of 6
-==47038==    at 0x4C29BC3: malloc (vg_replace_malloc.c:299)
-==47038==    by 0x52EB75D: g_malloc (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x5302D6D: g_slice_alloc (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52D4C9D: g_hash_table_new_full (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52F6B4A: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52E1BB9: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x400F9C2: _dl_init (in /usr/lib64/ld-2.17.so)
-==47038==    by 0x4001179: ??? (in /usr/lib64/ld-2.17.so)
-==47038==    by 0xA: ???
-==47038==    by 0x1FFEFFF98E: ???
-==47038==    by 0x1FFEFFF99F: ???
-==47038==    by 0x1FFEFFF9A9: ???
-==47038== 
-==47038== 2,032 bytes in 1 blocks are still reachable in loss record 5 of 6
-==47038==    at 0x4C2B955: calloc (vg_replace_malloc.c:711)
-==47038==    by 0x52EB7B5: g_malloc0 (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52B57A6: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x5302EB4: g_slice_alloc (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52D4C9D: g_hash_table_new_full (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52F6B4A: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52E1BB9: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x400F9C2: _dl_init (in /usr/lib64/ld-2.17.so)
-==47038==    by 0x4001179: ??? (in /usr/lib64/ld-2.17.so)
-==47038==    by 0xA: ???
-==47038==    by 0x1FFEFFF98E: ???
-==47038==    by 0x1FFEFFF99F: ???
-==47038== 
-==47038== 16,384 bytes in 1 blocks are still reachable in loss record 6 of 6
-==47038==    at 0x4C29BC3: malloc (vg_replace_malloc.c:299)
-==47038==    by 0x52EB75D: g_malloc (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52F6B5B: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x52E1BB9: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
-==47038==    by 0x400F9C2: _dl_init (in /usr/lib64/ld-2.17.so)
-==47038==    by 0x4001179: ??? (in /usr/lib64/ld-2.17.so)
-==47038==    by 0xA: ???
-==47038==    by 0x1FFEFFF98E: ???
-==47038==    by 0x1FFEFFF99F: ???
-==47038==    by 0x1FFEFFF9A9: ???
-==47038==    by 0x1FFEFFF9C5: ???
-==47038==    by 0x1FFEFFF9CC: ???
-==47038== 
-==47038== LEAK SUMMARY:
-==47038==    definitely lost: 0 bytes in 0 blocks
-==47038==    indirectly lost: 0 bytes in 0 blocks
-==47038==      possibly lost: 0 bytes in 0 blocks
-==47038==    still reachable: 18,604 bytes in 6 blocks
-==47038==         suppressed: 0 bytes in 0 blocks
-==47038== 
-==47038== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
-==47038== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+==4400== Memcheck, a memory error detector
+==4400== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
+==4400== Using Valgrind-3.13.0 and LibVEX; rerun with -h for copyright info
+==4400== Command: ./memory_model.x --configs ./traces/vectoradd-mini/configs/ --sort 0 --log 0 --tmp 0 --dump_histogram 0
+==4400== Parent PID: 67540
+==4400== 
+--4400-- 
+--4400-- Valgrind options:
+--4400--    --leak-check=full
+--4400--    --show-leak-kinds=all
+--4400--    --allow-mismatched-debuginfo=yes
+--4400--    --read-inline-info=yes
+--4400--    --read-var-info=yes
+--4400--    --quiet
+--4400--    --verbose
+--4400--    -v
+--4400--    --log-file=valgrind.log
+--4400--    --track-origins=no
+--4400-- Contents of /proc/version:
+--4400--   Linux version 3.10.0-1160.102.1.el7.x86_64 (mockbuild@kbuilder.bsys.centos.org) (gcc version 4.8.5 20150623 (Red Hat 4.8.5-44) (GCC) ) #1 SMP Tue Oct 17 15:42:21 UTC 2023
+--4400-- 
+--4400-- Arch and hwcaps: AMD64, LittleEndian, amd64-cx16-lzcnt-rdtscp-sse3-avx-avx2-bmi
+--4400-- Page sizes: currently 4096, max supported 4096
+--4400-- Valgrind library directory: /opt/rh/devtoolset-7/root/usr/lib64/valgrind
+--4400-- Reading syms from /home/yangjianchao/Github/memory_model/memory_model.x
+--4400-- warning: addVar: unknown size (ss)
+--4400-- warning: addVar: unknown size (ss)
+--4400-- warning: addVar: unknown size (file)
+--4400-- warning: addVar: unknown size (iss)
+--4400-- warning: addVar: unknown size (iss)
+--4400-- warning: addVar: unknown size (stream)
+--4400-- warning: addVar: unknown size (__is)
+--4400-- warning: addVar: unknown size (<anon_var>)
+--4400-- warning: addVar: unknown size (<anon_var>)
+--4400-- warning: addVar: unknown size (ss)
+--4400-- Reading syms from /usr/lib64/ld-2.17.so
+--4400-- Reading syms from /opt/rh/devtoolset-7/root/usr/lib64/valgrind/memcheck-amd64-linux
+--4400--    object doesn't have a symbol table
+--4400--    object doesn't have a dynamic symbol table
+--4400-- Scheduler: using generic scheduler lock implementation.
+--4400-- Reading suppressions file: /opt/rh/devtoolset-7/root/usr/lib64/valgrind/default.supp
+==4400== embedded gdbserver: reading from /tmp/vgdb-pipe-from-vgdb-to-4400-by-yangjianchao-on-localhost.localdomain
+==4400== embedded gdbserver: writing to   /tmp/vgdb-pipe-to-vgdb-from-4400-by-yangjianchao-on-localhost.localdomain
+==4400== embedded gdbserver: shared mem   /tmp/vgdb-pipe-shared-mem-vgdb-4400-by-yangjianchao-on-localhost.localdomain
+==4400== 
+==4400== TO CONTROL THIS PROCESS USING vgdb (which you probably
+==4400== don't want to do, unless you know exactly what you're doing,
+==4400== or are doing some strange experiment):
+==4400==   /opt/rh/devtoolset-7/root/usr/lib64/valgrind/../../bin/vgdb --pid=4400 ...command...
+==4400== 
+==4400== TO DEBUG THIS PROCESS USING GDB: start GDB like this
+==4400==   /path/to/gdb ./memory_model.x
+==4400== and then give GDB the following command
+==4400==   target remote | /opt/rh/devtoolset-7/root/usr/lib64/valgrind/../../bin/vgdb --pid=4400
+==4400== --pid is optional if only one valgrind process is running
+==4400== 
+--4400-- REDIR: 0x4019e40 (ld-linux-x86-64.so.2:strlen) redirected to 0x58059d91 (???)
+--4400-- REDIR: 0x4019c10 (ld-linux-x86-64.so.2:index) redirected to 0x58059dab (???)
+--4400-- Reading syms from /opt/rh/devtoolset-7/root/usr/lib64/valgrind/vgpreload_core-amd64-linux.so
+--4400-- Reading syms from /opt/rh/devtoolset-7/root/usr/lib64/valgrind/vgpreload_memcheck-amd64-linux.so
+==4400== WARNING: new redirection conflicts with existing -- ignoring it
+--4400--     old: 0x04019e40 (strlen              ) R-> (0000.0) 0x58059d91 ???
+--4400--     new: 0x04019e40 (strlen              ) R-> (2007.0) 0x04c2ca70 strlen
+--4400-- REDIR: 0x4019dc0 (ld-linux-x86-64.so.2:strcmp) redirected to 0x4c2dbc0 (strcmp)
+--4400-- REDIR: 0x401aa80 (ld-linux-x86-64.so.2:mempcpy) redirected to 0x4c30c40 (mempcpy)
+--4400-- Reading syms from /usr/local/boost/lib/libboost_mpi.so.1.83.0
+--4400-- Reading syms from /usr/local/boost/lib/libboost_serialization.so.1.83.0
+--4400-- Reading syms from /usr/lib64/libglib-2.0.so.0.5600.1
+--4400--    object doesn't have a symbol table
+--4400-- Reading syms from /usr/local/mpich-3.3.2/lib/libmpicxx.so.12.1.8
+--4400-- Reading syms from /usr/local/mpich-3.3.2/lib/libmpi.so.12.1.8
+--4400-- Reading syms from /usr/lib64/libstdc++.so.6.0.19
+--4400-- ELF section outside all mapped regions
+--4400-- Reading syms from /usr/lib64/libm-2.17.so
+--4400-- Reading syms from /usr/lib64/libgcc_s-4.8.5-20150702.so.1
+--4400--    object doesn't have a symbol table
+--4400-- Reading syms from /usr/lib64/libc-2.17.so
+--4400-- Reading syms from /usr/lib64/librt-2.17.so
+--4400-- Reading syms from /usr/lib64/libpthread-2.17.so
+--4400-- Reading syms from /usr/lib64/libpcre.so.1.2.0
+--4400--    object doesn't have a symbol table
+--4400-- Reading syms from /usr/lib64/libgfortran.so.4.0.0
+--4400--    object doesn't have a symbol table
+--4400-- Reading syms from /usr/lib64/libquadmath.so.0.0.0
+--4400--    object doesn't have a symbol table
+--4400-- REDIR: 0x62c61d0 (libc.so.6:strcasecmp) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
+--4400-- REDIR: 0x62c2f40 (libc.so.6:strnlen) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
+--4400-- REDIR: 0x62c84d0 (libc.so.6:strncasecmp) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
+--4400-- REDIR: 0x62c59a0 (libc.so.6:memset) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
+--4400-- REDIR: 0x62c5950 (libc.so.6:memcpy@GLIBC_2.2.5) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
+--4400-- REDIR: 0x62c2e10 (libc.so.6:strlen) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
+--4400-- REDIR: 0x62c13c0 (libc.so.6:strcmp) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
+--4400-- REDIR: 0x62cabc0 (libc.so.6:memcpy@@GLIBC_2.14) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
+--4400-- REDIR: 0x62c5b00 (libc.so.6:mempcpy) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
+--4400-- REDIR: 0x62c3020 (libc.so.6:strncmp) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
+--4400-- REDIR: 0x62c2e60 (libc.so.6:__GI_strlen) redirected to 0x4c2c9d0 (__GI_strlen)
+--4400-- REDIR: 0x62c4930 (libc.so.6:__GI_strrchr) redirected to 0x4c2c430 (__GI_strrchr)
+--4400-- REDIR: 0x62bc160 (libc.so.6:calloc) redirected to 0x4c2b8bf (calloc)
+--4400-- REDIR: 0x62bb740 (libc.so.6:malloc) redirected to 0x4c29b3c (malloc)
+--4400-- REDIR: 0x62cac30 (libc.so.6:__GI_memcpy) redirected to 0x4c2e560 (__GI_memcpy)
+--4400-- REDIR: 0xffffffffff600000 (???:???) redirected to 0x58059d73 (???)
+--4400-- REDIR: 0x62c53c0 (libc.so.6:__GI_memcmp) redirected to 0x4c2f4b0 (__GI_memcmp)
+--4400-- REDIR: 0x6374fc0 (libc.so.6:__strcmp_sse42) redirected to 0x4c2db70 (__strcmp_sse42)
+--4400-- REDIR: 0x62c5a00 (libc.so.6:__GI_memset) redirected to 0x4c2fe60 (memset)
+--4400-- REDIR: 0x63a58b0 (libc.so.6:__strlen_sse2_pminub) redirected to 0x4c2c9b0 (strlen)
+--4400-- REDIR: 0x62bbc40 (libc.so.6:realloc) redirected to 0x4c2ba8e (realloc)
+--4400-- REDIR: 0x62c5380 (libc.so.6:bcmp) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
+--4400-- REDIR: 0x63a01e0 (libc.so.6:__memcmp_sse4_1) redirected to 0x4c2f5f0 (__memcmp_sse4_1)
+--4400-- REDIR: 0x638ac70 (libc.so.6:__memcpy_ssse3_back) redirected to 0x4c2df80 (memcpy@@GLIBC_2.14)
+--4400-- REDIR: 0x62c3060 (libc.so.6:__GI_strncmp) redirected to 0x4c2d200 (__GI_strncmp)
+--4400-- REDIR: 0x62c2850 (libc.so.6:strcpy) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
+--4400-- REDIR: 0x62d07d0 (libc.so.6:__strcpy_sse2_unaligned) redirected to 0x4c2ca90 (strcpy)
+--4400-- REDIR: 0x62bbb60 (libc.so.6:free) redirected to 0x4c2ac36 (free)
+--4400-- REDIR: 0x637d360 (libc.so.6:__strcasecmp_avx) redirected to 0x4c2d350 (strcasecmp)
+--4400-- REDIR: 0x62c1300 (libc.so.6:index) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
+--4400-- REDIR: 0x6374f10 (libc.so.6:__strchr_sse42) redirected to 0x4c2c620 (index)
+--4400-- REDIR: 0xffffffffff600400 (???:???) redirected to 0x58059d7d (???)
+--4400-- REDIR: 0x62c5030 (libc.so.6:memchr) redirected to 0x4c2dc60 (memchr)
+--4400-- REDIR: 0x62c57c0 (libc.so.6:__GI_memmove) redirected to 0x4c301b0 (__GI_memmove)
+--4400-- REDIR: 0x62c5b70 (libc.so.6:__GI_mempcpy) redirected to 0x4c30970 (__GI_mempcpy)
+--4400-- REDIR: 0x62dba10 (libc.so.6:__GI_strstr) redirected to 0x4c30ed0 (__strstr_sse2)
+--4400-- REDIR: 0x62c1340 (libc.so.6:__GI_strchr) redirected to 0x4c2c560 (__GI_strchr)
+--4400-- REDIR: 0x62cc2a0 (libc.so.6:__GI___rawmemchr) redirected to 0x4c307c0 (__GI___rawmemchr)
+--4400-- REDIR: 0x62cc4b0 (libc.so.6:strchrnul) redirected to 0x4c30760 (strchrnul)
+--4400-- REDIR: 0x62dbfd0 (libc.so.6:strstr) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
+--4400-- REDIR: 0x6376ef0 (libc.so.6:__strstr_sse42) redirected to 0x4c30f60 (__strstr_sse42)
+--4400-- REDIR: 0x62c48b0 (libc.so.6:strncpy) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
+--4400-- REDIR: 0x62d0e00 (libc.so.6:__strncpy_sse2_unaligned) redirected to 0x4c2d040 (__strncpy_sse2_unaligned)
+--4400-- REDIR: 0x637e9d0 (libc.so.6:__strncasecmp_avx) redirected to 0x4c2d430 (strncasecmp)
+--4400-- REDIR: 0x62c48f0 (libc.so.6:rindex) redirected to 0x4a24740 (_vgnU_ifunc_wrapper)
+--4400-- REDIR: 0x6376d50 (libc.so.6:__strrchr_sse42) redirected to 0x4c2c4c0 (__strrchr_sse42)
+--4400-- REDIR: 0x6375d70 (libc.so.6:__strncmp_sse42) redirected to 0x4c2d2e0 (__strncmp_sse42)
+--4400-- REDIR: 0x6390210 (libc.so.6:__memmove_ssse3_back) redirected to 0x4c2dd20 (memcpy@GLIBC_2.2.5)
+==4400== 
+==4400== HEAP SUMMARY:
+==4400==     in use at exit: 18,604 bytes in 6 blocks
+==4400==   total heap usage: 2,379,467 allocs, 2,379,461 frees, 26,177,457,037 bytes allocated
+==4400== 
+==4400== Searching for pointers to 6 not-freed blocks
+==4400== Checked 492,376 bytes
+==4400== 
+==4400== 4 bytes in 1 blocks are still reachable in loss record 1 of 6
+==4400==    at 0x4C29BC3: malloc (vg_replace_malloc.c:299)
+==4400==    by 0x52B5E71: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x532AB5B: g_private_get (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x5302D4C: g_slice_alloc (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52D4C9D: g_hash_table_new_full (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52F6B4A: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52E1BB9: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x400F9C2: _dl_init (in /usr/lib64/ld-2.17.so)
+==4400==    by 0x4001179: ??? (in /usr/lib64/ld-2.17.so)
+==4400==    by 0xA: ???
+==4400==    by 0x1FFEFFF986: ???
+==4400==    by 0x1FFEFFF997: ???
+==4400== 
+==4400== 32 bytes in 1 blocks are still reachable in loss record 2 of 6
+==4400==    at 0x4C2B955: calloc (vg_replace_malloc.c:711)
+==4400==    by 0x52EB7B5: g_malloc0 (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52D4D04: g_hash_table_new_full (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52F6B4A: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52E1BB9: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x400F9C2: _dl_init (in /usr/lib64/ld-2.17.so)
+==4400==    by 0x4001179: ??? (in /usr/lib64/ld-2.17.so)
+==4400==    by 0xA: ???
+==4400==    by 0x1FFEFFF986: ???
+==4400==    by 0x1FFEFFF997: ???
+==4400==    by 0x1FFEFFF9A1: ???
+==4400==    by 0x1FFEFFF9C2: ???
+==4400== 
+==4400== 64 bytes in 1 blocks are still reachable in loss record 3 of 6
+==4400==    at 0x4C2B955: calloc (vg_replace_malloc.c:711)
+==4400==    by 0x52EB7B5: g_malloc0 (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52D4CEF: g_hash_table_new_full (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52F6B4A: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52E1BB9: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x400F9C2: _dl_init (in /usr/lib64/ld-2.17.so)
+==4400==    by 0x4001179: ??? (in /usr/lib64/ld-2.17.so)
+==4400==    by 0xA: ???
+==4400==    by 0x1FFEFFF986: ???
+==4400==    by 0x1FFEFFF997: ???
+==4400==    by 0x1FFEFFF9A1: ???
+==4400==    by 0x1FFEFFF9C2: ???
+==4400== 
+==4400== 88 bytes in 1 blocks are still reachable in loss record 4 of 6
+==4400==    at 0x4C29BC3: malloc (vg_replace_malloc.c:299)
+==4400==    by 0x52EB75D: g_malloc (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x5302D6D: g_slice_alloc (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52D4C9D: g_hash_table_new_full (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52F6B4A: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52E1BB9: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x400F9C2: _dl_init (in /usr/lib64/ld-2.17.so)
+==4400==    by 0x4001179: ??? (in /usr/lib64/ld-2.17.so)
+==4400==    by 0xA: ???
+==4400==    by 0x1FFEFFF986: ???
+==4400==    by 0x1FFEFFF997: ???
+==4400==    by 0x1FFEFFF9A1: ???
+==4400== 
+==4400== 2,032 bytes in 1 blocks are still reachable in loss record 5 of 6
+==4400==    at 0x4C2B955: calloc (vg_replace_malloc.c:711)
+==4400==    by 0x52EB7B5: g_malloc0 (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52B57A6: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x5302EB4: g_slice_alloc (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52D4C9D: g_hash_table_new_full (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52F6B4A: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52E1BB9: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x400F9C2: _dl_init (in /usr/lib64/ld-2.17.so)
+==4400==    by 0x4001179: ??? (in /usr/lib64/ld-2.17.so)
+==4400==    by 0xA: ???
+==4400==    by 0x1FFEFFF986: ???
+==4400==    by 0x1FFEFFF997: ???
+==4400== 
+==4400== 16,384 bytes in 1 blocks are still reachable in loss record 6 of 6
+==4400==    at 0x4C29BC3: malloc (vg_replace_malloc.c:299)
+==4400==    by 0x52EB75D: g_malloc (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52F6B5B: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x52E1BB9: ??? (in /usr/lib64/libglib-2.0.so.0.5600.1)
+==4400==    by 0x400F9C2: _dl_init (in /usr/lib64/ld-2.17.so)
+==4400==    by 0x4001179: ??? (in /usr/lib64/ld-2.17.so)
+==4400==    by 0xA: ???
+==4400==    by 0x1FFEFFF986: ???
+==4400==    by 0x1FFEFFF997: ???
+==4400==    by 0x1FFEFFF9A1: ???
+==4400==    by 0x1FFEFFF9C2: ???
+==4400==    by 0x1FFEFFF9C9: ???
+==4400== 
+==4400== LEAK SUMMARY:
+==4400==    definitely lost: 0 bytes in 0 blocks
+==4400==    indirectly lost: 0 bytes in 0 blocks
+==4400==      possibly lost: 0 bytes in 0 blocks
+==4400==    still reachable: 18,604 bytes in 6 blocks
+==4400==         suppressed: 0 bytes in 0 blocks
+==4400== 
+==4400== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+==4400== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
