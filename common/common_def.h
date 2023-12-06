@@ -46,9 +46,6 @@ enum address_scope {
 
 enum address_format { list_all = 0, base_stride = 1, base_delta = 2 };
 
-
-
-
 const unsigned MAX_WARP_SIZE = 32;
 typedef std::bitset<MAX_WARP_SIZE> active_mask_t;
 
@@ -67,9 +64,6 @@ enum _memory_op_t { no_memory_op = 0, memory_load, memory_store };
 
 enum mem_operation_t { NOT_TEX, TEX };
 typedef enum mem_operation_t mem_operation;
-
-
-
 
 #define MEM_ACCESS_TYPE_TUP_DEF                                         \
   MA_TUP_BEGIN(mem_access_type)                                         \
@@ -169,9 +163,6 @@ enum cache_operator_type {
   CACHE_WRITE_BACK,    // .wb
   CACHE_WRITE_THROUGH  // .wt
 };
-
-
-
 
 /***********************************************************************/
 
