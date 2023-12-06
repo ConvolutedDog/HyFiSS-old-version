@@ -13,13 +13,6 @@
 
 #include "trace-parser.h"
 
-kernel_trace_t::kernel_trace_t() {
-  kernel_name = "Empty";
-  shmem_base_addr = 0;
-  local_base_addr = 0;
-  binary_verion = 0;
-  trace_verion = 0;
-}
 
 void app_config::init(std::string config_path, bool PRINT_LOG) {
     
@@ -449,21 +442,24 @@ void issue_config::init(std::string config_path, bool PRINT_LOG) {
 kernel_trace_t* trace_parser::parse_kernel_info(int kernel_id, bool PRINT_LOG) {
   kernel_trace_t *kernel_info = new kernel_trace_t;
   
-  kernel_info->kernel_name = get_appcfg()->get_kernel_name(kernel_id).c_str();
+  kernel_info->kernel_name = get_appcfg()->get_kernel_name(kernel_id);
 
-  if (PRINT_LOG) std::cout << "    Creating kernel info for kernel: " << kernel_info->kernel_name
-                           << " (kernel_id: " + std::to_string(kernel_id) + ")" << std::endl;
+  if (PRINT_LOG) {
+    std::string logMsg = "    Creating kernel info for kernel: " + std::string(kernel_info->kernel_name) +
+                         " (kernel_id: " + std::to_string(kernel_id) + ")";
+    std::cout << logMsg << std::endl;
+  }
 
-  kernel_info->kernel_id = (unsigned)get_appcfg()->get_app_kernel_id(kernel_id);
-  kernel_info->grid_dim_x = (unsigned)get_appcfg()->get_kernel_grid_dim_x(kernel_id);
-  kernel_info->grid_dim_y = (unsigned)get_appcfg()->get_kernel_grid_dim_y(kernel_id);
-  kernel_info->grid_dim_z = (unsigned)get_appcfg()->get_kernel_grid_dim_z(kernel_id);
-  kernel_info->tb_dim_x = (unsigned)get_appcfg()->get_kernel_tb_dim_x(kernel_id);
-  kernel_info->tb_dim_y = (unsigned)get_appcfg()->get_kernel_tb_dim_y(kernel_id);
-  kernel_info->tb_dim_z = (unsigned)get_appcfg()->get_kernel_tb_dim_z(kernel_id);
-  kernel_info->shmem = (unsigned)get_appcfg()->get_kernel_shmem_base_addr(kernel_id);
-  kernel_info->nregs = (unsigned)get_appcfg()->get_kernel_num_registers(kernel_id);
-  kernel_info->cuda_stream_id = (unsigned)get_appcfg()->get_kernel_cuda_stream_id(kernel_id);
+  kernel_info->kernel_id = static_cast<unsigned>(get_appcfg()->get_app_kernel_id(kernel_id));
+  kernel_info->grid_dim_x = static_cast<unsigned>(get_appcfg()->get_kernel_grid_dim_x(kernel_id));
+  kernel_info->grid_dim_y = static_cast<unsigned>(get_appcfg()->get_kernel_grid_dim_y(kernel_id));
+  kernel_info->grid_dim_z = static_cast<unsigned>(get_appcfg()->get_kernel_grid_dim_z(kernel_id));
+  kernel_info->tb_dim_x = static_cast<unsigned>(get_appcfg()->get_kernel_tb_dim_x(kernel_id));
+  kernel_info->tb_dim_y = static_cast<unsigned>(get_appcfg()->get_kernel_tb_dim_y(kernel_id));
+  kernel_info->nregs = static_cast<unsigned>(get_appcfg()->get_kernel_num_registers(kernel_id));
+  kernel_info->cuda_stream_id = static_cast<unsigned>(get_appcfg()->get_kernel_cuda_stream_id(kernel_id));
+  kernel_info->shmem = static_cast<unsigned>(get_appcfg()->get_kernel_shmem_base_addr(kernel_id));
+  
   /* default disabled */
   kernel_info->binary_verion = VOLTA_BINART_VERSION;
   /* default disabled */
@@ -1118,6 +1114,8 @@ void trace_parser::process_compute_instns_fast(std::string compute_instns_dir, b
                 }
                 // kernel_id, pc
                 _inst_trace_t* _inst_trace = (*get_instncfg()->get_instn_info_vector())[std::make_pair(kernel_id-1, _pc)]; // ?????
+                // trace_warp_inst_t* _trace_warp_inst = trace_warp_inst_t();
+                // _trace_warp_inst.parse_from_trace_struct(_inst_trace, &Volta_OpcodeMap, )
                 // inst_trace's kernel_id starts from 0
                 // compute_instn's kernel_id starts from 0
                 conpute_instns[kernel_id-1][gwarp_id].push_back(compute_instn(kernel_id - 1, _pc, _mask, gwarp_id, _inst_trace));
