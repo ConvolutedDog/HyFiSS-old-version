@@ -19,6 +19,7 @@
 #include "./trace-driven/trace-driven.h"
 #include "./common/CLI/CLI.hpp"
 #include "./parda/parda.h"
+#include "./hw-parser/hw-parser.h"
 
 #include <chrono>
 
@@ -304,6 +305,8 @@ START_TIMER(0);
 
   bool PRINT_COMPUTE_LOG = false;
 
+  std::string hw_config_file = "./DEV-Def/QV100.config";
+
   app.add_option("--configs", configs, "The configs path, which is generated from our NVBit tool, "
                                        "e.g., \"./traces/vectoradd/configs\"");
   app.add_option("--sort", sort, "Simulate the order in which instructions are issued based on their "
@@ -312,6 +315,7 @@ START_TIMER(0);
   app.add_option("--dump_histogram", dump_histogram, "Dump the histogram of the private L1 cache hit "
                                                      "rate");
   app.add_option("--clog", PRINT_COMPUTE_LOG, "Print the computation traces processing log or not");
+  app.add_option("--config_file", hw_config_file, "The config file, e.g., \"../DEV-Def/QV100.config\"");
 
   int _tmp_print_;
 
@@ -324,6 +328,7 @@ START_TIMER(0);
   trace_parser tracer(configs.c_str());
 
   tracer.parse_configs_file(PRINT_LOG);
+  hw_config hw_cfg(hw_config_file);
 
 START_TIMER(1);
 
