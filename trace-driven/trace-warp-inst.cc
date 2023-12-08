@@ -1,7 +1,7 @@
 
 #include "trace-warp-inst.h"
 
-types_of_operands get_oprnd_type(op_type op, special_ops sp_op){
+inline types_of_operands get_oprnd_type(op_type op, special_ops sp_op){
   switch (op) {
     case SP_OP:
     case SFU_OP:
@@ -745,7 +745,7 @@ bool trace_warp_inst_t::parse_from_trace_struct(
   return true;
 }
 
-void trace_warp_inst_t::set_active(const active_mask_t &active) {
+inline void trace_warp_inst_t::set_active(const active_mask_t &active) {
   m_warp_active_mask = active;
   // if (m_isatomic) {
   //   for (unsigned i = 0; i < MAX_WARP_SIZE; i++) {
