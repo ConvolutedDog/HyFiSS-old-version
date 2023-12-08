@@ -97,7 +97,9 @@ struct _inst_trace_t {
 
   std::vector<std::string> get_opcode_tokens() const;
 
-  std::vector<std::string> get_opcode_tokens_directly() const;
+  inline std::vector<std::string> get_opcode_tokens_directly() const {
+    return opcode_tokens;
+  };
 
   ~_inst_trace_t();  
 };
