@@ -1091,12 +1091,17 @@ void trace_parser::process_compute_instns_fast(std::string compute_instns_dir, b
 // START_TIMER(6);
         // int block_id = std::stoi(match[2]);
         // std::cout << "x: " << kernel_id << " y: " << block_id << std::endl;
-        std::ifstream fs;
-        fs.open(compute_instns_filepath);
+        std::ifstream fs(compute_instns_filepath);
+
+        // fs.open(compute_instns_filepath);
         if (!fs.is_open()) {
           std::cout << "Unable to open file: " << compute_instns_filepath << std::endl;
           exit(1);
         }
+
+        char buf[BUFSIZ*10];
+        fs.rdbuf()->pubsetbuf(buf, sizeof(buf));
+
         std::string line;
         while (!fs.eof()) {
           getline(fs, line);
@@ -1109,15 +1114,18 @@ void trace_parser::process_compute_instns_fast(std::string compute_instns_dir, b
             unsigned _mask;
             
             // get above parameters from line
-            std::stringstream ss;
-            ss.str(line);
-            // std::cout << "line: " << line << std::endl;
-            ss >> std::hex >> _pc;
-            ss >> std::hex >> _mask_str;
+            // std::stringstream ss;
+            // ss.str(line);
+            // ss >> std::hex >> _pc;
+            // ss >> std::hex >> _mask_str;
+            char mask_str[9];
+            sscanf(line.c_str(), "%x %s", &_pc, mask_str);
+            _mask_str = std::string(mask_str);
             
                 if (_mask_str == "!") _mask = 0xffffffff;
                 else {
                   _mask = (unsigned)std::stoul(_mask_str, nullptr, 16);
+                  // sscanf(_mask_str.c_str(), "%x", &_mask);
                 }
                 // kernel_id, pc
                 _inst_trace_t* _inst_trace = (*get_instncfg()->get_instn_info_vector())[std::make_pair(kernel_id-1, _pc)]; // ?????
@@ -1127,7 +1135,7 @@ void trace_parser::process_compute_instns_fast(std::string compute_instns_dir, b
                 // inst_trace's kernel_id starts from 0
                 // compute_instn's kernel_id starts from 0
                 // conpute_instns[kernel_id-1][gwarp_id].push_back(compute_instn(kernel_id - 1, _pc, _mask, gwarp_id, _inst_trace));
-                conpute_instns[kernel_id-1][gwarp_id].push_back(compute_instn(kernel_id - 1, _pc, 
+                conpute_instns[kernel_id-1][gwarp_id].emplace_back(compute_instn(kernel_id - 1, _pc, 
                                                                               _mask, gwarp_id, _inst_trace, 
                                                                               NULL));
           }
