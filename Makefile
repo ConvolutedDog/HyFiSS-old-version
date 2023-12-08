@@ -15,7 +15,7 @@ else
 CXX = g++
 endif
 
-CXXFLAGS = -Wall 
+CXXFLAGS = -Wall -finline-functions -funswitch-loops -fgcse-after-reload -fomit-frame-pointer -fprofile-arcs -freg-struct-return -mfpmath=sse -malign-double -msseregparm
 
 # Detect Support for C++11 (C++0x) from GCC Version 
 GNUC_CPP0X := $(shell mpic++ --version | perl -ne 'if (/g++\s+\(.*\)\s+([0-9.]+)/){ if($$1 >= 4.3) {$$n=1} else {$$n=0;} } END { print $$n; }')
@@ -24,6 +24,7 @@ ifeq ($(GNUC_CPP0X), 1)
 	CXXFLAGS += -std=c++11
 endif
 
+CXXFLAGS += -I./hw-parser
 CXXFLAGS += -I./ISA-Def -I./DEV-Def -I./trace-parser -I./trace-driven -I./common
 CXXFLAGS += -I./common/CLI -I./common/CLI/impl -I$(MPI_HOME)/include
 CXXFLAGS += -I$(BOOST_HOME)/include
@@ -52,6 +53,7 @@ $(shell mkdir $(OBJ_PATH))
 endif
 
 OBJS = $(OBJ_PATH)/splay.o $(OBJ_PATH)/process_args.o $(OBJ_PATH)/parda_print.o $(OBJ_PATH)/narray.o $(OBJ_PATH)/parda.o
+OBJS += $(OBJ_PATH)/hw-parser.o
 OBJS += $(OBJ_PATH)/memory-space.o $(OBJ_PATH)/inst-memadd-info.o $(OBJ_PATH)/sass-inst.o $(OBJ_PATH)/inst-trace.o
 OBJS += $(OBJ_PATH)/kernel-trace.o $(OBJ_PATH)/mem-access.o $(OBJ_PATH)/kernel-info.o $(OBJ_PATH)/trace-warp-inst.o
 OBJS += $(OBJ_PATH)/common_def.o $(OBJ_PATH)/trace-parser.o $(OBJ_PATH)/trace-driven.o $(OBJ_PATH)/main.o
@@ -104,6 +106,9 @@ $(OBJ_PATH)/inst-memadd-info.o: trace-parser/inst-memadd-info.cc
 	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
 
 $(OBJ_PATH)/inst-trace.o: trace-parser/inst-trace.cc
+	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
+
+$(OBJ_PATH)/hw-parser.o: hw-parser/hw-parser.cc
 	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
 
 $(OBJ_PATH)/splay.o: parda/splay.c
