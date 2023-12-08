@@ -24,7 +24,7 @@ ifeq ($(GNUC_CPP0X), 1)
 	CXXFLAGS += -std=c++11
 endif
 
-CXXFLAGS += -I./hw-parser
+CXXFLAGS += -I./hw-parser -I./hw-component
 CXXFLAGS += -I./ISA-Def -I./DEV-Def -I./trace-parser -I./trace-driven -I./common
 CXXFLAGS += -I./common/CLI -I./common/CLI/impl -I$(MPI_HOME)/include
 CXXFLAGS += -I$(BOOST_HOME)/include
@@ -53,7 +53,8 @@ $(shell mkdir $(OBJ_PATH))
 endif
 
 OBJS = $(OBJ_PATH)/splay.o $(OBJ_PATH)/process_args.o $(OBJ_PATH)/parda_print.o $(OBJ_PATH)/narray.o $(OBJ_PATH)/parda.o
-OBJS += $(OBJ_PATH)/hw-parser.o
+OBJS += $(OBJ_PATH)/hw-parser.o $(OBJ_PATH)/Scoreboard.o $(OBJ_PATH)/RegisterBankAllocator.o
+OBJS += $(OBJ_PATH)/hw-stt.o $(OBJ_PATH)/inst-stt.o 
 OBJS += $(OBJ_PATH)/memory-space.o $(OBJ_PATH)/inst-memadd-info.o $(OBJ_PATH)/sass-inst.o $(OBJ_PATH)/inst-trace.o
 OBJS += $(OBJ_PATH)/kernel-trace.o $(OBJ_PATH)/mem-access.o $(OBJ_PATH)/kernel-info.o $(OBJ_PATH)/trace-warp-inst.o
 OBJS += $(OBJ_PATH)/common_def.o $(OBJ_PATH)/trace-parser.o $(OBJ_PATH)/main.o
@@ -89,6 +90,18 @@ $(OBJ_PATH)/kernel-trace.o: trace-driven/kernel-trace.cc
 
 # $(OBJ_PATH)/trace-driven.o: trace-driven/trace-driven.cc
 # 	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
+
+$(OBJ_PATH)/Scoreboard.o: hw-component/Scoreboard.cc
+	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
+
+$(OBJ_PATH)/RegisterBankAllocator.o: hw-component/RegisterBankAllocator.cc
+	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
+
+$(OBJ_PATH)/hw-stt.o: trace-driven/hw-stt.cc
+	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
+
+$(OBJ_PATH)/inst-stt.o: trace-driven/inst-stt.cc
+	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
 
 $(OBJ_PATH)/common_def.o: common/common_def.cc
 	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
