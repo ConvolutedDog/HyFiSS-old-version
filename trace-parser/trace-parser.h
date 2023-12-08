@@ -29,6 +29,8 @@
 #include "../trace-driven/kernel-trace.h"
 #include "../trace-driven/trace-warp-inst.h"
 
+#include "../trace-driven/inst-stt.h"
+
 #ifndef TRACE_PARSER_H
 #define TRACE_PARSER_H
 
@@ -448,6 +450,8 @@ struct compute_instn {
     //             << inst_trace->instn_str << std::endl;
     //   exit(0);
     // }
+
+    inst_stt_ptr = inst_stt();
     
     valid = true;
   }
@@ -468,6 +472,9 @@ struct compute_instn {
   _inst_trace_t* inst_trace;
   // trace_warp_inst_t* trace_warp_inst;
   trace_warp_inst_t trace_warp_inst;
+
+  // inst_stt
+  inst_stt inst_stt_ptr;
 
 #ifdef USE_BOOST
   friend class boost::serialization::access;
