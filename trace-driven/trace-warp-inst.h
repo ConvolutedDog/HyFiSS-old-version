@@ -98,7 +98,7 @@ class trace_warp_inst_t {
       const std::unordered_map<std::string, OpcodeChar> *OpcodeMap,
       unsigned gwarp_id);
 
-  void set_active(const active_mask_t &active);
+  inline void set_active(const active_mask_t &active);
 
   // void set_addr(unsigned n, new_addr_type addr) {
   //   if (!m_per_scalar_thread_valid) {
