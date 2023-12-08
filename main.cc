@@ -16,7 +16,21 @@
 #include "./ISA-Def/trace_opcode.h"
 #include "./DEV-Def/compute_capability_config.h"
 #include "./trace-parser/trace-parser.h"
-#include "./trace-driven/trace-driven.h"
+
+/////////////////////////////////////////////
+#include "./common/vector_types.h"
+#include "./trace-driven/mem-access.h"
+#include "./trace-driven/kernel-info.h"
+#include "./trace-driven/trace-warp-inst.h"
+#include "./ISA-Def/ampere_opcode.h"
+#include "./ISA-Def/kepler_opcode.h"
+#include "./ISA-Def/pascal_opcode.h"
+#include "./ISA-Def/trace_opcode.h"
+#include "./ISA-Def/turing_opcode.h"
+#include "./ISA-Def/volta_opcode.h"
+#include "./ISA-Def/accelwattch_component_mapping.h"
+/////////////////////////////////////////////
+
 #include "./common/CLI/CLI.hpp"
 #include "./parda/parda.h"
 #include "./hw-parser/hw-parser.h"
