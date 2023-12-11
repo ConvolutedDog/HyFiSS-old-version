@@ -68,6 +68,9 @@ struct _inst_trace_t {
 
     opcode_tokens = get_opcode_tokens();
     memadd_info->width = get_datawidth_from_opcode(opcode_tokens);
+
+
+
   };
 
   // unsigned line_num;
@@ -75,10 +78,11 @@ struct _inst_trace_t {
   unsigned m_pc;
   unsigned mask; // invalid
   unsigned reg_dsts_num;
-  unsigned reg_dest[MAX_DST];
+  int reg_dest[MAX_DST];
   std::string opcode;
+  bool read_or_wirte;
   unsigned reg_srcs_num;
-  unsigned reg_src[MAX_SRC];
+  int reg_src[MAX_SRC];
   inst_memadd_info_t *memadd_info;
   std::string instn_str;
 
