@@ -3,6 +3,7 @@
 #include <sstream>
 #include <vector>
 #include <map>
+#include <cmath>
 #include <algorithm>
 #include <iostream>
 
@@ -169,6 +170,8 @@ void hw_config::init(const std::string config_file) {
       coalesce_arch = std::stoi(value);
     } else if (entry == "-gpgpu_num_sched_per_sm") {
       num_sched_per_sm = std::stoi(value);
+    } else if (entry == "-gpgpu_inst_fetch_throughput") {
+      inst_fetch_throughput = std::stoi(value);
     } else if (entry == "-gpgpu_max_insn_issue_per_warp") {
       max_insn_issue_per_warp = std::stoi(value);
     } else if (entry == "-gpgpu_dual_issue_diff_exec_units") {
@@ -223,8 +226,12 @@ void hw_config::init(const std::string config_file) {
       std::cout << "Unknown hardware option: " << entry << std::endl;
     }
 
-    m_valid = true;
   }
+  
+  max_warps_per_sm = (unsigned)(max_threads_per_sm / warp_size);
+  bank_warp_shift = (unsigned)(int)(log(warp_size + 0.5) / log(2.0));
+
+  m_valid = true;
 }
 
 // #define HW_PARSER_MOUDLE_TEST
