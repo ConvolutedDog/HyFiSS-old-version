@@ -120,6 +120,7 @@ class hw_config {
     coalesce_arch = 0;
 
     /* Warp Schedulers */
+    inst_fetch_throughput = 0;
     num_sched_per_sm = 0;
     max_insn_issue_per_warp = 0;
     dual_issue_diff_exec_units = false;
@@ -199,6 +200,7 @@ class hw_config {
   unsigned get_max_threads_per_sm() const { return max_threads_per_sm; }
   unsigned get_warp_size() const { return warp_size; }
   unsigned get_max_ctas_per_sm() const { return max_ctas_per_sm; }
+  unsigned get_max_warps_per_sm() const { return max_warps_per_sm; }
   unsigned get_ID_OC_SP_pipeline_width() const {
     return ID_OC_SP_pipeline_width;
   }
@@ -285,12 +287,14 @@ class hw_config {
   unsigned get_reg_file_port_throughput() const {
     return reg_file_port_throughput;
   }
+  unsigned get_bank_warp_shift() const { return bank_warp_shift; }
   unsigned get_shmem_num_banks() const { return shmem_num_banks; }
   unsigned get_shmem_limited_broadcast() const {
     return shmem_limited_broadcast;
   }
   unsigned get_shmem_warp_parts() const { return shmem_warp_parts; }
   unsigned get_coalesce_arch() const { return coalesce_arch; }
+  unsigned get_inst_fetch_throughput() const { return inst_fetch_throughput; }
   unsigned get_num_sched_per_sm() const { return num_sched_per_sm; }
   unsigned get_max_insn_issue_per_warp() const {
     return max_insn_issue_per_warp;
@@ -386,6 +390,7 @@ class hw_config {
   unsigned max_threads_per_sm;
   unsigned warp_size;
   unsigned max_ctas_per_sm;
+  unsigned max_warps_per_sm;
 
 
   /* Pipeline Widths */
@@ -441,7 +446,7 @@ class hw_config {
   /* Register Banks */
   unsigned num_reg_banks;
   unsigned reg_file_port_throughput;
-
+  unsigned bank_warp_shift;
 
   /* Shared Memory Bankconflict Detection */
   unsigned shmem_num_banks;
@@ -451,6 +456,7 @@ class hw_config {
 
 
   /* Warp Schedulers */
+  unsigned inst_fetch_throughput;
   /* Number of schedulers per SM. */
   unsigned num_sched_per_sm;
   /* How many instns a warp scheduler can issue per cycle. */
