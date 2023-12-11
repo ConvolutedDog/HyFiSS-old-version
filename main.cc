@@ -35,6 +35,8 @@
 #include "./parda/parda.h"
 #include "./hw-parser/hw-parser.h"
 
+#include "../hw-component/PrivateSM.h"
+
 #include <chrono>
 
 trace_kernel_info_t *create_kernel_info(kernel_trace_t* kernel_trace_info,
@@ -770,8 +772,30 @@ START_TIMER(5);
   38     ReadOperands: port_num-\d+/m_in_ports\[\d+\].m_in\[\d+\] fails as not found free cu
   39     Writeback: bank-\d+ of reg-\d+ is not idle
   **********************************************************************************************/
-  
-  
+
+  for (int _pass = 0; _pass < pass_num; _pass++) {
+    int curr_process_idx_rank = world.rank() + _pass * world.size();
+    /* curr_process_idx is the SM id that should be processed */
+    unsigned smid = curr_process_idx_rank;
+    std::cout << "### Rank-" << world.rank() << ", processing SM-" << smid << std::endl;
+    // if (smid < gpu_config[V100].num_sm) {
+    if (smid == 0) {
+      std::cout << "$$$ Rank-" << world.rank() << ", processing SM-" << smid << std::endl;
+      PrivateSM private_sm = PrivateSM(smid, &tracer, &hw_cfg);
+      std::cout << "private_sm.get_cycle(): " << private_sm.get_cycle() << std::endl;
+      // traverse blocks_per_kernel
+      for (auto pair : *(private_sm.get_blocks_per_kernel())) {
+        unsigned kid = pair.first;
+        std::vector<unsigned> block_ids = pair.second;
+        for (unsigned block_id : block_ids) {
+          std::cout << "kid: " << kid << ", block_id: " << block_id << std::endl;
+        }
+      }
+      while (private_sm.get_active()) {
+        private_sm.run();
+      }
+    }
+  }
   
 
 STOP_AND_REPORT_TIMER_rank(world.rank(), 5);
