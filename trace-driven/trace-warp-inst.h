@@ -149,6 +149,14 @@ class trace_warp_inst_t {
     assert(i < incount);
     return arch_reg.src[i];
   }
+  void set_arch_reg_dst(unsigned i, int reg) {
+    assert(i < outcount);
+    arch_reg.dst[i] = reg;
+  }
+  void set_arch_reg_src(unsigned i, int reg) {
+    assert(i < incount);
+    arch_reg.src[i] = reg;
+  }
   _memory_op_t get_memory_op() const { return memory_op; }
   unsigned get_num_operands() const { return num_operands; }
   unsigned get_num_regs() const { return num_regs; }
