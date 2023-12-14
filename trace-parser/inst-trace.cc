@@ -111,6 +111,96 @@ unsigned _inst_trace_t::get_datawidth_from_opcode(
   return 4;  // default is 4 bytes
 }
 
+unsigned _inst_trace_t::get_latency() const {
+  return latency;
+}
+
+unsigned _inst_trace_t::get_initiation_interval() const {
+  return initiation_interval;
+}
+
+enum FUNC_UNITS_NAME _inst_trace_t::get_func_unit() const {
+  return func_unit;
+}
+
+void _inst_trace_t::parse_opcode_latency_info() {
+  std::cout << "@@@@@@ " << opcode_tokens[0] << std::endl;
+  auto it = Volta_OpcodeMap.find(opcode_tokens[0]);
+  if (it == Volta_OpcodeMap.end()) {
+    std::cout << "ERROR: opcode " << opcode << " not found in Volta_OpcodeMap" << std::endl;
+    assert(0);
+  } else {
+    initiation_interval = 1;
+    latency = 1;
+    func_unit = NON_UNIT;
+    
+    auto category = it->second.opcode_category;
+    std::cout << " SP_OP: " << SP_OP 
+              << " DP_OP: " << DP_OP 
+              << " SFU_OP: " << SFU_OP 
+              << " INTP_OP: " << INTP_OP
+              << " SPECIALIZED_UNIT_1_OP: " << SPECIALIZED_UNIT_1_OP
+              << " SPECIALIZED_UNIT_2_OP: " << SPECIALIZED_UNIT_2_OP
+              << " SPECIALIZED_UNIT_3_OP: " << SPECIALIZED_UNIT_3_OP << std::endl;
+    std::cout << " category: " << category << std::endl;
+    // std::cout << hw_cfg->get_opcode_latency_initiation_int(0) << std::endl;
+    // std::cout << hw_cfg->get_opcode_latency_initiation_int(1) << std::endl;
+
+    switch (category) {
+      case SP_OP:
+        latency = hw_cfg->get_opcode_latency_initiation_sp(0);
+        initiation_interval = hw_cfg->get_opcode_latency_initiation_sp(1);
+        func_unit = SP_UNIT;
+        break;
+      case DP_OP:
+        latency = hw_cfg->get_opcode_latency_initiation_dp(0);
+        initiation_interval = hw_cfg->get_opcode_latency_initiation_dp(1);
+        func_unit = DP_UNIT;
+        break;
+      case SFU_OP:
+        latency = hw_cfg->get_opcode_latency_initiation_sfu(0);
+        initiation_interval = hw_cfg->get_opcode_latency_initiation_sfu(1);
+        func_unit = SFU_UNIT;
+        break;
+      case INTP_OP:
+        latency = hw_cfg->get_opcode_latency_initiation_int(0);
+        initiation_interval = hw_cfg->get_opcode_latency_initiation_int(1);
+        func_unit = INT_UNIT;
+        break;
+      case SPECIALIZED_UNIT_1_OP:
+        latency = hw_cfg->get_opcode_latency_initiation_spec_op_1(0);
+        initiation_interval = hw_cfg->get_opcode_latency_initiation_spec_op_1(1);
+        func_unit = SPEC_UNIT_1;
+        break;
+      case SPECIALIZED_UNIT_2_OP:
+        latency = hw_cfg->get_opcode_latency_initiation_spec_op_2(0);
+        initiation_interval = hw_cfg->get_opcode_latency_initiation_spec_op_2(1);
+        func_unit = SPEC_UNIT_2;
+        break;
+      case SPECIALIZED_UNIT_3_OP:
+        latency = hw_cfg->get_opcode_latency_initiation_spec_op_3(0);
+        initiation_interval = hw_cfg->get_opcode_latency_initiation_spec_op_3(1);
+        func_unit = SPEC_UNIT_3;
+        break;
+      case LOAD_OP: // TODO: need to be modified
+      case STORE_OP: // TODO: need to be modified
+        latency = 100; // TODO: need to be modified
+        initiation_interval = 100; // TODO: need to be modified
+        func_unit = LDST_UNIT;
+        break;
+      default:
+        latency = 1;
+        initiation_interval = 1;
+        /* Here, we suppose that the instns that are not included in the above 
+         * cases will be executed in the INT_UNIT, but they still have latency 
+         * of 1 and initiation_interval of 1. */
+        func_unit = INT_UNIT;
+        break;
+    }
+
+    std::cout << "  latency: " << latency << " initiation_interval: " << initiation_interval << std::endl;
+  }
+}
 
 int get_line_num_by_pc(const std::string filename, const std::string targetNumber) {
     std::ifstream file(filename);
