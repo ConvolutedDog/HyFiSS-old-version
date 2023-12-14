@@ -3,7 +3,20 @@
 #include "PrivateSM.h"
 
 
+bool operator<(const curr_instn_id_per_warp_entry& lhs, const curr_instn_id_per_warp_entry& rhs) {
+  if (lhs.kid != rhs.kid) {
+    return lhs.kid < rhs.kid;
+  } else {
+    if (lhs.block_id != rhs.block_id) {
+      return lhs.block_id < rhs.block_id;
+    } else {
+      return lhs.warp_id < rhs.warp_id;
+    }
+  }
+}
+
 PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cfg){
+  
   m_smid = smid;
   m_cycle = 0;
   active = true;
@@ -20,10 +33,27 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
   m_num_warps_per_sm.resize(appcfg->get_kernels_num(), 0);
 
   // m_num_warps_per_sm[i] stores the i-th kernel's warps number that are allocated to this SM
-  for (auto it = kernel_block_pair.begin(); it != kernel_block_pair.end(); it++){
+  for (auto it = kernel_block_pair.begin(); it != kernel_block_pair.end(); it++) {
     unsigned kid = it->first - 1;
     unsigned _warps_per_block = appcfg->get_num_warp_per_block(kid);
     m_num_warps_per_sm[kid] += _warps_per_block;
+  }
+
+  /* curr_instn_id_per_warp stores the current instn id of each warp */
+  for (auto it = kernel_block_pair.begin(); it != kernel_block_pair.end(); it++) {
+    unsigned kid = it->first - 1;
+    unsigned block_id = it->second;
+    unsigned _warps_per_block = appcfg->get_num_warp_per_block(kid);
+    for (unsigned _i = 0; _i < _warps_per_block; _i++) {
+      // std::cout << "D: Initial curr_instn_id_per_warp: " << kid << " " << block_id << " " << _i << " to 0." << std::endl;
+      curr_instn_id_per_warp_entry _entry = curr_instn_id_per_warp_entry(kid, block_id, _i);
+      curr_instn_id_per_warp[_entry] = 0;
+    }
+  }
+
+  //traverse m_num_warps_per_sm
+  for (auto it = m_num_warps_per_sm.begin(); it != m_num_warps_per_sm.end(); it++){
+    std::cout << "m_num_warps_per_sm: " << *it << std::endl;
   }
 
   // sum of std::vector<unsigned> m_num_warps_per_sm
@@ -32,12 +62,14 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
   // when accessing the ibuffer, the index is:
   //     global_all_kernels_warp_id = gwarp_id + sum_{kid = 0,1,...,kernel_id-1}(m_num_warps_per_sm[kid])
   m_ibuffer = new IBuffer(m_smid, all_warps_num);
-  last_fetch_warp_id = -1;
+  last_fetch_warp_id = 0;
+  last_issue_sched_id = 0;
+  
 
   m_inst_fetch_buffer = new inst_fetch_buffer_entry();
 
-  /* curr_instn_id_per_warp stores the current instn id of each warp */
-  curr_instn_id_per_warp.resize(all_warps_num, 0);
+  
+  // std::cout << "D: all_warps_num: " << all_warps_num << std::endl;
 
   num_banks = hw_cfg->get_num_reg_banks();
   bank_warp_shift = hw_cfg->get_bank_warp_shift();
@@ -46,6 +78,10 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
   banks_per_sched = (unsigned)(num_banks / num_scheds);
   inst_fetch_throughput = hw_cfg->get_inst_fetch_throughput();
 
+  warps_per_sched = (unsigned)(all_warps_num / num_scheds);
+
+  last_issue_warp_ids.resize(num_scheds, 0);
+
   m_reg_bank_allocator = new RegisterBankAllocator(m_smid, 
                                                    num_banks, 
                                                    num_scheds, 
@@ -53,6 +89,68 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
                                                    banks_per_sched);
 
   parse_blocks_per_kernel();
+
+  total_pipeline_stages =
+      N_PIPELINE_STAGES + hw_cfg->get_specialized_unit_size() * 2;
+  m_pipeline_reg.reserve(total_pipeline_stages);
+  
+  std::cout << "total_pipeline_stages: " << total_pipeline_stages << std::endl;
+
+  for (unsigned j = 0; j < N_PIPELINE_STAGES; j++) {
+    std::cout << ";;;pipeline_width index " << j << " : " 
+              << hw_cfg->get_pipe_widths(static_cast<pipeline_stage_name_t>(j)) << " "
+              << hw_cfg->get_pipeline_stage_name_decode(
+                 static_cast<pipeline_stage_name_t>(j))
+              << std::endl;
+    m_pipeline_reg.push_back(
+      register_set(
+        hw_cfg->get_pipe_widths(static_cast<pipeline_stage_name_t>(j)), 
+        std::string(
+          hw_cfg->get_pipeline_stage_name_decode(
+          static_cast<pipeline_stage_name_t>(j))
+        ), 
+        hw_cfg
+      )
+    );
+  }
+
+  for (unsigned j = 0; j < hw_cfg->get_specialized_unit_size(); j++) {
+    std::cout << ";;;pipeline_width index " 
+              << j + N_PIPELINE_STAGES << " : " 
+              << hw_cfg->get_pipe_widths_ID_OC_spec_unit(j) << " "
+              << std::string("ID_OC_") + hw_cfg->get_m_specialized_unit_name(j)
+              << std::endl;
+    m_pipeline_reg.push_back(
+      register_set(
+        hw_cfg->get_pipe_widths_ID_OC_spec_unit(j),
+        std::string(
+          std::string("ID_OC_") + hw_cfg->get_m_specialized_unit_name(j)
+        ), 
+        hw_cfg
+      )
+    );
+    // m_config->m_specialized_unit[j].ID_OC_SPEC_ID = m_pipeline_reg.size() - 1;
+    m_specilized_dispatch_reg.push_back(
+        &m_pipeline_reg[m_pipeline_reg.size() - 1]);
+  }
+
+  for (unsigned j = 0; j < hw_cfg->get_specialized_unit_size(); j++) {
+    std::cout << ";;;pipeline_width index " 
+              << j + N_PIPELINE_STAGES + hw_cfg->get_specialized_unit_size() << " : " 
+              << hw_cfg->get_pipe_widths_OC_EX_spec_unit(j) << " "
+              << std::string("OC_EX_") + hw_cfg->get_m_specialized_unit_name(j)
+              << std::endl;
+    m_pipeline_reg.push_back(
+      register_set(
+        hw_cfg->get_pipe_widths_OC_EX_spec_unit(j),
+        std::string(
+          std::string("OC_EX_") + hw_cfg->get_m_specialized_unit_name(j)
+        ), 
+        hw_cfg
+      )
+    );
+    // m_config->m_specialized_unit[j].OC_EX_SPEC_ID = m_pipeline_reg.size() - 1;
+  }
 
 }
 
@@ -83,7 +181,7 @@ void PrivateSM::run(){
 
   std::cout << "# cycle: " << m_cycle << std::endl;
 
-  if (m_cycle >= 10) {
+  if (m_cycle >= 20) {
     active = false;
   }
 
@@ -96,6 +194,7 @@ void PrivateSM::run(){
     /* Calculate gwarp_id:
      *     gwarp_id_start = block_id * warps_per_block
      *     gwarp_id_end   = (block_id + 1) * warps_per_block */
+    // std::cout << "D: warps_per_block, block_id: " << warps_per_block << " " << block_id << std::endl;
     unsigned gwarp_id_start = warps_per_block * block_id;
     unsigned gwarp_id_end = gwarp_id_start + warps_per_block - 1;
 
@@ -110,7 +209,7 @@ void PrivateSM::run(){
     /**********************************************************************************************/
     std::vector<std::vector<stage_instns_identifier>::iterator> writeback_stage_instns_to_remove;
     // traverse writeback_stage_instns
-    for (auto it = writeback_stage_instns.begin(); it != writeback_stage_instns.end(); it++){
+    for (auto it = writeback_stage_instns.begin(); it != writeback_stage_instns.end(); it++) {
       unsigned _kid = it->kid;
       unsigned _pc = it->pc;
       unsigned _wid = it->wid;
@@ -221,24 +320,28 @@ void PrivateSM::run(){
       writeback_stage_instns.erase(*it);
     }
 
-    
-
     /**********************************************************************************************/
     /***                                                                                        ***/
     /***                       Transfer instns to writeback_stage_instns.                       ***/
     /***                                                                                        ***/
     /**********************************************************************************************/
+    // std::cout << "D: kid: " << kid << " m_valid: " << m_inst_fetch_buffer->m_valid << std::endl;
     for (auto gwid = gwarp_id_start; gwid <= gwarp_id_end; gwid++) {
       auto global_all_kernels_warp_id = gwid + std::accumulate(m_num_warps_per_sm.begin(), m_num_warps_per_sm.begin() + kid, 0);
       // check if the ibuffer has free slot
+      // std::cout << "D: global_all_kernels_warp_id: " << global_all_kernels_warp_id << std::endl;
+      // std::cout << "D: m_ibuffer->is_not_empty(global_all_kernels_warp_id): " << m_ibuffer->is_not_empty(global_all_kernels_warp_id) << std::endl;
       if (m_ibuffer->is_not_empty(global_all_kernels_warp_id)) {
         // pop the instn from ibuffer
-        ibuffer_entry entry = m_ibuffer->pop_front(global_all_kernels_warp_id);
+        // TODO
+        // ibuffer_entry entry = m_ibuffer->pop_front(global_all_kernels_warp_id);
+        ibuffer_entry entry = m_ibuffer->front(global_all_kernels_warp_id);
         unsigned _fetch_instn_id = entry.uid;
         unsigned _pc = entry.pc;
         unsigned _gwid = entry.wid;
         unsigned _kid = entry.kid;
-        writeback_stage_instns.push_back(stage_instns_identifier(_kid, _pc, _gwid, _fetch_instn_id));
+        // TODO
+        // writeback_stage_instns.push_back(stage_instns_identifier(_kid, _pc, _gwid, _fetch_instn_id));
         std::cout << "  Transfer instn (pc, gwid, kid, fetch_instn_id): (" << _pc << ", " 
                                                                            << _gwid << ", " 
                                                                            << _kid << ", " 
@@ -246,19 +349,115 @@ void PrivateSM::run(){
         m_ibuffer->print_ibuffer(gwid);
       }
     }
-        
+
     /**********************************************************************************************/
     /***                                                                                        ***/
-    /***                                Decode instns to Ibuffer.                               ***/
+    /***                               Issue intns to issue_port.                               ***/
     /***                                                                                        ***/
     /**********************************************************************************************/
+    for (unsigned _sched_id = 0; _sched_id < num_scheds; _sched_id++) {
+      auto sched_id = (last_issue_sched_id + _sched_id) % num_scheds;
+      std::cout << "D: sched_id: " << sched_id << std::endl;
+      
+      // LRR warp sheduling
+      for (auto gwid = gwarp_id_start; (gwid <= gwarp_id_end) && (gwid % num_scheds == sched_id); gwid++) {
+        // std::cout << last_issue_warp_ids.size() << std::endl;
+        // for (auto it = last_issue_warp_ids.begin(); it != last_issue_warp_ids.end(); it++) {
+        //   std::cout << *it << std::endl;
+        // }
+        auto wid = (last_issue_warp_ids[sched_id] + gwid) % warps_per_block + gwarp_id_start;
+        auto global_all_kernels_warp_id = wid + std::accumulate(m_num_warps_per_sm.begin(), m_num_warps_per_sm.begin() + kid, 0);
+        // std::cout << "D: global_all_kernels_warp_id: " << global_all_kernels_warp_id << std::endl;
+        // std::cout << "D: m_ibuffer->is_not_empty(global_all_kernels_warp_id): " << m_ibuffer->is_not_empty(global_all_kernels_warp_id) << std::endl;
+        if (m_ibuffer->is_not_empty(global_all_kernels_warp_id)) {
+          // pop the instn from ibuffer
+          ibuffer_entry entry = m_ibuffer->pop_front(global_all_kernels_warp_id);
+          unsigned _fetch_instn_id = entry.uid;
+          unsigned _pc = entry.pc;
+          unsigned _gwid = entry.wid;
+          unsigned _kid = entry.kid;
+          std::cout << "try to issue: " << _fetch_instn_id << " " 
+                                        << _pc << " " 
+                                        << _gwid << " " 
+                                        << _kid << std::endl;
+          // get instn by entry
+          compute_instn* tmp = tracer->get_one_kernel_one_warp_one_instn(_kid, _gwid, _fetch_instn_id);
+          _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
+          trace_warp_inst_t* tmp_trace_warp_inst = &(tmp->trace_warp_inst);
+          std::cout << tmp_inst_trace->instn_str << std::endl;
+          
+          std::cout << "opcode: " << tmp_trace_warp_inst->get_opcode() << " " 
+                    << tmp_trace_warp_inst->get_op() << std::endl;
+          std::cout << "        " << OP_SHFL << " " << ALU_OP << std::endl;
+          auto latency = tmp_inst_trace->get_latency();
+          std::cout << "latency: " << latency << std::endl;
+          auto init_latency = tmp_inst_trace->get_initiation_interval();
+          std::cout << "init_latency: " << init_latency << std::endl;
+          
+          // get the function unit of the instn
+          auto fu = tmp_inst_trace->get_func_unit();
+          std::cout << "Execute on FU: ";
+          switch (fu) {
+            case NON_UNIT:
+              std::cout << "NON_UNIT" << std::endl;
+              break;
+            case SP_UNIT:
+              std::cout << "SP_UNIT" << std::endl;
+              break;
+            case SFU_UNIT:
+              std::cout << "SFU_UNIT" << std::endl;
+              break;
+            case INT_UNIT:
+              std::cout << "INT_UNIT" << std::endl;
+              break;
+            case DP_UNIT:
+              std::cout << "DP_UNIT" << std::endl;
+              break;
+            case TENSOR_CORE_UNIT:
+              std::cout << "TENSOR_CORE_UNIT" << std::endl;
+              break;
+            case LDST_UNIT:
+              std::cout << "LDST_UNIT" << std::endl;
+              break;
+            case SPEC_UNIT_1:
+              std::cout << "SPEC_UNIT_1" << std::endl;
+              break;
+            case SPEC_UNIT_2:
+              std::cout << "SPEC_UNIT_2" << std::endl;
+              break;
+            case SPEC_UNIT_3:
+              std::cout << "SPEC_UNIT_3" << std::endl;
+              break;
+            default:
+              std::cout << "default UNIT" << std::endl;
+              break;
+          }
+          // traverse m_pipeline_reg
+          // for (auto it = m_pipeline_reg.begin(); it != m_pipeline_reg.end(); it++) {
+          //   std::cout << "||name: " << it->get_name() << std::endl;
+          //   std::cout << "  has_ready: " << it->has_ready() << std::endl;
+          //   std::cout << "  has_free: " << it->has_free() << std::endl;
+          //   it->print();
+          // }
+          
+
+
+        }
+      }
+
+
+    }
+
+    last_issue_sched_id = (last_issue_sched_id + 1) % num_scheds;
+
     /**********************************************************************************************/
     /***                                                                                        ***/
-    /***                                Fetch instns to Fbuffer.                                ***/
+    /***                           Fetch and Decode instns to Fbuffer.                          ***/
     /***                                                                                        ***/
     /**********************************************************************************************/
-    for (auto _ = 0; _ < get_inst_fetch_throughput(); _++) {
+    for (unsigned _ = 0; _ < get_inst_fetch_throughput(); _++) {
       // DECODE
+      
       if (m_inst_fetch_buffer->m_valid) {
         auto _pc = m_inst_fetch_buffer->pc;
         auto _wid = m_inst_fetch_buffer->wid;
@@ -266,7 +465,7 @@ void PrivateSM::run(){
         auto _uid = m_inst_fetch_buffer->uid;
 
         auto global_all_kernels_warp_id = _wid + std::accumulate(m_num_warps_per_sm.begin(), m_num_warps_per_sm.begin() + _kid, 0);
-
+        
         if (m_ibuffer->has_free_slot(global_all_kernels_warp_id)) {
           auto _entry = ibuffer_entry(_pc, _wid, _kid, _uid);
           m_ibuffer->push_back(global_all_kernels_warp_id, _entry);
@@ -274,47 +473,70 @@ void PrivateSM::run(){
           m_inst_fetch_buffer->m_valid = false;
           std::cout << "    DECODE: ";
           m_ibuffer->print_ibuffer(_wid);
+        } else {
+          std::cout << "    No DECODE cause m_ibuffer->has_free_slot() == false" << std::endl;
         }
+      } else {
+        std::cout << "    No DECODE cause m_inst_fetch_buffer->m_valid == false" << std::endl;
       }
       
-
+      // std::cout << "D: gwarp_id_start, gwarp_id_end: " << gwarp_id_start << " " << gwarp_id_end << std::endl;
 
       // FETCH
       for (auto gwid = gwarp_id_start; gwid <= gwarp_id_end; gwid++) {
         // Round-robin issue
-        auto wid = (last_fetch_warp_id + gwid + 1) % warps_per_block + gwarp_id_start;
+        auto wid = (last_fetch_warp_id + gwid) % warps_per_block + gwarp_id_start;
 
         // auto curr_warp_id = wid + gwarp_id_start;
-
+        // std::cout << "D: last_fetch_warp_id, gwid, wid: " << last_fetch_warp_id << " " << gwid << " " << wid << std::endl;
         // access ibuffer and access curr_instn_id_per_warp
         // auto global_all_kernels_warp_id = gwid + std::accumulate(m_num_warps_per_sm.begin(), m_num_warps_per_sm.begin() + kid, 0);
         auto global_all_kernels_warp_id = wid + std::accumulate(m_num_warps_per_sm.begin(), m_num_warps_per_sm.begin() + kid, 0);
+        
+        
+        // std::cout << "D: kid, global_all_kernels_warp_id: " << kid << ", " << global_all_kernels_warp_id << std::endl;
         // check if the ibuffer has free slot
         bool fetch_instn = false;
         while (!m_inst_fetch_buffer->m_valid) {
           // curr_instn_id_per_warp stores the current instn id of each warp
-          unsigned fetch_instn_id = curr_instn_id_per_warp[global_all_kernels_warp_id];
+          // std::cout << "D: Access curr_instn_id_per_warp: " << kid << " " <<  block_id << " " << gwid - gwarp_id_start << std::endl;
+          curr_instn_id_per_warp_entry _entry = curr_instn_id_per_warp_entry(kid, block_id, gwid - gwarp_id_start);
+          unsigned fetch_instn_id = curr_instn_id_per_warp[_entry];
+          // std::cout << "D: fetch_instn_id: " << fetch_instn_id << std::endl;
           compute_instn* tmp = tracer->get_one_kernel_one_warp_one_instn(kid, wid, fetch_instn_id);
+          // std::cout << "D: @@@ " << tmp << std::endl;
           _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
           // m_inst_fetch_buffer = inst_fetch_buffer_entry(tmp_inst_trace->m_pc, wid, kid, fetch_instn_id);
+          
+          if (tmp_inst_trace == NULL) {
+            
+            // std::cout << "D: tmp_inst_trace == NULL" << std::endl;
+            break;
+          }
+
+          // std::cout << "D: @@@ "  << tmp_inst_trace->m_pc << std::endl;
+
           m_inst_fetch_buffer->pc = tmp_inst_trace->m_pc;
           m_inst_fetch_buffer->wid = wid;
           m_inst_fetch_buffer->kid = kid;
           m_inst_fetch_buffer->uid = fetch_instn_id;
           m_inst_fetch_buffer->m_valid = true;
+          // std::cout << "D: @@@" << std::endl;
           
           std::cout << "  Fetch instn (pc, gwid, kid, fetch_instn_id): " << "(" << tmp_inst_trace->m_pc << ", " 
                                                                             << wid << ", " 
                                                                             << kid << ", " 
                                                                             << fetch_instn_id << ")" << std::endl;
           fetch_instn = true;
-          curr_instn_id_per_warp[global_all_kernels_warp_id]++;
-          last_fetch_warp_id = wid;
+          curr_instn_id_per_warp[_entry]++;
+          
         }
-
+        
         if (fetch_instn) break;
 
       }
+
+      last_fetch_warp_id = (last_fetch_warp_id + 1) % warps_per_block;
 
       // for (auto gwid = gwarp_id_start; gwid <= gwarp_id_end; gwid++) {
       //   // Round-robin issue
@@ -357,8 +579,19 @@ void PrivateSM::run(){
       // }
     }
     
+    /**********************************************************************************************/
+    /***                                                                                        ***/
+    /***                            Release all register bank state.                            ***/
+    /***                                                                                        ***/
+    /**********************************************************************************************/
+    for (unsigned i = 0; i < num_banks; i++) {
+      if (m_reg_bank_allocator->getBankState(i) == ON_WRITING || 
+          m_reg_bank_allocator->getBankState(i) == ON_READING) {
+        m_reg_bank_allocator->releaseBankState(i);
+      }
+    }
 
-
+  // std::cout << "D: !!!!" << std::endl;
   // }
 
   // std::cout << "$ SM-" << m_smid << " Kernel NUM: " 
