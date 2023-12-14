@@ -45,6 +45,11 @@ class IBuffer {
     return entry;
   }
 
+  ibuffer_entry front(unsigned global_all_kernels_warp_id) {
+    ibuffer_entry entry = m_ibuffer[global_all_kernels_warp_id].front();
+    return entry;
+  }
+
   void print_ibuffer() {
     for (unsigned i = 0; i < m_num_warps; i++) {
       std::cout << "warp - " << i << ": ";
