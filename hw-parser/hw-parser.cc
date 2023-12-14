@@ -9,6 +9,8 @@
 
 #include "hw-parser.h"
 
+
+
 /* Parse "a,b,c,d,e,f" into std::vector<unsigned> x = {a, b, c, d, e, f}. */
 std::vector<unsigned> hw_config::parse_value(std::string value) {
   std::vector<unsigned> result;
@@ -18,6 +20,36 @@ std::vector<unsigned> hw_config::parse_value(std::string value) {
     result.push_back(std::stoi(token));
   }
   return result;
+}
+
+std::vector<unsigned> hw_config::parse_value_spec_unit(std::string value) {
+  std::vector<unsigned> result;
+  std::stringstream ss(value);
+  std::string token;
+  while (std::getline(ss, token, ',')) {
+    if (token == "BRA")
+      result.push_back(BRA_name);
+    else if (token == "TEX")
+      result.push_back(TEX_name);
+    else if (token == "TENSOR")
+      result.push_back(TENSOR_name);
+    else
+      result.push_back(std::stoi(token));
+  }
+  return result;
+}
+
+std::string change_to_name(unsigned name) {
+  switch (name) {
+    case BRA_name:
+      return "BRA";
+    case TEX_name:
+      return "TEX";
+    case TENSOR_name:
+      return "TENSOR";
+    default:
+      return "UNKNOWN";
+  }
 }
 
 /* Read from QV100.config, and assign configs to entries. */
@@ -222,6 +254,87 @@ void hw_config::init(const std::string config_file) {
       icnt_flit_size = std::stoi(value);
     } else if (entry == "-gpgpu_dram_latency") {
       dram_latency = std::stoi(value);
+    } else if (entry == "-gpgpu_trace_opcode_latency_initiation_int") {
+      auto result = parse_value(value);
+      for (unsigned i = 0; i < 2; i++) {
+        trace_opcode_latency_initiation_int.push_back(result[i]);
+      }
+      // std::cout << "·trace_opcode_latency_initiation_int.size(): " 
+      //           << trace_opcode_latency_initiation_int.size() << std::endl;
+      // std::cout << "·trace_opcode_latency_initiation_int: " 
+      //           << trace_opcode_latency_initiation_int[0] << " "
+      //           << trace_opcode_latency_initiation_int[1] << std::endl;
+
+    } else if (entry == "-gpgpu_trace_opcode_latency_initiation_sp") {
+      trace_opcode_latency_initiation_sp = parse_value(value);
+    } else if (entry == "-gpgpu_trace_opcode_latency_initiation_dp") {
+      trace_opcode_latency_initiation_dp = parse_value(value);
+    } else if (entry == "-gpgpu_trace_opcode_latency_initiation_sfu") {
+      trace_opcode_latency_initiation_sfu = parse_value(value);
+    } else if (entry == "-gpgpu_trace_opcode_latency_initiation_tensor") {
+      trace_opcode_latency_initiation_tensor = parse_value(value);
+    } else if (entry == "-gpgpu_trace_opcode_latency_initiation_spec_op_1") {
+      trace_opcode_latency_initiation_spec_op_1 = parse_value(value);
+    } else if (entry == "-gpgpu_trace_opcode_latency_initiation_spec_op_2") {
+      trace_opcode_latency_initiation_spec_op_2 = parse_value(value);
+    } else if (entry == "-gpgpu_trace_opcode_latency_initiation_spec_op_3") {
+      trace_opcode_latency_initiation_spec_op_3 = parse_value(value);
+    } else if (entry == "-gpgpu_specialized_unit_1") {
+      /*
+      m_specialized_unit_size = 0;
+      m_specialized_unit_1_enabled = false;
+      m_specialized_unit_2_enabled = false;
+      m_specialized_unit_3_enabled = false;
+
+      m_specialized_unit_1_max_latency = 0;
+      m_specialized_unit_2_max_latency = 0;
+      m_specialized_unit_3_max_latency = 0;
+
+      ID_OC_specialized_unit_1_pipeline_width = 0;
+      OC_EX_specialized_unit_1_pipeline_width = 0;
+      ID_OC_specialized_unit_2_pipeline_width = 0;
+      OC_EX_specialized_unit_2_pipeline_width = 0;
+      ID_OC_specialized_unit_3_pipeline_width = 0;
+      OC_EX_specialized_unit_3_pipeline_width = 0;
+
+      num_specialized_unit_1_units = 0;
+      num_specialized_unit_2_units = 0;
+      num_specialized_unit_3_units = 0;
+
+      m_specialized_unit_1_name = "";
+      m_specialized_unit_2_name = "";
+      m_specialized_unit_3_name = "";
+      # <enabled>,<num_units>,<max_latency>,<ID_OC_SPEC>,<OC_EX_SPEC>,<NAME>
+      */
+      auto result = parse_value_spec_unit(value);
+      m_specialized_unit_1_enabled = (bool)result[0];
+      num_specialized_unit_1_units = result[1];
+      m_specialized_unit_1_max_latency = result[2];
+      ID_OC_specialized_unit_1_pipeline_width = result[3];
+      OC_EX_specialized_unit_1_pipeline_width = result[4];
+      m_specialized_unit_1_name = change_to_name(result[5]);
+      if (m_specialized_unit_1_enabled)
+        m_specialized_unit_size += 1;
+    } else if (entry == "-gpgpu_specialized_unit_2") {
+      auto result = parse_value_spec_unit(value);
+      m_specialized_unit_2_enabled = (bool)result[0];
+      num_specialized_unit_2_units = result[1];
+      m_specialized_unit_2_max_latency = result[2];
+      ID_OC_specialized_unit_2_pipeline_width = result[3];
+      OC_EX_specialized_unit_2_pipeline_width = result[4];
+      m_specialized_unit_2_name = change_to_name(result[5]);
+      if (m_specialized_unit_2_enabled)
+        m_specialized_unit_size += 1;
+    } else if (entry == "-gpgpu_specialized_unit_3") {
+      auto result = parse_value_spec_unit(value);
+      m_specialized_unit_3_enabled = (bool)result[0];
+      num_specialized_unit_3_units = result[1];
+      m_specialized_unit_3_max_latency = result[2];
+      ID_OC_specialized_unit_3_pipeline_width = result[3];
+      OC_EX_specialized_unit_3_pipeline_width = result[4];
+      m_specialized_unit_3_name = change_to_name(result[5]);
+      if (m_specialized_unit_3_enabled)
+        m_specialized_unit_size += 1;
     } else {
       std::cout << "Unknown hardware option: " << entry << std::endl;
     }
@@ -369,6 +482,34 @@ int hw_parser_test() {
   std::cout << "icnt_flit_size: " << hw_cfg.get_icnt_flit_size() << std::endl;
   std::cout << "dram_latency: " << hw_cfg.get_dram_latency() << std::endl;
   std::cout << "hw-parser module test done." << std::endl;
+
+  std::cout << "trace_opcode_latency_initiation_int: " 
+            << hw_cfg.get_opcode_latency_initiation_int(0) << " " 
+            << hw_cfg.get_opcode_latency_initiation_int(1) << std::endl;
+  std::cout << "trace_opcode_latency_initiation_sp: "
+            << hw_cfg.get_opcode_latency_initiation_sp(0) << " " 
+            << hw_cfg.get_opcode_latency_initiation_sp(1) << std::endl;
+  std::cout << "trace_opcode_latency_initiation_dp: "
+            << hw_cfg.get_opcode_latency_initiation_dp(0) << " " 
+            << hw_cfg.get_opcode_latency_initiation_dp(1) << std::endl;
+  std::cout << "trace_opcode_latency_initiation_sfu: "
+            << hw_cfg.get_opcode_latency_initiation_sfu(0) << " " 
+            << hw_cfg.get_opcode_latency_initiation_sfu(1) << std::endl;
+  std::cout << "trace_opcode_latency_initiation_tensor_core: "
+            << hw_cfg.get_opcode_latency_initiation_tensor_core(0) << " " 
+            << hw_cfg.get_opcode_latency_initiation_tensor_core(1) << std::endl;
+  std::cout << "trace_opcode_latency_initiation_spec_op_1: "
+            << hw_cfg.get_opcode_latency_initiation_spec_op_1(0) << " " 
+            << hw_cfg.get_opcode_latency_initiation_spec_op_1(1) << std::endl;
+  std::cout << "trace_opcode_latency_initiation_spec_op_2: "
+            << hw_cfg.get_opcode_latency_initiation_spec_op_2(0) << " " 
+            << hw_cfg.get_opcode_latency_initiation_spec_op_2(1) << std::endl;
+  std::cout << "trace_opcode_latency_initiation_spec_op_3: "
+            << hw_cfg.get_opcode_latency_initiation_spec_op_3(0) << " " 
+            << hw_cfg.get_opcode_latency_initiation_spec_op_3(1) << std::endl;
+  std::cout << "m_specialized_unit_size: " 
+            << hw_cfg.get_specialized_unit_size() << std::endl;
+  
 
   return 0;
 }
