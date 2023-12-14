@@ -11,6 +11,7 @@
 #include <list>
 #include <string.h>
 #include <unordered_map>
+#include <math.h>
 
 // #include "option_parser.h"
 
@@ -65,14 +66,19 @@ class app_config {
   int get_kernel_grid_dim_z(int kernel_id) { return kernel_grid_dim_z[kernel_id]; }
   /* get the total number of global warps */
   int get_num_global_warps(int kernel_id) {
-    return (int)(get_kernel_grid_dim_x(kernel_id) * get_kernel_grid_dim_y(kernel_id) * 
-                 get_kernel_grid_dim_z(kernel_id) * get_kernel_tb_dim_x(kernel_id) * 
-                 get_kernel_tb_dim_y(kernel_id) * get_kernel_tb_dim_z(kernel_id) / WARP_SIZE);
+    return (int)( (get_kernel_grid_dim_x(kernel_id) * get_kernel_grid_dim_y(kernel_id) * 
+                   get_kernel_grid_dim_z(kernel_id)
+                  ) * 
+                  ((get_kernel_tb_dim_x(kernel_id) * 
+                    get_kernel_tb_dim_y(kernel_id) * get_kernel_tb_dim_z(kernel_id) + WARP_SIZE - 1
+                   ) / WARP_SIZE
+                  )
+                );
   }
   /* get the total number of warps per block */
   int get_num_warp_per_block(int kernel_id) {
-    return (int)(get_kernel_tb_dim_x(kernel_id) * get_kernel_tb_dim_y(kernel_id) * 
-                 get_kernel_tb_dim_z(kernel_id) / WARP_SIZE);
+    return (int)((get_kernel_tb_dim_x(kernel_id) * get_kernel_tb_dim_y(kernel_id) * 
+                 get_kernel_tb_dim_z(kernel_id) + WARP_SIZE - 1) / WARP_SIZE);
   }
 
   /* get kernel_tb_dim_x,  kernel_tb_dim_y,  kernel_tb_dim_z */
@@ -155,6 +161,10 @@ class instn_config {
   instn_config() {
     m_valid = false;
   }
+  instn_config(hw_config* hw_cfg) {
+    m_valid = false;
+    this->hw_cfg = hw_cfg;
+  }
   ~instn_config() {
     for (auto iter = instn_info_vector.begin(); iter != instn_info_vector.end(); ++iter) {
       delete iter->second;
@@ -164,9 +174,18 @@ class instn_config {
 
   std::map<std::pair<int, int>, _inst_trace_t*>* get_instn_info_vector() { return &instn_info_vector; }
 
+  int get_instn_latency(int kernel_id, int pc) {
+    auto iter = instn_info_vector.find(std::make_pair(kernel_id, pc));
+    if (iter != instn_info_vector.end()) {
+      return iter->second->latency;
+    } else {
+      return -1;
+    }
+  }
+
  private:
   bool m_valid;
-
+  hw_config* hw_cfg;
   // instn format:
   // kernel_id  pc  instn_str
   //     2      c0  DSETP.GTU.AND P0 P7 R2 R4 P7
@@ -498,6 +517,10 @@ struct compute_instn {
 class trace_parser {
  public:
   trace_parser(const char *input_configs_filepath);
+  trace_parser(const char *input_configs_filepath, hw_config* hw_cfg) {
+    configs_filepath = input_configs_filepath;
+    this->hw_cfg = hw_cfg;
+  }
   
   void parse_configs_file(bool PRINT_LOG);
   void process_configs_file(std::string config_path, int config_type, bool PRINT_LOG);
@@ -556,6 +579,8 @@ class trace_parser {
   app_config appcfg;
   instn_config instncfg; 
   issue_config issuecfg;
+  hw_config* hw_cfg;
+
   /* kernel_id -> block_id -> mem_instn */
   std::vector<std::vector<std::vector<mem_instn>>> mem_instns;
   /* kernel_id -> warp_id -> compute_instn */
