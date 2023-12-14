@@ -264,7 +264,8 @@ void instn_config::init(std::string config_path, bool PRINT_LOG) {
       // std::cout << "pc: " << std::hex << pc << std::dec << std::endl;
       // std::cout << "instn_str: " << instn_str << std::endl << std::endl;
 
-      _inst_trace_t* instn_info = new _inst_trace_t(kernel_id - 1, pc, instn_str);
+      // _inst_trace_t* instn_info = new _inst_trace_t(kernel_id - 1, pc, instn_str);
+      _inst_trace_t* instn_info = new _inst_trace_t(kernel_id - 1, pc, instn_str, hw_cfg);
       // instn_info.kernel_id = kernel_id;
       // instn_info.pc = pc;
       // instn_info.instn_str = instn_str;
@@ -602,7 +603,10 @@ void trace_parser::process_configs_file(const std::string config_path, int confi
     appcfg = app_config();
     appcfg.init(abs_config_path, PRINT_LOG);
   } else if (config_type == INSTN_CONFIG) {
-    instncfg = instn_config();
+    // instncfg = instn_config();
+    instncfg = instn_config(hw_cfg);
+    // std::cout << "``````\\|/" << hw_cfg->get_opcode_latency_initiation_int(0) << std::endl;
+    // std::cout << "``````\\|/" << hw_cfg->get_opcode_latency_initiation_int(1) << std::endl;
     instncfg.init(abs_config_path, PRINT_LOG);
   } else if (config_type == ISSUE_CONFIG) {
     issuecfg = issue_config();
