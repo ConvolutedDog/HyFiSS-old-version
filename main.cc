@@ -341,10 +341,12 @@ START_TIMER(0);
 
   int passnum_concurrent_issue_to_sm = 1;
 
-  trace_parser tracer(configs.c_str());
+  hw_config hw_cfg(hw_config_file);
+
+  trace_parser tracer(configs.c_str(), &hw_cfg);
 
   tracer.parse_configs_file(PRINT_LOG);
-  hw_config hw_cfg(hw_config_file);
+  
 
 START_TIMER(1);
 
@@ -681,46 +683,46 @@ START_TIMER(5);
   if (world.rank() == 0) {
     std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" << std::endl;
 
-    compute_instn* tmp = tracer.get_one_kernel_one_warp_one_instn(42, 2, 3);
-    _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
-    trace_warp_inst_t* tmp_trace_warp_inst = &(tmp->trace_warp_inst);
+    // compute_instn* tmp = tracer.get_one_kernel_one_warp_one_instn(42, 2, 3);
+    // _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
+    // trace_warp_inst_t* tmp_trace_warp_inst = &(tmp->trace_warp_inst);
 
-    std::cout << "kernel_id: " << std::dec << tmp_inst_trace->kernel_id << std::endl;
-    std::cout << "m_pc: " << std::hex << tmp_inst_trace->m_pc << std::endl;
-    std::cout << "instn_str: " << tmp_inst_trace->instn_str << std::endl;
+    // std::cout << "kernel_id: " << std::dec << tmp_inst_trace->kernel_id << std::endl;
+    // std::cout << "m_pc: " << std::hex << tmp_inst_trace->m_pc << std::endl;
+    // std::cout << "instn_str: " << tmp_inst_trace->instn_str << std::endl;
     
-    std::cout << "m_opcode: " << std::dec << tmp_trace_warp_inst->get_opcode() << " OP_IMAD: " << OP_IMAD << std::endl;
-    std::cout << "m_uid: " << std::dec << tmp_trace_warp_inst->get_uid() << std::endl;
-    std::cout << "m_empty: " << std::dec << tmp_trace_warp_inst->isempty() << std::endl;
-    std::cout << "m_isatomic: " << std::dec << tmp_trace_warp_inst->isatomic() << std::endl;
-    std::cout << "m_decoded: " << std::dec << tmp_trace_warp_inst->isdecoded() << std::endl;
-    std::cout << "pc: " << std::hex << tmp_trace_warp_inst->get_pc() << std::endl;
-    std::cout << "isize: " << std::dec << tmp_trace_warp_inst->get_isize() << std::endl;
+    // std::cout << "m_opcode: " << std::dec << tmp_trace_warp_inst->get_opcode() << " OP_IMAD: " << OP_IMAD << std::endl;
+    // std::cout << "m_uid: " << std::dec << tmp_trace_warp_inst->get_uid() << std::endl;
+    // std::cout << "m_empty: " << std::dec << tmp_trace_warp_inst->isempty() << std::endl;
+    // std::cout << "m_isatomic: " << std::dec << tmp_trace_warp_inst->isatomic() << std::endl;
+    // std::cout << "m_decoded: " << std::dec << tmp_trace_warp_inst->isdecoded() << std::endl;
+    // std::cout << "pc: " << std::hex << tmp_trace_warp_inst->get_pc() << std::endl;
+    // std::cout << "isize: " << std::dec << tmp_trace_warp_inst->get_isize() << std::endl;
 
-    std::cout << "num_operands: " << std::dec << tmp_trace_warp_inst->get_num_operands() << std::endl;
-    std::cout << "num_regs: " << std::dec << tmp_trace_warp_inst->get_num_regs() << std::endl;
-    std::cout << "outcount: " << std::dec << tmp_trace_warp_inst->get_outcount() << std::endl;
-    std::cout << "incount: " << std::dec << tmp_trace_warp_inst->get_incount() << std::endl;
-    std::cout << "is_vectorin: " << std::dec << tmp_trace_warp_inst->get_is_vectorin() << std::endl;
-    std::cout << "is_vectorout: " << std::dec << tmp_trace_warp_inst->get_is_vectorout() << std::endl;
+    // std::cout << "num_operands: " << std::dec << tmp_trace_warp_inst->get_num_operands() << std::endl;
+    // std::cout << "num_regs: " << std::dec << tmp_trace_warp_inst->get_num_regs() << std::endl;
+    // std::cout << "outcount: " << std::dec << tmp_trace_warp_inst->get_outcount() << std::endl;
+    // std::cout << "incount: " << std::dec << tmp_trace_warp_inst->get_incount() << std::endl;
+    // std::cout << "is_vectorin: " << std::dec << tmp_trace_warp_inst->get_is_vectorin() << std::endl;
+    // std::cout << "is_vectorout: " << std::dec << tmp_trace_warp_inst->get_is_vectorout() << std::endl;
 
-    for (unsigned i = 0; i < tmp_trace_warp_inst->get_incount(); i++) {
-      std::cout << "arch_reg.src[" << i << "]: " << std::dec << tmp_trace_warp_inst->get_arch_reg_src(i) << std::endl;
-    }
-    for (unsigned i = 0; i < tmp_trace_warp_inst->get_outcount(); i++) {
-      std::cout << "arch_reg.dst[" << i << "]: " << std::dec << tmp_trace_warp_inst->get_arch_reg_dst(i) << std::endl;
-    }
+    // for (unsigned i = 0; i < tmp_trace_warp_inst->get_incount(); i++) {
+    //   std::cout << "arch_reg.src[" << i << "]: " << std::dec << tmp_trace_warp_inst->get_arch_reg_src(i) << std::endl;
+    // }
+    // for (unsigned i = 0; i < tmp_trace_warp_inst->get_outcount(); i++) {
+    //   std::cout << "arch_reg.dst[" << i << "]: " << std::dec << tmp_trace_warp_inst->get_arch_reg_dst(i) << std::endl;
+    // }
 
-    std::cout << "op: " << std::dec << tmp_trace_warp_inst->get_op() << " INTP_OP: " << INTP_OP << std::endl;
-    std::cout << "sp_op: " << std::dec << tmp_trace_warp_inst->get_sp_op() << " INT__OP: " << INT__OP << std::endl;
-    std::cout << "mem_op: " << std::dec << tmp_trace_warp_inst->get_mem_op() << " NOT_TEX: " << NOT_TEX << std::endl;
-    std::cout << "const_cache_operand: " << std::dec << tmp_trace_warp_inst->get_const_cache_operand() << std::endl;
-    std::cout << "oprnd_type: " << std::dec << tmp_trace_warp_inst->get_oprnd_type_() << " INT_OP: " << INT_OP << std::endl;
-    std::cout << "should_do_atomic: " << std::dec << tmp_trace_warp_inst->get_should_do_atomic() << std::endl;
+    // std::cout << "op: " << std::dec << tmp_trace_warp_inst->get_op() << " INTP_OP: " << INTP_OP << std::endl;
+    // std::cout << "sp_op: " << std::dec << tmp_trace_warp_inst->get_sp_op() << " INT__OP: " << INT__OP << std::endl;
+    // std::cout << "mem_op: " << std::dec << tmp_trace_warp_inst->get_mem_op() << " NOT_TEX: " << NOT_TEX << std::endl;
+    // std::cout << "const_cache_operand: " << std::dec << tmp_trace_warp_inst->get_const_cache_operand() << std::endl;
+    // std::cout << "oprnd_type: " << std::dec << tmp_trace_warp_inst->get_oprnd_type_() << " INT_OP: " << INT_OP << std::endl;
+    // std::cout << "should_do_atomic: " << std::dec << tmp_trace_warp_inst->get_should_do_atomic() << std::endl;
 
-    std::cout << "gwarp_id: " << std::dec << tmp_trace_warp_inst->get_gwarp_id() << std::endl;
-    std::cout << "warp_id: " << std::dec << tmp_trace_warp_inst->get_warp_id() << std::endl;
-    std::cout << "active_mask: " << std::dec << tmp_trace_warp_inst->get_active_mask() << std::endl;
+    // std::cout << "gwarp_id: " << std::dec << tmp_trace_warp_inst->get_gwarp_id() << std::endl;
+    // std::cout << "warp_id: " << std::dec << tmp_trace_warp_inst->get_warp_id() << std::endl;
+    // std::cout << "active_mask: " << std::dec << tmp_trace_warp_inst->get_active_mask() << std::endl;
     
     std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" << std::endl;
   }
