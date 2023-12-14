@@ -6,11 +6,35 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <iostream>
 
 #ifndef HW_PARSER_H
 #define HW_PARSER_H
 
 #define MHZ *1000000
+
+enum pipeline_stage_name_t {
+  ID_OC_SP = 0,
+  ID_OC_DP = 1,
+  ID_OC_INT = 2,
+  ID_OC_SFU = 3,
+  ID_OC_MEM = 4,
+  OC_EX_SP = 5,
+  OC_EX_DP = 6,
+  OC_EX_INT = 7,
+  OC_EX_SFU = 8,
+  OC_EX_MEM = 9,
+  EX_WB = 10,
+  ID_OC_TENSOR_CORE = 11,
+  OC_EX_TENSOR_CORE = 12,
+  N_PIPELINE_STAGES
+};
+
+const char *const pipeline_stage_name_decode[] = {
+    "ID_OC_SP",          "ID_OC_DP",         "ID_OC_INT", "ID_OC_SFU",
+    "ID_OC_MEM",         "OC_EX_SP",         "OC_EX_DP",  "OC_EX_INT",
+    "OC_EX_SFU",         "OC_EX_MEM",        "EX_WB",     "ID_OC_TENSOR_CORE",
+    "OC_EX_TENSOR_CORE", "N_PIPELINE_STAGES"};
 
 enum opcode_operation {
   ADD = 0,
@@ -19,6 +43,12 @@ enum opcode_operation {
   MAD = 3,
   DIV = 4,
   SHFL = 5,
+};
+
+enum specialized_unit_name {
+  BRA_name = 0,
+  TEX_name = 1,
+  TENSOR_name = 2,
 };
 
 /* Type of Warp Scheduler */
@@ -166,7 +196,43 @@ class hw_config {
     /* DRAM Configuration */
     dram_latency = 0;
 
+    /* Trace OpCode Latency and Initiation Interval */
+    // trace_opcode_latency_initiation_int = std::vector<unsigned>(2, 0);
+    // trace_opcode_latency_initiation_sp = std::vector<unsigned>(2, 0);
+    // trace_opcode_latency_initiation_dp = std::vector<unsigned>(2, 0);
+    // trace_opcode_latency_initiation_sfu = std::vector<unsigned>(2, 0);
+    // trace_opcode_latency_initiation_tensor = std::vector<unsigned>(2, 0);
+    // trace_opcode_latency_initiation_spec_op_1 = std::vector<unsigned>(2, 0);
+    // trace_opcode_latency_initiation_spec_op_2 = std::vector<unsigned>(2, 0);
+    // trace_opcode_latency_initiation_spec_op_3 = std::vector<unsigned>(2, 0);
+    m_specialized_unit_size = 0;
+    m_specialized_unit_1_enabled = false;
+    m_specialized_unit_2_enabled = false;
+    m_specialized_unit_3_enabled = false;
+
+    m_specialized_unit_1_max_latency = 0;
+    m_specialized_unit_2_max_latency = 0;
+    m_specialized_unit_3_max_latency = 0;
+
+    ID_OC_specialized_unit_1_pipeline_width = 0;
+    OC_EX_specialized_unit_1_pipeline_width = 0;
+    ID_OC_specialized_unit_2_pipeline_width = 0;
+    OC_EX_specialized_unit_2_pipeline_width = 0;
+    ID_OC_specialized_unit_3_pipeline_width = 0;
+    OC_EX_specialized_unit_3_pipeline_width = 0;
+
+    num_specialized_unit_1_units = 0;
+    num_specialized_unit_2_units = 0;
+    num_specialized_unit_3_units = 0;
+
+    m_specialized_unit_1_name = "";
+    m_specialized_unit_2_name = "";
+    m_specialized_unit_3_name = "";
+
     init(config_file);
+
+    // std::cout << "````trace_opcode_latency_initiation_int.size(): " 
+    //           << trace_opcode_latency_initiation_int.size() << std::endl;
   }
 
   /* Read from QV100.config, and assign configs to entries. */
@@ -174,6 +240,8 @@ class hw_config {
 
   /* Parse "a,b,c,d,e,f" into std::vector<unsigned> x = {a, b, c, d, e, f}. */
   std::vector<unsigned> parse_value(std::string value);
+
+  std::vector<unsigned> parse_value_spec_unit(std::string value);
 
   /* Getters */
   unsigned get_stack_size_limit() const { return stack_size_limit; }
@@ -201,6 +269,7 @@ class hw_config {
   unsigned get_warp_size() const { return warp_size; }
   unsigned get_max_ctas_per_sm() const { return max_ctas_per_sm; }
   unsigned get_max_warps_per_sm() const { return max_warps_per_sm; }
+  
   unsigned get_ID_OC_SP_pipeline_width() const {
     return ID_OC_SP_pipeline_width;
   }
@@ -238,6 +307,84 @@ class hw_config {
   unsigned get_OC_EX_TENSOR_CORE_pipeline_width() const {
     return OC_EX_TENSOR_CORE_pipeline_width;
   }
+  
+  unsigned get_pipe_widths(enum pipeline_stage_name_t pipeline_stage_name) const {
+    switch (pipeline_stage_name) {
+      case ID_OC_SP:
+        return ID_OC_SP_pipeline_width;
+      case ID_OC_DP:
+        return ID_OC_DP_pipeline_width;
+      case ID_OC_INT:
+        return ID_OC_INT_pipeline_width;
+      case ID_OC_SFU:
+        return ID_OC_SFU_pipeline_width;
+      case ID_OC_MEM:
+        return ID_OC_MEM_pipeline_width;
+      case OC_EX_SP:
+        return OC_EX_SP_pipeline_width;
+      case OC_EX_DP:
+        return OC_EX_DP_pipeline_width;
+      case OC_EX_INT:
+        return OC_EX_INT_pipeline_width;
+      case OC_EX_SFU:
+        return OC_EX_SFU_pipeline_width;
+      case OC_EX_MEM:
+        return OC_EX_MEM_pipeline_width;
+      case EX_WB:
+        return EX_WB_pipeline_width;
+      case ID_OC_TENSOR_CORE:
+        return ID_OC_TENSOR_CORE_pipeline_width;
+      case OC_EX_TENSOR_CORE:
+        return OC_EX_TENSOR_CORE_pipeline_width;
+      default:
+        assert(0);
+    }
+  }
+
+  std::string get_m_specialized_unit_name(unsigned index) {
+    switch (index) {
+      case 0:
+        return m_specialized_unit_1_name;
+      case 1:
+        return m_specialized_unit_2_name;
+      case 2:
+        return m_specialized_unit_3_name;
+      default:
+        assert(0);
+    }
+  }
+
+  unsigned get_pipe_widths_ID_OC_spec_unit(unsigned index) {
+    switch (index) {
+      case 0:
+        return ID_OC_specialized_unit_1_pipeline_width;
+      case 1:
+        return ID_OC_specialized_unit_2_pipeline_width;
+      case 2:
+        return ID_OC_specialized_unit_3_pipeline_width;
+      default:
+        assert(0);
+    }
+  }
+
+  unsigned get_pipe_widths_OC_EX_spec_unit(unsigned index) {
+    switch (index) {
+      case 0:
+        return OC_EX_specialized_unit_1_pipeline_width;
+      case 1:
+        return OC_EX_specialized_unit_2_pipeline_width;
+      case 2:
+        return OC_EX_specialized_unit_3_pipeline_width;
+      default:
+        assert(0);
+    }
+  }
+
+  std::string get_pipeline_stage_name_decode(
+    enum pipeline_stage_name_t pipeline_stage_name) const {
+    return std::string(pipeline_stage_name_decode[pipeline_stage_name]);
+  }
+
   unsigned get_num_sp_units() const { return num_sp_units; }
   unsigned get_num_sfu_units() const { return num_sfu_units; }
   unsigned get_num_dp_units() const { return num_dp_units; }
@@ -338,8 +485,123 @@ class hw_config {
   unsigned get_icnt_flit_size() const { return icnt_flit_size; }
   unsigned get_dram_latency() const { return dram_latency; }
   
+  unsigned get_opcode_latency_initiation_int(unsigned id) const {
+    // std::cout << "trace_opcode_latency_initiation_int.size(): " 
+    //           << trace_opcode_latency_initiation_int.size() << std::endl;
+    // std::cout << "trace_opcode_latency_initiation_int[id]: " 
+    //           << trace_opcode_latency_initiation_int[0] << std::endl;
+    return trace_opcode_latency_initiation_int[id];
+  }
+  unsigned get_opcode_latency_initiation_sp(int id) const {
+    return trace_opcode_latency_initiation_sp[id];
+  }
+  unsigned get_opcode_latency_initiation_dp(int id) const {
+    return trace_opcode_latency_initiation_dp[id];
+  }
+  unsigned get_opcode_latency_initiation_sfu(int id) const {
+    return trace_opcode_latency_initiation_sfu[id];;
+  }
+  unsigned get_opcode_latency_initiation_tensor_core(int id) const {
+    return trace_opcode_latency_initiation_tensor[id];
+  }
+  unsigned get_opcode_latency_initiation_spec_op_1(int id) const {
+    return trace_opcode_latency_initiation_spec_op_1[id];
+  }
+  unsigned get_opcode_latency_initiation_spec_op_2(int id) const {
+    return trace_opcode_latency_initiation_spec_op_2[id];
+  }
+  unsigned get_opcode_latency_initiation_spec_op_3(int id) const {
+    return trace_opcode_latency_initiation_spec_op_3[id];
+  }
+  unsigned get_specialized_unit_size() const {
+    return m_specialized_unit_size;
+  }
 
+      /*
+      m_specialized_unit_size = 0;
+      m_specialized_unit_1_enabled = false;
+      m_specialized_unit_2_enabled = false;
+      m_specialized_unit_3_enabled = false;
 
+      m_specialized_unit_1_max_latency = 0;
+      m_specialized_unit_2_max_latency = 0;
+      m_specialized_unit_3_max_latency = 0;
+
+      ID_OC_specialized_unit_1_pipeline_width = 0;
+      OC_EX_specialized_unit_1_pipeline_width = 0;
+      ID_OC_specialized_unit_2_pipeline_width = 0;
+      OC_EX_specialized_unit_2_pipeline_width = 0;
+      ID_OC_specialized_unit_3_pipeline_width = 0;
+      OC_EX_specialized_unit_3_pipeline_width = 0;
+
+      num_specialized_unit_1_units = 0;
+      num_specialized_unit_2_units = 0;
+      num_specialized_unit_3_units = 0;
+
+      m_specialized_unit_1_name = "";
+      m_specialized_unit_2_name = "";
+      m_specialized_unit_3_name = "";
+      # <enabled>,<num_units>,<max_latency>,<ID_OC_SPEC>,<OC_EX_SPEC>,<NAME>
+      */
+  
+  bool get_specialized_unit_1_enabled() const {
+    return m_specialized_unit_1_enabled;
+  }
+  bool get_specialized_unit_2_enabled() const {
+    return m_specialized_unit_2_enabled;
+  }
+  bool get_specialized_unit_3_enabled() const {
+    return m_specialized_unit_3_enabled;
+  }
+
+  unsigned get_specialized_unit_1_max_latency() const {
+    return m_specialized_unit_1_max_latency;
+  }
+  unsigned get_specialized_unit_2_max_latency() const {
+    return m_specialized_unit_2_max_latency;
+  }
+  unsigned get_specialized_unit_3_max_latency() const {
+    return m_specialized_unit_3_max_latency;
+  }
+
+  unsigned get_ID_OC_specialized_unit_1_pipeline_width() const {
+    return ID_OC_specialized_unit_1_pipeline_width;
+  }
+  unsigned get_OC_EX_specialized_unit_1_pipeline_width() const {
+    return OC_EX_specialized_unit_1_pipeline_width;
+  }
+  unsigned get_ID_OC_specialized_unit_2_pipeline_width() const {
+    return ID_OC_specialized_unit_2_pipeline_width;
+  }
+  unsigned get_OC_EX_specialized_unit_2_pipeline_width() const {
+    return OC_EX_specialized_unit_2_pipeline_width;
+  }
+  unsigned get_ID_OC_specialized_unit_3_pipeline_width() const {
+    return ID_OC_specialized_unit_3_pipeline_width;
+  }
+  unsigned get_OC_EX_specialized_unit_3_pipeline_width() const {
+    return OC_EX_specialized_unit_3_pipeline_width;
+  }
+
+  unsigned get_num_specialized_unit_1_units() const {
+    return num_specialized_unit_1_units;
+  }
+  unsigned get_num_specialized_unit_2_units() const {
+    return num_specialized_unit_2_units;
+  }
+  unsigned get_num_specialized_unit_3_units() const {
+    return num_specialized_unit_3_units;
+  }
+
+  std::string get_specialized_unit_1_name() const {
+    return m_specialized_unit_1_name;
+  }
+  std::string get_specialized_unit_2_name() const {
+    return m_specialized_unit_2_name;
+  }
+  std::string get_specialized_unit_3_name() const {
+    return m_specialized_unit_3_name;
+  }
 
  private:
   bool m_valid;
@@ -513,6 +775,43 @@ class hw_config {
 
   /* DRAM Configuration */
   unsigned dram_latency;
+
+  /* Trace OpCode Latency and Initiation Interval */
+  std::vector<unsigned> trace_opcode_latency_initiation_int;
+  std::vector<unsigned> trace_opcode_latency_initiation_sp;
+  std::vector<unsigned> trace_opcode_latency_initiation_dp;
+  std::vector<unsigned> trace_opcode_latency_initiation_sfu;
+  std::vector<unsigned> trace_opcode_latency_initiation_tensor;
+  std::vector<unsigned> trace_opcode_latency_initiation_spec_op_1;
+  std::vector<unsigned> trace_opcode_latency_initiation_spec_op_2;
+  std::vector<unsigned> trace_opcode_latency_initiation_spec_op_3;
+  unsigned m_specialized_unit_size;
+  /*
+  # <enabled>,<num_units>,<max_latency>,<ID_OC_SPEC>,<OC_EX_SPEC>,<NAME>
+  -gpgpu_specialized_unit_1 1,4,4,4,4,BRA
+  */
+  unsigned ID_OC_specialized_unit_1_pipeline_width;
+  unsigned OC_EX_specialized_unit_1_pipeline_width;
+  unsigned ID_OC_specialized_unit_2_pipeline_width;
+  unsigned OC_EX_specialized_unit_2_pipeline_width;
+  unsigned ID_OC_specialized_unit_3_pipeline_width;
+  unsigned OC_EX_specialized_unit_3_pipeline_width;
+
+  unsigned num_specialized_unit_1_units;
+  unsigned num_specialized_unit_2_units;
+  unsigned num_specialized_unit_3_units;
+
+  bool m_specialized_unit_1_enabled;
+  bool m_specialized_unit_2_enabled;
+  bool m_specialized_unit_3_enabled;
+
+  unsigned m_specialized_unit_1_max_latency;
+  unsigned m_specialized_unit_2_max_latency;
+  unsigned m_specialized_unit_3_max_latency;
+
+  std::string m_specialized_unit_1_name;
+  std::string m_specialized_unit_2_name;
+  std::string m_specialized_unit_3_name;
 
   std::map<std::string, std::string> configs_str;
 
