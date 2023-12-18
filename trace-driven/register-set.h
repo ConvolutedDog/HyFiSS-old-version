@@ -103,8 +103,8 @@ class register_set {
 
   void move_warp_newalloc_src(inst_fetch_buffer_entry *&dest, 
                  inst_fetch_buffer_entry *&src) {
-    std::cout << "123456" << std::endl;
-    std::cout << "src: " << src->kid << ", " 
+    std::cout << "    src: " 
+                         << src->kid << ", " 
                          << src->pc << ", " 
                          << src->wid << ", " 
                          << src->uid << std::endl;
@@ -115,7 +115,8 @@ class register_set {
     dest->m_valid = true;
     // src->clear();
 
-    std::cout << "dest: " << dest->kid << ", " 
+    std::cout << "    dest: " 
+                          << dest->kid << ", " 
                           << dest->pc << ", " 
                           << dest->wid << ", " 
                           << dest->uid << std::endl;
@@ -140,7 +141,8 @@ class register_set {
   }
   //获取一个空寄存器，并将一条指令存入。
   void move_in(bool sub_core_model, unsigned reg_id, inst_fetch_buffer_entry *&src) {
-    std::cout << "move in: " << src->pc << ", " 
+    std::cout << "  move in: " 
+                              << src->pc << ", " 
                               << src->wid << ", " 
                               << src->kid << ", " 
                               << src->uid << std::endl; 
@@ -202,7 +204,7 @@ class register_set {
   }
   //打印寄存器集合中的所有寄存器。
   void print() const {
-    std::cout << m_name << " : @ " << this << std::endl;
+    std::cout << "    " << m_name << " : @ " << this << std::endl;
     for (unsigned i = 0; i < regs.size(); i++) {
       std::cout << "     ";
       if (regs[i]->m_valid) {
@@ -242,7 +244,7 @@ class register_set {
     // in subcore model, each sched has a one specific reg to use (based on
     // sched id)
     if (!sub_core_model) return *(get_free());
-    std::cout << "@#@#@#: " << regs[reg_id] << std::endl;
+    std::cout << "  @#@#@#: " << regs[reg_id] << std::endl;
     assert(reg_id < regs.size());
     if (regs[reg_id]->m_valid == false) {
       // std::cout << "get free: | " << regs[reg_id] << std::endl;
