@@ -9,11 +9,14 @@
 
 #include "../hw-parser/hw-parser.h"
 #include "RegisterBankAllocator.h"
+#include "Scoreboard.h"
 #include "../trace-driven/entry.h"
 #include "../trace-driven/register-set.h"
 
 #ifndef PRIVATESM_H
 #define PRIVATESM_H
+
+#define PRED_NUM_OFFSET 65536
 
 enum exec_unit_type_t {
   NONE = 0,
@@ -104,6 +107,7 @@ class PrivateSM {
   std::map<unsigned, std::vector<unsigned>>* get_blocks_per_kernel();
 
   unsigned get_inst_fetch_throughput();
+  unsigned get_reg_file_port_throughput();
 
   void issue_warp(register_set &pipe_reg_set, ibuffer_entry entry, unsigned sch_id);
 
@@ -118,6 +122,7 @@ class PrivateSM {
   bool sub_core_model;
   unsigned banks_per_sched;
   unsigned inst_fetch_throughput;
+  unsigned reg_file_port_throughput;
 
   // number of warps per kernel that are allocated to this SM
   std::vector<unsigned> m_num_warps_per_sm;
@@ -149,6 +154,8 @@ class PrivateSM {
   register_set* m_tensor_core_out;// = &m_pipeline_reg[ID_OC_TENSOR_CORE];
   std::vector<register_set*> m_spec_cores_out;// = m_specilized_dispatch_reg;
   register_set* m_mem_out;// = &m_pipeline_reg[ID_OC_MEM];
+
+  Scoreboard* m_scoreboard;
 
   int last_fetch_warp_id;
   int last_issue_sched_id;
