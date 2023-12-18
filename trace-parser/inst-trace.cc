@@ -17,7 +17,7 @@ std::string intToHex(unsigned num) {
 
 inst_trace_t::inst_trace_t() { memadd_info = NULL; }
 
-_inst_trace_t::_inst_trace_t() { memadd_info = NULL; }
+// _inst_trace_t::_inst_trace_t() { memadd_info = NULL; }
 
 inst_trace_t::~inst_trace_t() {
   if (memadd_info != NULL) delete memadd_info;
@@ -34,12 +34,12 @@ inst_trace_t::inst_trace_t(const inst_trace_t &b) {
   }
 }
 
-_inst_trace_t::_inst_trace_t(const _inst_trace_t &b) {
-  if (memadd_info != NULL) {
-    memadd_info = new inst_memadd_info_t();
-    memadd_info = b.memadd_info;
-  }
-}
+// _inst_trace_t::_inst_trace_t(const _inst_trace_t &b) {
+//   if (memadd_info != NULL) {
+//     memadd_info = new inst_memadd_info_t();
+//     memadd_info = b.memadd_info;
+//   }
+// }
 
 bool inst_trace_t::check_opcode_contain(const std::vector<std::string> &opcode,
                                         std::string param) const {
