@@ -1,6 +1,6 @@
 
 USE_BOOST ?= 1
-DEBUG ?= 0
+DEBUG ?= 1
 USE_OPTION_PARSER = 0
 
 BOOST_HOME ?= $(shell dirname $(shell echo $$LD_LIBRARY_PATH | tr ':' '\n' | grep boost/lib | head -n 1))
