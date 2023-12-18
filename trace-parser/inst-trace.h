@@ -60,8 +60,8 @@ struct inst_trace_t {
 
 
 struct _inst_trace_t {
-  _inst_trace_t();
-  _inst_trace_t(const _inst_trace_t &b);
+  // _inst_trace_t();
+  // _inst_trace_t(const _inst_trace_t &b);
   _inst_trace_t(unsigned _kernel_id, unsigned _pc, std::string _instn_str) {
     kernel_id = _kernel_id;
     m_pc = _pc;
@@ -84,6 +84,8 @@ struct _inst_trace_t {
 
     opcode_tokens = get_opcode_tokens();
     memadd_info->width = get_datawidth_from_opcode(opcode_tokens);
+    m_valid = true;
+    mask = 0x0;
   };
 
   _inst_trace_t(unsigned _kernel_id, unsigned _pc, std::string _instn_str, hw_config* hw_cfg) {
@@ -114,16 +116,20 @@ struct _inst_trace_t {
     // std::cout << "``````|||" << this->hw_cfg->get_opcode_latency_initiation_int(0) << std::endl;
 
     parse_opcode_latency_info();
+    m_valid = true;
+    mask = 0x0;
   };
 
   // unsigned line_num;
+  bool m_valid = false;
+
   unsigned kernel_id;
   unsigned m_pc;
-  unsigned mask; // invalid
+  unsigned mask = 0x0; // invalid
   unsigned reg_dsts_num;
   int reg_dest[MAX_DST];
   std::string opcode;
-  bool read_or_wirte;
+  // bool read_or_wirte;
   unsigned reg_srcs_num;
   int reg_src[MAX_SRC];
   inst_memadd_info_t *memadd_info;
