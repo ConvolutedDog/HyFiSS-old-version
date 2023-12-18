@@ -523,8 +523,8 @@ bool trace_warp_inst_t::parse_from_trace_struct(
 
   is_vectorin = false;
   is_vectorout = false;
-  ar1 = 0;
-  ar2 = 0;
+  ar1 = -1;
+  ar2 = -1;
   memory_op = no_memory_op;
   data_size = 0;
   op = ALU_OP;
@@ -738,6 +738,17 @@ bool trace_warp_inst_t::parse_from_trace_struct(
       break;
     default:
       break;
+  }
+
+  // if (trace->pred_str != "") std::cout << "pred_str: " << trace->pred_str << std::endl;
+
+  if (trace->pred_str != "") {
+    std::regex pattern("@!?P(\\d+)");
+    std::smatch match;
+
+    if (std::regex_search(trace->pred_str, match, pattern) && match.size() > 1) {
+      pred = std::stoul(match.str(1)); 
+    }
   }
 
   m_empty = false;
