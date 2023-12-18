@@ -5,6 +5,7 @@
 #include <map>
 #include <unordered_map>
 #include <string.h>
+#include <regex>
 
 #include "../common/vector_types.h"
 #include "../common/common_def.h"
@@ -43,9 +44,9 @@ class trace_warp_inst_t {
     is_vectorin = false;
     is_vectorout = false;
 
-    pred = 0;
-    ar1 = 0;
-    ar2 = 0;
+    pred = -1;
+    ar1 = -1;
+    ar2 = -1;
 
     for (unsigned i = 0; i < MAX_REG_OPERANDS; i++) {
       arch_reg.src[i] = -1;
