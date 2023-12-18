@@ -454,8 +454,9 @@ struct compute_instn {
     inst_trace = _inst_trace;
     inst_trace->mask = _mask;
     // trace_warp_inst = _trace_warp_inst;
-    // trace_warp_inst = new trace_warp_inst_t();
+    trace_warp_inst = trace_warp_inst_t();
     // trace_warp_inst->parse_from_trace_struct(_inst_trace, &Volta_OpcodeMap, gwarp_id);
+    // trace_warp_inst = *_trace_warp_inst;
     trace_warp_inst.parse_from_trace_struct(_inst_trace, &Volta_OpcodeMap, gwarp_id);
     
     // if (kernel_id == 2 && pc != 0) {
@@ -479,12 +480,12 @@ struct compute_instn {
   unsigned kernel_id, pc;
   unsigned mask;
 
-  unsigned cta_id_x;
-  unsigned cta_id_y;
-  unsigned cta_id_z;
+  // unsigned cta_id_x;
+  // unsigned cta_id_y;
+  // unsigned cta_id_z;
 
-  unsigned warp_id;
-  unsigned sm_id;
+  // unsigned warp_id;
+  // unsigned sm_id;
 
   unsigned gwarp_id;
 
@@ -501,11 +502,11 @@ struct compute_instn {
   void serialize(Archive & ar, const unsigned int version) {
     ar & pc;
     ar & kernel_id;
-    ar & cta_id_x;
-    ar & cta_id_y;
-    ar & cta_id_z;
-    ar & warp_id;
-    ar & sm_id;
+    // ar & cta_id_x;
+    // ar & cta_id_y;
+    // ar & cta_id_z;
+    // ar & warp_id;
+    // ar & sm_id;
     ar & mask;
     ar & gwarp_id;
     ar & valid;
@@ -564,6 +565,10 @@ class trace_parser {
 
   compute_instn* get_one_kernel_one_warp_one_instn(int kernel_id, int warp_id, int next_instn_id) {
     return &conpute_instns[kernel_id][warp_id][next_instn_id];
+  }
+
+  unsigned get_one_kernel_one_warp_instn_size(int kernel_id, int warp_id) {
+    return conpute_instns[kernel_id][warp_id].size();
   }
 
  private:
