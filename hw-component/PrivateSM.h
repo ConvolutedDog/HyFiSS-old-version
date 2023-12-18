@@ -3,6 +3,7 @@
 #include <utility>
 #include <map>
 #include "../trace-parser/trace-parser.h"
+#include <memory>
 
 #include "IBuffer.h"
 
@@ -11,6 +12,17 @@
 
 #ifndef PRIVATESM_H
 #define PRIVATESM_H
+
+enum exec_unit_type_t {
+  NONE = 0,
+  SP = 1,
+  SFU = 2,
+  LDST = 3,
+  DP = 4,
+  INT = 5,
+  TENSOR = 6,
+  SPECIALIZED = 7
+};
 
 struct stage_instns_identifier {
   stage_instns_identifier(unsigned _kid, unsigned _pc, 
@@ -30,6 +42,10 @@ struct stage_instns_identifier {
 struct inst_fetch_buffer_entry {
   inst_fetch_buffer_entry() {
     m_valid = false;
+    pc = 0;
+    wid = 0;
+    kid = 0;
+    uid = 0;
   };
   inst_fetch_buffer_entry(unsigned _pc, unsigned _wid, unsigned _kid, unsigned _uid) {
     pc = _pc;
@@ -91,13 +107,20 @@ class register_set {
  public:
   //构造函数，用于初始化寄存器集合，寄存器集合中有num个寄存器，每个寄存器含有一条指令。
   register_set(){};
-  register_set(unsigned num, std::string name, hw_config* hw_cfg) {
+  
+  register_set(const unsigned num, const std::string name, hw_config* hw_cfg) {
+    // for (unsigned i = 0; i < num; i++) {
+    //   regs_instance.push_back(inst_fetch_buffer_entry());
+    //   regs.push_back(&(regs_instance.back()));
+    // }
+    regs.reserve(num);
     for (unsigned i = 0; i < num; i++) {
       regs.push_back(new inst_fetch_buffer_entry());
     }
     //m_name是该寄存器集合的名字。
     m_name = name;
     m_hw_cfg = hw_cfg;
+    // this->print();
   }
   //获取该寄存器集合的名字。
   const std::string get_name() { return m_name; }
@@ -109,6 +132,17 @@ class register_set {
       }
     }
     return false;
+  }
+  void release_register_set() {
+    std::cout << "DELETE " << m_name << std::endl;
+    for (auto ptr : regs) {
+      // if (ptr != NULL) {
+        delete ptr;
+        ptr = NULL;
+      // }
+    }
+    regs.clear();
+
   }
   //给定一个寄存器id，判断该寄存器是否为空。
   bool has_free(bool sub_core_model, unsigned reg_id) {
@@ -159,6 +193,27 @@ class register_set {
     return (unsigned)(regs[reg_id]->wid % m_hw_cfg->get_num_sched_per_sm());
   }
 
+  void move_warp_newalloc_src(inst_fetch_buffer_entry *&dest, 
+                 inst_fetch_buffer_entry *&src) {
+    std::cout << "123456" << std::endl;
+    std::cout << "src: " << src->kid << ", " 
+                         << src->pc << ", " 
+                         << src->wid << ", " 
+                         << src->uid << std::endl;
+    dest->pc = src->pc;
+    dest->wid = src->wid;
+    dest->kid = src->kid;
+    dest->uid = src->uid;
+    dest->m_valid = true;
+    // src->clear();
+
+    std::cout << "dest: " << dest->kid << ", " 
+                          << dest->pc << ", " 
+                          << dest->wid << ", " 
+                          << dest->uid << std::endl;
+    
+  }
+
   void move_warp(inst_fetch_buffer_entry *&dest, 
                  inst_fetch_buffer_entry *&src) {
     dest->pc = src->pc;
@@ -177,15 +232,27 @@ class register_set {
   }
   //获取一个空寄存器，并将一条指令存入。
   void move_in(bool sub_core_model, unsigned reg_id, inst_fetch_buffer_entry *&src) {
-    inst_fetch_buffer_entry **free;
+    std::cout << "move in: " << src->pc << ", " 
+                              << src->wid << ", " 
+                              << src->kid << ", " 
+                              << src->uid << std::endl; 
+    inst_fetch_buffer_entry *free;
+    // std::cout << "sub_core_model: | " << sub_core_model << std::endl;
     if (!sub_core_model) {
-      free = get_free();
+      free = *(get_free());
     } else {
       assert(reg_id < regs.size());
-      free = get_free(sub_core_model, reg_id);
+      free = get_free_addr(sub_core_model, reg_id);
     }
-    inst_fetch_buffer_entry* tmp = *free;
-    move_warp(tmp, src);
+
+    if (free != NULL) {
+      // std::cout << "get_free_addr(sub_core_model, reg_id): " 
+      //           << get_free_addr(sub_core_model, reg_id) << std::endl;
+      // std::cout << "free: " << free << std::endl;
+      inst_fetch_buffer_entry* tmp = free;
+      // std::cout << "tmp: " << tmp << std::endl;
+      move_warp_newalloc_src(tmp, src);
+    }
   }
   //获取一个非空寄存器，并将其指令移出到dest。
   void move_out_to(inst_fetch_buffer_entry *&dest) {
@@ -257,7 +324,21 @@ class register_set {
 
     assert(reg_id < regs.size());
     if (regs[reg_id]->m_valid == false) {
+      std::cout << "get free: " << regs[reg_id] << std::endl;
+      std::cout << "get free: " << &regs[reg_id] << std::endl;
       return &regs[reg_id];
+    }
+    return NULL;
+  }
+  inst_fetch_buffer_entry* get_free_addr(bool sub_core_model, unsigned reg_id) {
+    // in subcore model, each sched has a one specific reg to use (based on
+    // sched id)
+    if (!sub_core_model) return *(get_free());
+    std::cout << "@#@#@#: " << regs[reg_id] << std::endl;
+    assert(reg_id < regs.size());
+    if (regs[reg_id]->m_valid == false) {
+      // std::cout << "get free: | " << regs[reg_id] << std::endl;
+      return regs[reg_id];
     }
     return NULL;
   }
@@ -267,6 +348,7 @@ class register_set {
  private:
   //将寄存器集合中的所有寄存器用一个向量保存。
   std::vector<inst_fetch_buffer_entry*> regs;
+  // std::vector<inst_fetch_buffer_entry> regs_instance;
   //该寄存器集合的名字。
   std::string m_name;
   hw_config* m_hw_cfg;
@@ -275,7 +357,37 @@ class register_set {
 class PrivateSM {
  public:
   PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cfg);
+  ~PrivateSM() {
+    delete m_ibuffer;
+    delete m_inst_fetch_buffer;
+    delete m_reg_bank_allocator;
+    /*
+    register_set* m_sp_out;// = &m_pipeline_reg[ID_OC_SP];
+    register_set* m_dp_out;// = &m_pipeline_reg[ID_OC_DP];
+    register_set* m_sfu_out;// = &m_pipeline_reg[ID_OC_SFU];
+    register_set* m_int_out;// = &m_pipeline_reg[ID_OC_INT];
+    register_set* m_tensor_core_out;// = &m_pipeline_reg[ID_OC_TENSOR_CORE];
+    std::vector<register_set*> m_spec_cores_out;// = m_specilized_dispatch_reg;
+    register_set* m_mem_out;// = &m_pipeline_reg[ID_OC_MEM];
+    */
 
+    m_sp_out->release_register_set();
+    m_dp_out->release_register_set();
+    m_sfu_out->release_register_set();
+    m_int_out->release_register_set();
+    m_tensor_core_out->release_register_set();
+    m_mem_out->release_register_set();
+    for (auto ptr : m_specilized_dispatch_reg) {
+      ptr->release_register_set();
+    }
+    m_specilized_dispatch_reg.clear();
+    m_spec_cores_out.clear();
+  
+    for (auto ptr : m_pipeline_reg) {
+      ptr.release_register_set();
+    }
+    
+  };
   void run();
 
   bool get_active() { return active; }
@@ -326,6 +438,40 @@ class PrivateSM {
 
   unsigned get_inst_fetch_throughput() { return inst_fetch_throughput; }
 
+  void issue_warp(register_set &pipe_reg_set, ibuffer_entry entry, unsigned sch_id) {
+    // print entry
+    std::cout << "issue_warp: " << std::endl;
+    std::cout << "    pc: " << entry.pc << ", wid: " << entry.wid 
+              << ", kid: " << entry.kid << ", uid: " << entry.uid << std::endl;
+
+    // inst_fetch_buffer_entry **pipe_reg =
+    //   pipe_reg_set.get_free(m_hw_cfg->get_sub_core_model(), sch_id);
+    // assert(pipe_reg);
+
+    inst_fetch_buffer_entry* tmp = new inst_fetch_buffer_entry();
+    tmp->kid = entry.kid;
+    tmp->pc = entry.pc;
+    tmp->uid = entry.uid;
+    tmp->wid = entry.wid;
+    tmp->m_valid = true;
+
+    std::cout << "issue_warp: " << std::endl;
+    std::cout << "    pc: " << tmp->pc << ", wid: " << tmp->wid 
+              << ", kid: " << tmp->kid << ", uid: " << tmp->uid << std::endl;
+
+    pipe_reg_set.move_in(m_hw_cfg->get_sub_core_model(), sch_id, tmp);
+
+    delete tmp;
+    tmp = nullptr;  // Optional: set tmp to nullptr to avoid dangling pointer
+
+    // print reigster set
+    std::cout << "Now register set: " << std::endl;
+    pipe_reg_set.print();
+
+    // Scoreboard: TODO
+
+  }
+
  private:
   unsigned m_smid;
   unsigned long long m_cycle;
@@ -361,6 +507,13 @@ class PrivateSM {
   unsigned total_pipeline_stages;
   std::vector<register_set> m_pipeline_reg;
   std::vector<register_set*> m_specilized_dispatch_reg;
+  register_set* m_sp_out;// = &m_pipeline_reg[ID_OC_SP];
+  register_set* m_dp_out;// = &m_pipeline_reg[ID_OC_DP];
+  register_set* m_sfu_out;// = &m_pipeline_reg[ID_OC_SFU];
+  register_set* m_int_out;// = &m_pipeline_reg[ID_OC_INT];
+  register_set* m_tensor_core_out;// = &m_pipeline_reg[ID_OC_TENSOR_CORE];
+  std::vector<register_set*> m_spec_cores_out;// = m_specilized_dispatch_reg;
+  register_set* m_mem_out;// = &m_pipeline_reg[ID_OC_MEM];
 
   int last_fetch_warp_id;
   int last_issue_sched_id;
@@ -376,6 +529,7 @@ class PrivateSM {
 
   std::vector<stage_instns_identifier> warp_exit_stage_instns;
 
+  hw_config* m_hw_cfg;
 };
 
 #endif
