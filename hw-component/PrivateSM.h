@@ -66,37 +66,7 @@ struct stage_instns_identifier {
 class PrivateSM {
  public:
   PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cfg);
-  ~PrivateSM() {
-    delete m_ibuffer;
-    delete m_inst_fetch_buffer;
-    delete m_reg_bank_allocator;
-    /*
-    register_set* m_sp_out;// = &m_pipeline_reg[ID_OC_SP];
-    register_set* m_dp_out;// = &m_pipeline_reg[ID_OC_DP];
-    register_set* m_sfu_out;// = &m_pipeline_reg[ID_OC_SFU];
-    register_set* m_int_out;// = &m_pipeline_reg[ID_OC_INT];
-    register_set* m_tensor_core_out;// = &m_pipeline_reg[ID_OC_TENSOR_CORE];
-    std::vector<register_set*> m_spec_cores_out;// = m_specilized_dispatch_reg;
-    register_set* m_mem_out;// = &m_pipeline_reg[ID_OC_MEM];
-    */
-
-    m_sp_out->release_register_set();
-    m_dp_out->release_register_set();
-    m_sfu_out->release_register_set();
-    m_int_out->release_register_set();
-    m_tensor_core_out->release_register_set();
-    m_mem_out->release_register_set();
-    for (auto ptr : m_specilized_dispatch_reg) {
-      ptr->release_register_set();
-    }
-    m_specilized_dispatch_reg.clear();
-    m_spec_cores_out.clear();
-  
-    for (auto ptr : m_pipeline_reg) {
-      ptr.release_register_set();
-    }
-    
-  };
+  ~PrivateSM();
   void run();
 
   bool get_active() { return active; }
@@ -105,7 +75,7 @@ class PrivateSM {
   bool is_active() { return active; }
   bool check_active();
 
-  unsigned get_num_warps_per_sm(unsigned kernel_id) { return m_num_warps_per_sm[kernel_id]; }
+  unsigned get_num_warps_per_sm(unsigned kernel_id);
 
   /*
   在V100配置中，m_num_banks被初始化为16。m_bank_warp_shift被初始化为5。由于在操作数
@@ -127,59 +97,15 @@ class PrivateSM {
   */
   int register_bank(int regnum, int wid, unsigned sched_id);
 
-  void parse_blocks_per_kernel() {
-    for (unsigned i = 0; i < kernel_block_pair.size(); i++) {
-      if (blocks_per_kernel.find(kernel_block_pair[i].first) == blocks_per_kernel.end()) {
-        blocks_per_kernel[kernel_block_pair[i].first] = std::vector<unsigned>(1, kernel_block_pair[i].second);
-      } else {
-        blocks_per_kernel[kernel_block_pair[i].first].push_back(kernel_block_pair[i].second);
-      }
-    }
-  }
+  void parse_blocks_per_kernel();
   
-  std::vector<unsigned> get_blocks_per_kernel(unsigned kernel_id) {
-    return blocks_per_kernel[kernel_id];
-  }
+  std::vector<unsigned> get_blocks_per_kernel(unsigned kernel_id);
 
-  std::map<unsigned, std::vector<unsigned>>* get_blocks_per_kernel() {
-    return &blocks_per_kernel;
-  }
+  std::map<unsigned, std::vector<unsigned>>* get_blocks_per_kernel();
 
-  unsigned get_inst_fetch_throughput() { return inst_fetch_throughput; }
+  unsigned get_inst_fetch_throughput();
 
-  void issue_warp(register_set &pipe_reg_set, ibuffer_entry entry, unsigned sch_id) {
-    // print entry
-    std::cout << "issue_warp: " << std::endl;
-    std::cout << "    pc: " << entry.pc << ", wid: " << entry.wid 
-              << ", kid: " << entry.kid << ", uid: " << entry.uid << std::endl;
-
-    // inst_fetch_buffer_entry **pipe_reg =
-    //   pipe_reg_set.get_free(m_hw_cfg->get_sub_core_model(), sch_id);
-    // assert(pipe_reg);
-
-    inst_fetch_buffer_entry* tmp = new inst_fetch_buffer_entry();
-    tmp->kid = entry.kid;
-    tmp->pc = entry.pc;
-    tmp->uid = entry.uid;
-    tmp->wid = entry.wid;
-    tmp->m_valid = true;
-
-    std::cout << "issue_warp: " << std::endl;
-    std::cout << "    pc: " << tmp->pc << ", wid: " << tmp->wid 
-              << ", kid: " << tmp->kid << ", uid: " << tmp->uid << std::endl;
-
-    pipe_reg_set.move_in(m_hw_cfg->get_sub_core_model(), sch_id, tmp);
-
-    delete tmp;
-    tmp = nullptr;  // Optional: set tmp to nullptr to avoid dangling pointer
-
-    // print reigster set
-    std::cout << "Now register set: " << std::endl;
-    pipe_reg_set.print();
-
-    // Scoreboard: TODO
-
-  }
+  void issue_warp(register_set &pipe_reg_set, ibuffer_entry entry, unsigned sch_id);
 
  private:
   unsigned m_smid;
