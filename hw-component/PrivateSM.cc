@@ -67,6 +67,7 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
   last_fetch_warp_id = 0;
   last_issue_sched_id = 0;
   
+  m_scoreboard = new Scoreboard(m_smid, all_warps_num);
 
   m_inst_fetch_buffer = new inst_fetch_buffer_entry();
 
@@ -79,6 +80,7 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
   sub_core_model = hw_cfg->get_sub_core_model();
   banks_per_sched = (unsigned)(num_banks / num_scheds);
   inst_fetch_throughput = hw_cfg->get_inst_fetch_throughput();
+  reg_file_port_throughput = hw_cfg->get_reg_file_port_throughput();
 
   warps_per_sched = (unsigned)(all_warps_num / num_scheds);
 
@@ -192,6 +194,7 @@ bool PrivateSM::check_active(){
 PrivateSM::~PrivateSM() {
   delete m_ibuffer;
   delete m_inst_fetch_buffer;
+  delete m_scoreboard;
   delete m_reg_bank_allocator;
   /*
   register_set* m_sp_out;// = &m_pipeline_reg[ID_OC_SP];
@@ -244,12 +247,13 @@ std::map<unsigned, std::vector<unsigned>>* PrivateSM::get_blocks_per_kernel() {
 }
 
 unsigned PrivateSM::get_inst_fetch_throughput() { return inst_fetch_throughput; }
+unsigned PrivateSM::get_reg_file_port_throughput() { return reg_file_port_throughput; }
 
 void PrivateSM::issue_warp(register_set &pipe_reg_set, 
                            ibuffer_entry entry, 
                            unsigned sch_id) {
   // print entry
-  std::cout << "issue_warp: " << std::endl;
+  std::cout << "  issue_warp: " << std::endl;
   std::cout << "    pc: " << entry.pc << ", wid: " << entry.wid 
             << ", kid: " << entry.kid << ", uid: " << entry.uid << std::endl;
 
@@ -264,7 +268,7 @@ void PrivateSM::issue_warp(register_set &pipe_reg_set,
   tmp->wid = entry.wid;
   tmp->m_valid = true;
 
-  std::cout << "issue_warp: " << std::endl;
+  std::cout << "  issue_warp: " << std::endl;
   std::cout << "    pc: " << tmp->pc << ", wid: " << tmp->wid 
             << ", kid: " << tmp->kid << ", uid: " << tmp->uid << std::endl;
 
@@ -274,7 +278,7 @@ void PrivateSM::issue_warp(register_set &pipe_reg_set,
   tmp = nullptr;  // Optional: set tmp to nullptr to avoid dangling pointer
 
   // print reigster set
-  std::cout << "Now register set: " << std::endl;
+  std::cout << "  Now register set: " << std::endl;
   pipe_reg_set.print();
 
   // Scoreboard: TODO
@@ -457,17 +461,47 @@ void PrivateSM::run(){
 
     /**********************************************************************************************/
     /***                                                                                        ***/
+    /***                                      Read Operands.                                    ***/
+    /***                                                                                        ***/
+    /**********************************************************************************************/
+    for (unsigned _iter = 0; _iter < get_reg_file_port_throughput(); _iter++) {
+      std::cout << "  Read Operands: " << "reg_file_port_idx: " << _iter << std::endl;
+      
+
+
+
+
+
+
+
+
+
+
+
+
+
+    }
+
+
+    /**********************************************************************************************/
+    /***                                                                                        ***/
     /***                               Issue intns to issue_port.                               ***/
     /***                                                                                        ***/
     /**********************************************************************************************/
-    exec_unit_type_t previous_issued_inst_exec_type = exec_unit_type_t::NONE;
+    
+
+    unsigned max_issue_per_warp = m_hw_cfg->get_max_insn_issue_per_warp();
 
     for (unsigned _sched_id = 0; _sched_id < num_scheds; _sched_id++) {
       auto sched_id = (last_issue_sched_id + _sched_id) % num_scheds;
       std::cout << "D: sched_id: " << sched_id << std::endl;
       
+      
       // LRR warp sheduling
-      for (auto gwid = gwarp_id_start; (gwid <= gwarp_id_end) && (gwid % num_scheds == sched_id); gwid++) {
+      for (auto gwid = gwarp_id_start; 
+           (gwid <= gwarp_id_end) && 
+           (gwid % num_scheds == sched_id); 
+           gwid++) {
         // std::cout << last_issue_warp_ids.size() << std::endl;
         // for (auto it = last_issue_warp_ids.begin(); it != last_issue_warp_ids.end(); it++) {
         //   std::cout << *it << std::endl;
@@ -476,214 +510,381 @@ void PrivateSM::run(){
         auto global_all_kernels_warp_id = wid + std::accumulate(m_num_warps_per_sm.begin(), m_num_warps_per_sm.begin() + kid, 0);
         // std::cout << "D: global_all_kernels_warp_id: " << global_all_kernels_warp_id << std::endl;
         // std::cout << "D: m_ibuffer->is_not_empty(global_all_kernels_warp_id): " << m_ibuffer->is_not_empty(global_all_kernels_warp_id) << std::endl;
-        if (m_ibuffer->is_not_empty(global_all_kernels_warp_id)) {
-          // pop the instn from ibuffer
-          ibuffer_entry entry = m_ibuffer->pop_front(global_all_kernels_warp_id);
-          unsigned _fetch_instn_id = entry.uid;
-          unsigned _pc = entry.pc;
-          unsigned _gwid = entry.wid;
-          unsigned _kid = entry.kid;
-          std::cout << "try to issue: " << _fetch_instn_id << " " 
-                                        << _pc << " " 
-                                        << _gwid << " " 
-                                        << _kid << std::endl;
-          
-          
-          
-          // get instn by entry
-          compute_instn* tmp = tracer->get_one_kernel_one_warp_one_instn(_kid, _gwid, _fetch_instn_id);
-          _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
-          trace_warp_inst_t* tmp_trace_warp_inst = &(tmp->trace_warp_inst);
-          std::cout << tmp_inst_trace->instn_str << std::endl;
-          
-          std::cout << "opcode: " << tmp_trace_warp_inst->get_opcode() << " " 
-                    << tmp_trace_warp_inst->get_op() << std::endl;
-          std::cout << "        " << OP_SHFL << " " << ALU_OP << std::endl;
-          auto latency = tmp_inst_trace->get_latency();
-          std::cout << "latency: " << latency << std::endl;
-          auto init_latency = tmp_inst_trace->get_initiation_interval();
-          std::cout << "init_latency: " << init_latency << std::endl;
-          
-          // get the function unit of the instn
-          auto fu = tmp_inst_trace->get_func_unit();
-          std::cout << "Execute on FU: ";
-          
-          /* Identify the availability of function units. */
-          bool sp_pipe_avail = false;
-          bool sfu_pipe_avail = false;
-          bool int_pipe_avail = false;
-          bool dp_pipe_avail = false;
-          bool tensor_core_pipe_avail = false;
-          bool ldst_pipe_avail = false;
-          bool spec_1_pipe_avail = false;
-          bool spec_2_pipe_avail = false;
-          bool spec_3_pipe_avail = false;
-          /*
-          enum exec_unit_type_t {
-            NONE = 0,
-            SP = 1,
-            SFU = 2,
-            LDST = 3,
-            DP = 4,
-            INT = 5,
-            TENSOR = 6,
-            SPECIALIZED = 7
-          };
-          */
-          switch (fu) {
-            case NON_UNIT:
-              std::cout << "NON_UNIT" << std::endl;
-              assert(0);
-              break;
-            case SP_UNIT:
-              std::cout << "SP_UNIT" << std::endl;
-              sp_pipe_avail = 
-                (m_hw_cfg->get_num_sp_units() > 0) &&
-                m_sp_out->has_free(m_hw_cfg->get_sub_core_model(), 
-                                   sched_id);
-              std::cout << "sp_pipe_avail: " << sp_pipe_avail << std::endl;
-              break;
-            case SFU_UNIT:
-              std::cout << "SFU_UNIT" << std::endl;
-              sfu_pipe_avail = 
-                (m_hw_cfg->get_num_sfu_units() > 0) &&
-                m_sfu_out->has_free(m_hw_cfg->get_sub_core_model(), 
-                                    sched_id);
-              std::cout << "sfu_pipe_avail: " << sfu_pipe_avail << std::endl;
-              break;
-            case INT_UNIT:
-              std::cout << "INT_UNIT" << std::endl;
-              int_pipe_avail = 
-                (m_hw_cfg->get_num_int_units() > 0) &&
-                m_int_out->has_free(m_hw_cfg->get_sub_core_model(), 
+        
+        unsigned issued_num = 0;
+        unsigned checked_num = 0;
+
+        exec_unit_type_t previous_issued_inst_exec_type = exec_unit_type_t::NONE;
+
+        while (
+          (issued_num < max_issue_per_warp) &&
+          (checked_num <= issued_num)
+        ) {
+          bool warp_inst_issued = false;
+
+          std::vector<int> regnums;
+          int pred;
+          int ar1;
+          int ar2;
+
+          if (m_ibuffer->is_not_empty(global_all_kernels_warp_id)) {
+            
+            std::cout << "  Before pop,m_ibuffer:" << std::endl;
+            m_ibuffer->print_ibuffer(wid);
+            // pop the instn from ibuffer
+            ibuffer_entry entry = m_ibuffer->front(global_all_kernels_warp_id);
+            std::cout << "  pop_front(uid,pc,wid,kid): " 
+                                        << entry.uid << " " 
+                                        << entry.pc << " " 
+                                        << entry.wid << " " 
+                                        << entry.kid << std::endl;
+            std::cout << "  After pop,m_ibuffer:" << std::endl;
+            m_ibuffer->print_ibuffer(entry.wid);
+            unsigned _fetch_instn_id = entry.uid;
+            unsigned _pc = entry.pc;
+            unsigned _gwid = entry.wid;
+            unsigned _kid = entry.kid;
+            std::cout << "  try to issue: " << _fetch_instn_id << " " 
+                                            << _pc << " " 
+                                            << _gwid << " " 
+                                            << _kid << std::endl;
+            
+            
+            
+            // get instn by entry
+            compute_instn* tmp = tracer->get_one_kernel_one_warp_one_instn(_kid, _gwid, _fetch_instn_id);
+            _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
+            trace_warp_inst_t* tmp_trace_warp_inst = &(tmp->trace_warp_inst);
+            std::cout << "    instn: " << tmp_inst_trace->instn_str << std::endl;
+            
+            std::cout << "    opcode: " << tmp_trace_warp_inst->get_opcode() << " " 
+                      << tmp_trace_warp_inst->get_op() << std::endl;
+            std::cout << "            " << OP_SHFL << " " << ALU_OP << std::endl;
+            auto latency = tmp_inst_trace->get_latency();
+            std::cout << "    latency: " << latency << std::endl;
+            auto init_latency = tmp_inst_trace->get_initiation_interval();
+            std::cout << "    init_latency: " << init_latency << std::endl;
+
+
+            std::cout << "  @ pred: " << tmp_trace_warp_inst->get_pred() << " " << std::endl;
+            std::cout << "  @ ar1: " << tmp_trace_warp_inst->get_ar1() << " " << std::endl;
+            std::cout << "  @ ar2: " << tmp_trace_warp_inst->get_ar2() << " " << std::endl;
+            std::cout << "  @ srcs: ";
+            for (unsigned i = 0; i < tmp_inst_trace->reg_srcs_num; i++) {
+              std::cout << tmp_inst_trace->reg_src[i] << " ";
+            }
+            std::cout << std::endl;
+            std::cout << "  @ dsts: ";
+            for (unsigned i = 0; i < tmp_inst_trace->reg_dsts_num; i++) {
+              std::cout << tmp_inst_trace->reg_dest[i] << " ";
+            }
+            std::cout << std::endl;
+
+            
+            pred = tmp_trace_warp_inst->get_pred();
+            ar1 = tmp_trace_warp_inst->get_ar1();
+            ar2 = tmp_trace_warp_inst->get_ar2();
+            
+            
+            for (unsigned i = 0; i < tmp_inst_trace->reg_srcs_num; i++) {
+              regnums.push_back(tmp_inst_trace->reg_src[i]);
+            }
+            for (unsigned i = 0; i < tmp_inst_trace->reg_dsts_num; i++) {
+              regnums.push_back(tmp_inst_trace->reg_dest[i]);
+            }
+
+            bool check_is_scoreboard_collision = false;
+            check_is_scoreboard_collision = 
+              m_scoreboard->checkCollision(global_all_kernels_warp_id, 
+                                           regnums, 
+                                           /* set PRED+NUM_OFFSET to avoid collision with regnums */
+                                           (pred < 0) ? pred : pred + PRED_NUM_OFFSET, 
+                                           ar1,
+                                           ar2);
+            std::cout << "  check_is_scoreboard_collision: " 
+                      << check_is_scoreboard_collision << std::endl;
+            
+            if (check_is_scoreboard_collision) continue;
+            
+            // get the function unit of the instn
+            auto fu = tmp_inst_trace->get_func_unit();
+            std::cout << "  Execute on FU: ";
+            
+            /* Identify the availability of function units. */
+            bool sp_pipe_avail = false;
+            bool sfu_pipe_avail = false;
+            bool int_pipe_avail = false;
+            bool dp_pipe_avail = false;
+            bool tensor_core_pipe_avail = false;
+            bool ldst_pipe_avail = false;
+            bool spec_1_pipe_avail = false;
+            bool spec_2_pipe_avail = false;
+            bool spec_3_pipe_avail = false;
+            /*
+            enum exec_unit_type_t {
+              NONE = 0,
+              SP = 1,
+              SFU = 2,
+              LDST = 3,
+              DP = 4,
+              INT = 5,
+              TENSOR = 6,
+              SPECIALIZED = 7
+            };
+            */
+            switch (fu) {
+              case NON_UNIT:
+                std::cout << "NON_UNIT" << std::endl;
+                assert(0);
+                break;
+              case SP_UNIT:
+                std::cout << "SP_UNIT" << std::endl;
+                sp_pipe_avail = 
+                  (m_hw_cfg->get_num_sp_units() > 0) &&
+                  m_sp_out->has_free(m_hw_cfg->get_sub_core_model(), 
                                     sched_id) &&
-                (!m_hw_cfg->get_dual_issue_diff_exec_units() || 
-                 previous_issued_inst_exec_type != exec_unit_type_t::INT);
-              if (int_pipe_avail) {
-                // issue
-                issue_warp(*m_int_out, entry, sched_id);
-                previous_issued_inst_exec_type = exec_unit_type_t::INT;
-                std::cout << "int_pipe_avail: " << int_pipe_avail << std::endl;
-              }
-              break;
-            case DP_UNIT:
-              std::cout << "DP_UNIT" << std::endl;
-              dp_pipe_avail = 
-                (m_hw_cfg->get_num_dp_units() > 0) &&
-                m_dp_out->has_free(m_hw_cfg->get_sub_core_model(), 
-                                   sched_id);
-              std::cout << "dp_pipe_avail: " << dp_pipe_avail << std::endl;
-              break;
-            case TENSOR_CORE_UNIT:
-              std::cout << "TENSOR_CORE_UNIT" << std::endl;
-              tensor_core_pipe_avail = 
-                (m_hw_cfg->get_num_tensor_core_units() > 0) &&
-                m_tensor_core_out->has_free(m_hw_cfg->get_sub_core_model(), 
-                                            sched_id);
-              std::cout << "tensor_pipe_avail: " << tensor_core_pipe_avail << std::endl;
-              break;
-            case LDST_UNIT:
-              std::cout << "LDST_UNIT" << std::endl;
-              ldst_pipe_avail = 
-                ( 1 ) &&
-                m_mem_out->has_free(m_hw_cfg->get_sub_core_model(), 
+                  (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
+                  previous_issued_inst_exec_type != exec_unit_type_t::SP);
+                std::cout << "sp_pipe_avail: " << sp_pipe_avail << std::endl;
+                if (sp_pipe_avail) {
+                  // issue
+                  warp_inst_issued = true;
+                  issued_num++;
+                  issue_warp(*m_sp_out, entry, sched_id);
+                  previous_issued_inst_exec_type = exec_unit_type_t::SP;
+                  
+                  m_sp_out->print();
+                }
+                break;
+              case SFU_UNIT:
+                std::cout << "SFU_UNIT" << std::endl;
+                sfu_pipe_avail = 
+                  (m_hw_cfg->get_num_sfu_units() > 0) &&
+                  m_sfu_out->has_free(m_hw_cfg->get_sub_core_model(), 
+                                      sched_id) &&
+                  (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
+                  previous_issued_inst_exec_type != exec_unit_type_t::SFU);
+                std::cout << "sfu_pipe_avail: " << sfu_pipe_avail << std::endl;
+                if (sfu_pipe_avail) {
+                  // issue
+                  warp_inst_issued = true;
+                  issued_num++;
+                  issue_warp(*m_sfu_out, entry, sched_id);
+                  previous_issued_inst_exec_type = exec_unit_type_t::SFU;
+                  
+                  m_sfu_out->print();
+                }
+                break;
+              case INT_UNIT:
+                std::cout << "INT_UNIT" << std::endl;
+                int_pipe_avail = 
+                  (m_hw_cfg->get_num_int_units() > 0) &&
+                  m_int_out->has_free(m_hw_cfg->get_sub_core_model(), 
+                                      sched_id) &&
+                  (!m_hw_cfg->get_dual_issue_diff_exec_units() || 
+                  previous_issued_inst_exec_type != exec_unit_type_t::INT);
+                std::cout << "  int_pipe_avail: " << int_pipe_avail << std::endl;
+                if (int_pipe_avail) {
+                  // issue
+                  warp_inst_issued = true;
+                  issued_num++;
+                  issue_warp(*m_int_out, entry, sched_id);
+                  previous_issued_inst_exec_type = exec_unit_type_t::INT;
+                  
+                  m_int_out->print();
+                }
+                break;
+              case DP_UNIT:
+                std::cout << "DP_UNIT" << std::endl;
+                dp_pipe_avail = 
+                  (m_hw_cfg->get_num_dp_units() > 0) &&
+                  m_dp_out->has_free(m_hw_cfg->get_sub_core_model(), 
                                     sched_id) &&
-                (!m_hw_cfg->get_dual_issue_diff_exec_units() || 
-                 previous_issued_inst_exec_type != exec_unit_type_t::LDST);
-              if (ldst_pipe_avail) {
-                // issue
-                issue_warp(*m_mem_out, entry, sched_id);
-                previous_issued_inst_exec_type = exec_unit_type_t::LDST;
-                std::cout << "ldst_pipe_avail: " << ldst_pipe_avail << std::endl;
+                  (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
+                  previous_issued_inst_exec_type != exec_unit_type_t::DP);
+                std::cout << "  dp_pipe_avail: " << dp_pipe_avail << std::endl;
+                if (dp_pipe_avail) {
+                  // issue
+                  warp_inst_issued = true;
+                  issued_num++;
+                  issue_warp(*m_dp_out, entry, sched_id);
+                  previous_issued_inst_exec_type = exec_unit_type_t::DP;
+                  
+                  m_dp_out->print();
+                }
+                break;
+              case TENSOR_CORE_UNIT:
+                std::cout << "TENSOR_CORE_UNIT" << std::endl;
+                tensor_core_pipe_avail = 
+                  (m_hw_cfg->get_num_tensor_core_units() > 0) &&
+                  m_tensor_core_out->has_free(m_hw_cfg->get_sub_core_model(), 
+                                              sched_id) &&
+                  (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
+                  previous_issued_inst_exec_type != exec_unit_type_t::TENSOR);
+                std::cout << "  tensor_core_pipe_avail: " << tensor_core_pipe_avail << std::endl;
+                if (tensor_core_pipe_avail) {
+                  // issue
+                  warp_inst_issued = true;
+                  issued_num++;
+                  issue_warp(*m_tensor_core_out, entry, sched_id);
+                  previous_issued_inst_exec_type = exec_unit_type_t::TENSOR;
+                  
+                  m_tensor_core_out->print();
+                }
+                break;
+              case LDST_UNIT:
+                std::cout << "LDST_UNIT" << std::endl;
+                ldst_pipe_avail = 
+                  m_mem_out->has_free(m_hw_cfg->get_sub_core_model(), 
+                                      sched_id) &&
+                  (!m_hw_cfg->get_dual_issue_diff_exec_units() || 
+                  previous_issued_inst_exec_type != exec_unit_type_t::LDST);
+                std::cout << "  ldst_pipe_avail: " << ldst_pipe_avail << std::endl;
+                if (ldst_pipe_avail) {
+                  // issue
+                  warp_inst_issued = true;
+                  issued_num++;
+                  issue_warp(*m_mem_out, entry, sched_id);
+                  previous_issued_inst_exec_type = exec_unit_type_t::LDST;
+                  
+                  m_mem_out->print();
+                }
+                break;
+              case SPEC_UNIT_1:
+                std::cout << "SPEC_UNIT_1" << std::endl;
+                spec_1_pipe_avail = 
+                  (m_hw_cfg->get_specialized_unit_1_enabled()) &&
+                  m_spec_cores_out[0]->has_free(m_hw_cfg->get_sub_core_model(), 
+                                                sched_id) &&
+                  (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
+                  previous_issued_inst_exec_type != exec_unit_type_t::SPECIALIZED);
+                std::cout << "  spec_1_pipe_avail: " << spec_1_pipe_avail << std::endl;
+                if (spec_1_pipe_avail) {
+                  // issue
+                  warp_inst_issued = true;
+                  issued_num++;
+                  issue_warp(*m_spec_cores_out[0], entry, sched_id);
+                  previous_issued_inst_exec_type = exec_unit_type_t::SPECIALIZED;
+                  
+                  m_spec_cores_out[0]->print();
+                }
+                break;
+              case SPEC_UNIT_2:
+                std::cout << "SPEC_UNIT_2" << std::endl;
+                spec_2_pipe_avail = 
+                  (m_hw_cfg->get_specialized_unit_2_enabled()) &&
+                  m_spec_cores_out[1]->has_free(m_hw_cfg->get_sub_core_model(), 
+                                                sched_id) &&
+                  (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
+                  previous_issued_inst_exec_type != exec_unit_type_t::SPECIALIZED);
+                std::cout << "  spec_2_pipe_avail: " << spec_2_pipe_avail << std::endl;
+                if (spec_2_pipe_avail) {
+                  // issue
+                  warp_inst_issued = true;
+                  issued_num++;
+                  issue_warp(*m_spec_cores_out[1], entry, sched_id);
+                  previous_issued_inst_exec_type = exec_unit_type_t::SPECIALIZED;
+                  
+                  m_spec_cores_out[1]->print();
+                }
+                break;
+              case SPEC_UNIT_3:
+                std::cout << "SPEC_UNIT_3" << std::endl;
+                spec_3_pipe_avail = 
+                  (m_hw_cfg->get_specialized_unit_3_enabled()) &&
+                  m_spec_cores_out[2]->has_free(m_hw_cfg->get_sub_core_model(), 
+                                                sched_id) &&
+                  (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
+                  previous_issued_inst_exec_type != exec_unit_type_t::SPECIALIZED);
+                std::cout << "  spec_3_pipe_avail: " << spec_3_pipe_avail << std::endl;
+                if (spec_3_pipe_avail) {
+                  // issue
+                  warp_inst_issued = true;
+                  issued_num++;
+                  issue_warp(*m_spec_cores_out[2], entry, sched_id);
+                  previous_issued_inst_exec_type = exec_unit_type_t::SPECIALIZED;
+                  
+                  m_spec_cores_out[2]->print();
+                }
+                break;
+              default:
+                std::cout << "default UNIT" << std::endl;
+                assert(0);
+            }
+
+
+
+            // traverse m_pipeline_reg
+            if (false) {
+              std::cout << "==================================================" << std::endl;
+              for (auto it = m_pipeline_reg.begin(); it != m_pipeline_reg.end(); it++) {
+                std::cout << "  ||name: " << it->get_name() << std::endl;
+                std::cout << "    has_ready: " << it->has_ready() << std::endl;
+                std::cout << "    has_free: " << it->has_free() << std::endl;
               }
-              break;
-            case SPEC_UNIT_1:
-              std::cout << "SPEC_UNIT_1" << std::endl;
-              spec_1_pipe_avail = 
-                (m_hw_cfg->get_specialized_unit_1_enabled()) &&
-                m_spec_cores_out[0]->has_free(m_hw_cfg->get_sub_core_model(), 
-                                              sched_id);
-              std::cout << "spec_1_pipe_avail: " << spec_1_pipe_avail << std::endl;
-              break;
-            case SPEC_UNIT_2:
-              std::cout << "SPEC_UNIT_2" << std::endl;
-              spec_2_pipe_avail = 
-                (m_hw_cfg->get_specialized_unit_2_enabled()) &&
-                m_spec_cores_out[1]->has_free(m_hw_cfg->get_sub_core_model(), 
-                                              sched_id);
-              std::cout << "spec_2_pipe_avail: " << spec_2_pipe_avail << std::endl;
-              break;
-            case SPEC_UNIT_3:
-              std::cout << "SPEC_UNIT_3" << std::endl;
-              spec_3_pipe_avail = 
-                (m_hw_cfg->get_specialized_unit_3_enabled()) &&
-                m_spec_cores_out[2]->has_free(m_hw_cfg->get_sub_core_model(), 
-                                              sched_id);
-              std::cout << "spec_3_pipe_avail: " << spec_3_pipe_avail << std::endl;
-              break;
-            default:
-              std::cout << "default UNIT" << std::endl;
-              break;
+
+
+              std::cout << "  ||name: " << m_sp_out->get_name() << std::endl;
+              std::cout << "    has_ready: " << m_sp_out->has_ready() << std::endl;
+              std::cout << "    has_free: " << m_sp_out->has_free() << std::endl;
+              // m_sp_out->print();
+              std::cout << "  ||name: " << m_dp_out->get_name() << std::endl;
+              std::cout << "    has_ready: " << m_dp_out->has_ready() << std::endl;
+              std::cout << "    has_free: " << m_dp_out->has_free() << std::endl;
+              // m_dp_out->print();
+              std::cout << "  ||name: " << m_sfu_out->get_name() << std::endl;
+              std::cout << "    has_ready: " << m_sfu_out->has_ready() << std::endl;
+              std::cout << "    has_free: " << m_sfu_out->has_free() << std::endl;
+              // m_sfu_out->print();
+              std::cout << "  ||name: " << m_int_out->get_name() << std::endl;
+              std::cout << "    has_ready: " << m_int_out->has_ready() << std::endl;
+              std::cout << "    has_free: " << m_int_out->has_free() << std::endl;
+              // m_int_out->print();
+              std::cout << "  ||name: " << m_tensor_core_out->get_name() << std::endl;
+              std::cout << "    has_ready: " << m_tensor_core_out->has_ready() << std::endl;
+              std::cout << "    has_free: " << m_tensor_core_out->has_free() << std::endl;
+              // m_tensor_core_out->print();
+              std::cout << "  ||name: " << m_mem_out->get_name() << std::endl;
+              std::cout << "    has_ready: " << m_mem_out->has_ready() << std::endl;
+              std::cout << "    has_free: " << m_mem_out->has_free() << std::endl;
+              // m_mem_out->print();
+              std::cout << "  ||name: " << m_spec_cores_out[0]->get_name() << std::endl;
+              std::cout << "    has_ready: " << m_spec_cores_out[0]->has_ready() << std::endl;
+              std::cout << "    has_free: " << m_spec_cores_out[0]->has_free() << std::endl;
+              // m_spec_cores_out[0]->print();
+              std::cout << "  ||name: " << m_spec_cores_out[1]->get_name() << std::endl;
+              std::cout << "    has_ready: " << m_spec_cores_out[1]->has_ready() << std::endl;
+              std::cout << "    has_free: " << m_spec_cores_out[1]->has_free() << std::endl;
+              // m_spec_cores_out[1]->print();
+              std::cout << "  ||name: " << m_spec_cores_out[2]->get_name() << std::endl;
+              std::cout << "    has_ready: " << m_spec_cores_out[2]->has_ready() << std::endl;
+              std::cout << "    has_free: " << m_spec_cores_out[2]->has_free() << std::endl;
+              // m_spec_cores_out[2]->print();
+              std::cout << "==================================================" << std::endl;
+            }
+            
           }
 
+          if (warp_inst_issued) {
+            m_ibuffer->pop_front(global_all_kernels_warp_id);
+            // check_is_scoreboard_collision = 
+            //   m_scoreboard->checkCollision(global_all_kernels_warp_id, 
+            //                                regnums, 
+            //                                /* set PRED+NUM_OFFSET to avoid collision with regnums */
+            //                                pred + PRED_NUM_OFFSET, 
+            //                                ar1,
+            //                                ar2);
 
+            // reserveRegisters(const unsigned wid, std::vector<int> regnums, bool is_load)
 
-          // traverse m_pipeline_reg
-          for (auto it = m_pipeline_reg.begin(); it != m_pipeline_reg.end(); it++) {
-            std::cout << "||name: " << it->get_name() << std::endl;
-            std::cout << "  has_ready: " << it->has_ready() << std::endl;
-            std::cout << "  has_free: " << it->has_free() << std::endl;
-            // it->print();
+            regnums.push_back((pred < 0) ? pred : pred + PRED_NUM_OFFSET);
+            regnums.push_back(ar1);
+            regnums.push_back(ar2);
+            m_scoreboard->reserveRegisters(global_all_kernels_warp_id, regnums, false);
+            m_scoreboard->printContents();
           }
 
-          /*
-          register_set* m_sp_out = &m_pipeline_reg[ID_OC_SP];
-          register_set* m_dp_out = &m_pipeline_reg[ID_OC_DP];
-          register_set* m_sfu_out = &m_pipeline_reg[ID_OC_SFU];
-          register_set* m_int_out = &m_pipeline_reg[ID_OC_INT];
-          register_set* m_tensor_core_out = &m_pipeline_reg[ID_OC_TENSOR_CORE];
-          register_set* m_spec_cores_out = m_specilized_dispatch_reg;
-          register_set* m_mem_out = &m_pipeline_reg[ID_OC_MEM];
-          */
-
-          std::cout << "||name: " << m_sp_out->get_name() << std::endl;
-          std::cout << "  has_ready: " << m_sp_out->has_ready() << std::endl;
-          std::cout << "  has_free: " << m_sp_out->has_free() << std::endl;
-          // m_sp_out->print();
-          std::cout << "||name: " << m_dp_out->get_name() << std::endl;
-          std::cout << "  has_ready: " << m_dp_out->has_ready() << std::endl;
-          std::cout << "  has_free: " << m_dp_out->has_free() << std::endl;
-          // m_dp_out->print();
-          std::cout << "||name: " << m_sfu_out->get_name() << std::endl;
-          std::cout << "  has_ready: " << m_sfu_out->has_ready() << std::endl;
-          std::cout << "  has_free: " << m_sfu_out->has_free() << std::endl;
-          // m_sfu_out->print();
-          std::cout << "||name: " << m_int_out->get_name() << std::endl;
-          std::cout << "  has_ready: " << m_int_out->has_ready() << std::endl;
-          std::cout << "  has_free: " << m_int_out->has_free() << std::endl;
-          // m_int_out->print();
-          std::cout << "||name: " << m_tensor_core_out->get_name() << std::endl;
-          std::cout << "  has_ready: " << m_tensor_core_out->has_ready() << std::endl;
-          std::cout << "  has_free: " << m_tensor_core_out->has_free() << std::endl;
-          // m_tensor_core_out->print();
-          std::cout << "||name: " << m_mem_out->get_name() << std::endl;
-          std::cout << "  has_ready: " << m_mem_out->has_ready() << std::endl;
-          std::cout << "  has_free: " << m_mem_out->has_free() << std::endl;
-          // m_mem_out->print();
-          std::cout << "||name: " << m_spec_cores_out[0]->get_name() << std::endl;
-          std::cout << "  has_ready: " << m_spec_cores_out[0]->has_ready() << std::endl;
-          std::cout << "  has_free: " << m_spec_cores_out[0]->has_free() << std::endl;
-          // m_spec_cores_out[0]->print();
-          std::cout << "||name: " << m_spec_cores_out[1]->get_name() << std::endl;
-          std::cout << "  has_ready: " << m_spec_cores_out[1]->has_ready() << std::endl;
-          std::cout << "  has_free: " << m_spec_cores_out[1]->has_free() << std::endl;
-          // m_spec_cores_out[1]->print();
-          std::cout << "||name: " << m_spec_cores_out[2]->get_name() << std::endl;
-          std::cout << "  has_ready: " << m_spec_cores_out[2]->has_ready() << std::endl;
-          std::cout << "  has_free: " << m_spec_cores_out[2]->has_free() << std::endl;
-          // m_spec_cores_out[2]->print();
-
-          
+          checked_num++;
         }
       }
 
@@ -779,6 +980,9 @@ void PrivateSM::run(){
         }
         
         if (fetch_instn) break;
+        else {
+          std::cout << "    No FETCH" << std::endl;
+        }
 
       }
 
