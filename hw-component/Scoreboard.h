@@ -4,6 +4,7 @@
 #include <set>
 #include <vector>
 #include <iostream>
+#include <algorithm>
 
 #ifndef SCOREBOARD_H
 #define SCOREBOARD_H
