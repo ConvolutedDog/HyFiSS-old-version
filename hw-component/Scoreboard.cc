@@ -46,10 +46,16 @@ const bool Scoreboard::islongop(const unsigned wid, const int regnum) {
 
 /* For pred registers, we reserve [65536 + pred] into reg_table and longopregs. */
 void Scoreboard::reserveRegisters(const unsigned wid, std::vector<int> regnums, bool is_load) {
+  std::vector<int> prev_regs;
+  // if regnums[r] is in prev_regs, we do not add it to scoreboard
+  // else we add it to scoreboard, and add it to prev_regs
   for (unsigned r = 0; r < regnums.size(); r++) {
     if (regnums[r] > 0) {
-      std::cout << "  reserve register: " << regnums[r] << std::endl;
-      reserveRegister(wid, regnums[r]);
+      if (std::find(prev_regs.begin(), prev_regs.end(), regnums[r]) == prev_regs.end()) {
+        prev_regs.push_back(regnums[r]);
+        std::cout << "  reserve register: " << regnums[r] << std::endl;
+        reserveRegister(wid, regnums[r]);
+      }
     }
   }
 
