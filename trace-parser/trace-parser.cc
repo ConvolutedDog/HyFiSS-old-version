@@ -574,6 +574,7 @@ void trace_parser::kernel_finalizer(kernel_trace_t *trace_info) {
 
 trace_parser::trace_parser(const char *input_configs_filepath) {
   configs_filepath = input_configs_filepath;
+  m_valid = true;
 }
 
 #include <unistd.h>
