@@ -299,15 +299,31 @@ class opndcoll_rfu_t {  // operand collector based register file unit
     }
 
     ~arbiter_t() {
-      // if (m_queue) delete[] m_queue;
-      // if (m_allocated_bank) delete[] m_allocated_bank;
-      // if (m_allocator_rr_head) delete[] m_allocator_rr_head;
-      // if (_inmatch) delete[] _inmatch;
-      // if (_outmatch) delete[] _outmatch;
-      // if (_request) {
-      //   for (unsigned i = 0; i < m_num_banks; i++) delete[] _request[i];
-      //   delete[] _request;
-      // }
+      if (m_queue) {
+        delete[] m_queue;
+        m_queue = nullptr;
+      }
+      if (m_allocated_bank) {
+        delete[] m_allocated_bank;
+        m_allocated_bank = nullptr;
+      }
+      if (m_allocator_rr_head) {
+        delete[] m_allocator_rr_head;
+        m_allocator_rr_head = nullptr;
+      }
+      if (_inmatch) {
+        delete[] _inmatch;
+        _inmatch = nullptr;
+      }
+      if (_outmatch) {
+        delete[] _outmatch;
+        _outmatch = nullptr;
+      }
+      if (_request) {
+        for (unsigned i = 0; i < m_num_banks; i++) delete[] _request[i];
+        delete[] _request;
+        _request = nullptr;
+      }
     }
     void init(unsigned num_cu, unsigned num_banks) {
       std::cout << "arbiter_t::init " 
@@ -479,8 +495,18 @@ class opndcoll_rfu_t {  // operand collector based register file unit
       m_hw_cfg = hw_cfg;
     }
     ~collector_unit_t() { 
-      // delete[] m_src_op; 
-      // delete m_warp;
+      for (unsigned i = 0; i < MAX_REG_OPERANDS * 2; i++) {
+        m_src_op[i] = op_t();
+      }
+      if (m_src_op) {
+        
+        delete[] m_src_op;
+        m_src_op = nullptr;
+      }
+      if (m_warp) {
+        delete m_warp;
+        m_warp = nullptr;
+      }
     }
     // accessors
     bool ready() const;
