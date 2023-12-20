@@ -521,6 +521,7 @@ class trace_parser {
   trace_parser(const char *input_configs_filepath, hw_config* hw_cfg) {
     configs_filepath = input_configs_filepath;
     this->hw_cfg = hw_cfg;
+    m_valid = true;
   }
   
   void parse_configs_file(bool PRINT_LOG);
@@ -571,6 +572,8 @@ class trace_parser {
     return conpute_instns[kernel_id][warp_id].size();
   }
 
+  bool get_m_valid() { return m_valid; }
+
  private:
   /* configs_filepath is path to kernelslist.g */
   std::string configs_filepath;
@@ -593,6 +596,8 @@ class trace_parser {
 
   /* concurrent idx -> vector<kernel_id> */
   std::vector<std::vector<int>> concurrent_kernels;
+
+  bool m_valid = false;
 };
 
 #endif
