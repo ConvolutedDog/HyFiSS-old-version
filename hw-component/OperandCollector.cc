@@ -30,7 +30,9 @@ void opndcoll_rfu_t::add_cu_set(unsigned set_id, unsigned num_cu,
                                   // from being invalid do to a resize;
   for (unsigned i = 0; i < num_cu; i++) {
     // m_cus[set_id].push_back(collector_unit_t());
-    m_cus[set_id].push_back(collector_unit_t(m_hw_cfg, m_tracer));
+    std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@" << std::endl;
+    // m_cus[set_id].push_back(*(new collector_unit_t(m_hw_cfg, m_tracer)));
+    m_cus[set_id].emplace_back(m_hw_cfg, m_tracer);
     m_cu.push_back(&m_cus[set_id].back());
     std::cout << "add_cu_set: " << i << " num_cu: " << num_cu << std::endl;
   }
