@@ -15,7 +15,7 @@ else
 CXX = g++
 endif
 
-CXXFLAGS = -Wall -finline-functions -funswitch-loops -fgcse-after-reload -fomit-frame-pointer -fprofile-arcs -freg-struct-return -mfpmath=sse -malign-double -msseregparm
+CXXFLAGS = -Wall -finline-functions -funswitch-loops
 
 # Detect Support for C++11 (C++0x) from GCC Version 
 GNUC_CPP0X := $(shell mpic++ --version | perl -ne 'if (/g++\s+\(.*\)\s+([0-9.]+)/){ if($$1 >= 4.3) {$$n=1} else {$$n=0;} } END { print $$n; }')
@@ -55,7 +55,7 @@ endif
 OBJS = $(OBJ_PATH)/splay.o $(OBJ_PATH)/process_args.o $(OBJ_PATH)/parda_print.o $(OBJ_PATH)/narray.o $(OBJ_PATH)/parda.o
 OBJS += $(OBJ_PATH)/hw-parser.o $(OBJ_PATH)/Scoreboard.o $(OBJ_PATH)/RegisterBankAllocator.o
 OBJS += $(OBJ_PATH)/IBuffer.o 
-OBJS += $(OBJ_PATH)/PrivateSM.o
+OBJS += $(OBJ_PATH)/PrivateSM.o $(OBJ_PATH)/OperandCollector.o
 OBJS += $(OBJ_PATH)/hw-stt.o $(OBJ_PATH)/inst-stt.o 
 OBJS += $(OBJ_PATH)/memory-space.o $(OBJ_PATH)/inst-memadd-info.o $(OBJ_PATH)/sass-inst.o $(OBJ_PATH)/inst-trace.o
 OBJS += $(OBJ_PATH)/kernel-trace.o $(OBJ_PATH)/mem-access.o $(OBJ_PATH)/kernel-info.o $(OBJ_PATH)/trace-warp-inst.o
@@ -100,6 +100,9 @@ $(OBJ_PATH)/RegisterBankAllocator.o: hw-component/RegisterBankAllocator.cc
 	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
 
 $(OBJ_PATH)/IBuffer.o: hw-component/IBuffer.cc
+	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
+
+$(OBJ_PATH)/OperandCollector.o: hw-component/OperandCollector.cc
 	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
 
 $(OBJ_PATH)/PrivateSM.o: hw-component/PrivateSM.cc
