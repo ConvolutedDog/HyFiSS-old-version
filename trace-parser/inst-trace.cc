@@ -124,7 +124,7 @@ enum FUNC_UNITS_NAME _inst_trace_t::get_func_unit() const {
 }
 
 void _inst_trace_t::parse_opcode_latency_info() {
-  std::cout << "@@@@@@ " << opcode_tokens[0] << std::endl;
+  // std::cout << "@@@@@@ " << opcode_tokens[0] << std::endl;
   auto it = Volta_OpcodeMap.find(opcode_tokens[0]);
   if (it == Volta_OpcodeMap.end()) {
     std::cout << "ERROR: opcode " << opcode << " not found in Volta_OpcodeMap" << std::endl;
@@ -135,14 +135,15 @@ void _inst_trace_t::parse_opcode_latency_info() {
     func_unit = NON_UNIT;
     
     auto category = it->second.opcode_category;
-    std::cout << " SP_OP: " << SP_OP 
-              << " DP_OP: " << DP_OP 
-              << " SFU_OP: " << SFU_OP 
-              << " INTP_OP: " << INTP_OP
-              << " SPECIALIZED_UNIT_1_OP: " << SPECIALIZED_UNIT_1_OP
-              << " SPECIALIZED_UNIT_2_OP: " << SPECIALIZED_UNIT_2_OP
-              << " SPECIALIZED_UNIT_3_OP: " << SPECIALIZED_UNIT_3_OP << std::endl;
-    std::cout << " category: " << category << std::endl;
+    // std::cout << " SP_OP: " << SP_OP 
+    //           << " DP_OP: " << DP_OP 
+    //           << " SFU_OP: " << SFU_OP 
+    //           << " INTP_OP: " << INTP_OP
+    //           << " SPECIALIZED_UNIT_1_OP: " << SPECIALIZED_UNIT_1_OP
+    //           << " SPECIALIZED_UNIT_2_OP: " << SPECIALIZED_UNIT_2_OP
+    //           << " SPECIALIZED_UNIT_3_OP: " << SPECIALIZED_UNIT_3_OP << std::endl;
+    // std::cout << " category: " << category << std::endl;
+    
     // std::cout << hw_cfg->get_opcode_latency_initiation_int(0) << std::endl;
     // std::cout << hw_cfg->get_opcode_latency_initiation_int(1) << std::endl;
 
@@ -198,7 +199,7 @@ void _inst_trace_t::parse_opcode_latency_info() {
         break;
     }
 
-    std::cout << "  latency: " << latency << " initiation_interval: " << initiation_interval << std::endl;
+    // std::cout << "  latency: " << latency << " initiation_interval: " << initiation_interval << std::endl;
   }
 }
 
