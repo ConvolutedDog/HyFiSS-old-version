@@ -13,6 +13,8 @@
 #include "../trace-driven/entry.h"
 #include "../trace-driven/register-set.h"
 
+#include "OperandCollector.h"
+
 #ifndef PRIVATESM_H
 #define PRIVATESM_H
 
@@ -80,6 +82,8 @@ class PrivateSM {
 
   unsigned get_num_warps_per_sm(unsigned kernel_id);
 
+  hw_config* get_hw_cfg() { return m_hw_cfg; }
+  trace_parser* get_tracer() { return tracer; }
   /*
   在V100配置中，m_num_banks被初始化为16。m_bank_warp_shift被初始化为5。由于在操作数
   收集器的寄存器文件中，warp0的r0寄存器放在0号bank，...，warp0的r15寄存器放在15号bank，
@@ -110,6 +114,8 @@ class PrivateSM {
   unsigned get_reg_file_port_throughput();
 
   void issue_warp(register_set &pipe_reg_set, ibuffer_entry entry, unsigned sch_id);
+
+  RegisterBankAllocator* get_reg_bank_allocator() { return m_reg_bank_allocator; }
 
  private:
   unsigned m_smid;
@@ -161,6 +167,8 @@ class PrivateSM {
   int last_issue_sched_id;
   std::vector<int> last_issue_warp_ids;
   RegisterBankAllocator* m_reg_bank_allocator;
+
+  opndcoll_rfu_t* m_operand_collector;
 
   /* curr_instn_id_per_warp stores the current instn id of each warp */
   std::map<curr_instn_id_per_warp_entry, unsigned> curr_instn_id_per_warp;
