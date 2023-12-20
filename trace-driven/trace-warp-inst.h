@@ -173,6 +173,8 @@ class trace_warp_inst_t {
   unsigned get_warp_id() const { return m_warp_id; }
   unsigned get_dynamic_warp_id() const { return m_dynamic_warp_id; }
   active_mask_t get_active_mask() const { return m_warp_active_mask; }
+  active_mask_t& get_active_mask_ref() { return m_warp_active_mask; }
+  unsigned get_activate_count() const { return m_warp_active_mask.count(); }
   /***************************************************************************/
 
  private:
