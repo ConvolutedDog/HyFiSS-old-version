@@ -130,6 +130,11 @@ class register_set {
     dest->kid = src->kid;
     dest->uid = src->uid;
     dest->m_valid = true;
+    std::cout << "    dest: " 
+                          << dest->kid << ", " 
+                          << dest->pc << ", " 
+                          << dest->wid << ", " 
+                          << dest->uid << std::endl;
     // src->clear();
   }
 
@@ -168,6 +173,7 @@ class register_set {
   void move_out_to(inst_fetch_buffer_entry *&dest) {
     inst_fetch_buffer_entry **ready = get_ready();
     move_warp(dest, *ready);
+    (*ready)->m_valid = false;
   }
   //依据寄存器编号reg_id，获取一个非空寄存器，并将其指令移出到dest。
   void move_out_to(bool sub_core_model, unsigned reg_id, inst_fetch_buffer_entry *&dest) {
@@ -254,6 +260,18 @@ class register_set {
   }
   //返回寄存器集合的大小。
   unsigned get_size() { return regs.size(); }
+  void print_regs(unsigned reg_id) {
+    std::cout << "    pipeline_reg[" << m_name << "] : @ " << this << std::endl;
+    std::cout << "     ";
+    if (regs[reg_id]->m_valid) {
+      std::cout << "    valid: ";
+      std::cout << "pc: " << regs[reg_id]->pc << ", wid: " << regs[reg_id]->wid 
+                << ", kid: " << regs[reg_id]->kid << ", uid: " << regs[reg_id]->uid;
+    } else {
+      std::cout << "    novalid      ";
+    }
+    std::cout << std::endl;
+  }
 
  private:
   //将寄存器集合中的所有寄存器用一个向量保存。
