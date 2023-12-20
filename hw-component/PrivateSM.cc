@@ -167,6 +167,57 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
   }
   m_mem_out = &m_pipeline_reg[ID_OC_MEM];
 
+  // op collector configuration
+  enum { SP_CUS, DP_CUS, SFU_CUS, TENSOR_CORE_CUS, INT_CUS, MEM_CUS, GEN_CUS };
+  
+  opndcoll_rfu_t::port_vector_t in_ports;
+  opndcoll_rfu_t::port_vector_t out_ports;
+  opndcoll_rfu_t::uint_vector_t cu_sets;
+
+  m_operand_collector = new opndcoll_rfu_t(m_hw_cfg, m_reg_bank_allocator, this->tracer);
+
+
+  // configure generic collectors
+  m_operand_collector->add_cu_set(
+      GEN_CUS, hw_cfg->get_operand_collector_num_units_gen(),
+      hw_cfg->get_operand_collector_num_out_ports_gen());
+
+  for (unsigned i = 0; i < hw_cfg->get_operand_collector_num_in_ports_gen();
+       i++) {
+    in_ports.push_back(&m_pipeline_reg[ID_OC_SP]);
+    in_ports.push_back(&m_pipeline_reg[ID_OC_SFU]);
+    in_ports.push_back(&m_pipeline_reg[ID_OC_MEM]);
+    out_ports.push_back(&m_pipeline_reg[OC_EX_SP]);
+    out_ports.push_back(&m_pipeline_reg[OC_EX_SFU]);
+    out_ports.push_back(&m_pipeline_reg[OC_EX_MEM]);
+    if (1) {
+      in_ports.push_back(&m_pipeline_reg[ID_OC_TENSOR_CORE]);
+      out_ports.push_back(&m_pipeline_reg[OC_EX_TENSOR_CORE]);
+    }
+    if (hw_cfg->get_num_dp_units() > 0) {
+      in_ports.push_back(&m_pipeline_reg[ID_OC_DP]);
+      out_ports.push_back(&m_pipeline_reg[OC_EX_DP]);
+    }
+    if (hw_cfg->get_num_int_units() > 0) {
+      in_ports.push_back(&m_pipeline_reg[ID_OC_INT]);
+      out_ports.push_back(&m_pipeline_reg[OC_EX_INT]);
+    }
+    if (hw_cfg->get_specialized_unit_size() > 0) {
+      for (unsigned j = 0; j < hw_cfg->get_specialized_unit_size(); ++j) {
+        in_ports.push_back(
+            &m_pipeline_reg[N_PIPELINE_STAGES + 0 + j]);
+        out_ports.push_back(
+            &m_pipeline_reg[N_PIPELINE_STAGES + 3 + j]);
+      }
+    }
+    cu_sets.push_back((unsigned)GEN_CUS);
+    m_operand_collector->add_port(in_ports, out_ports, cu_sets);
+    in_ports.clear(), out_ports.clear(), cu_sets.clear();
+  }
+
+  
+  m_operand_collector->init(m_hw_cfg, m_reg_bank_allocator, this->tracer);
+  
 }
 
 /* Here, wid is local wid. */
@@ -196,6 +247,7 @@ PrivateSM::~PrivateSM() {
   delete m_inst_fetch_buffer;
   delete m_scoreboard;
   delete m_reg_bank_allocator;
+  delete m_operand_collector;
   /*
   register_set* m_sp_out;// = &m_pipeline_reg[ID_OC_SP];
   register_set* m_dp_out;// = &m_pipeline_reg[ID_OC_DP];
@@ -466,8 +518,8 @@ void PrivateSM::run(){
     /**********************************************************************************************/
     for (unsigned _iter = 0; _iter < get_reg_file_port_throughput(); _iter++) {
       std::cout << "  Read Operands: " << "reg_file_port_idx: " << _iter << std::endl;
+      m_operand_collector->step();
       
-
 
 
 
@@ -494,7 +546,7 @@ void PrivateSM::run(){
 
     for (unsigned _sched_id = 0; _sched_id < num_scheds; _sched_id++) {
       auto sched_id = (last_issue_sched_id + _sched_id) % num_scheds;
-      std::cout << "D: sched_id: " << sched_id << std::endl;
+      std::cout << "    D: issue sched_id: " << sched_id << std::endl;
       
       
       // LRR warp sheduling
@@ -604,7 +656,10 @@ void PrivateSM::run(){
             std::cout << "  check_is_scoreboard_collision: " 
                       << check_is_scoreboard_collision << std::endl;
             
-            if (check_is_scoreboard_collision) continue;
+            if (check_is_scoreboard_collision) {
+              checked_num++;
+              continue;
+            }
             
             // get the function unit of the instn
             auto fu = tmp_inst_trace->get_func_unit();
@@ -876,8 +931,9 @@ void PrivateSM::run(){
             //                                ar2);
 
             // reserveRegisters(const unsigned wid, std::vector<int> regnums, bool is_load)
-
-            regnums.push_back((pred < 0) ? pred : pred + PRED_NUM_OFFSET);
+            
+            regnums.push_back((pred < 0) ? pred : pred + PRED_NUM_OFFSET); 
+            // BUG: need to change pred < 0 to "P?"
             regnums.push_back(ar1);
             regnums.push_back(ar2);
             m_scoreboard->reserveRegisters(global_all_kernels_warp_id, regnums, false);
