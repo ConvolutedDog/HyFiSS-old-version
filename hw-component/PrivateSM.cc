@@ -513,25 +513,32 @@ void PrivateSM::run(){
 
     /**********************************************************************************************/
     /***                                                                                        ***/
+    /***                                         Execute.                                       ***/
+    /***                                                                                        ***/
+    /**********************************************************************************************/
+    
+    std::vector<opndcoll_rfu_t::input_port_t>* m_in_ports_ptr = m_operand_collector->get_m_in_ports();
+    for (unsigned p = 0; p < m_in_ports_ptr->size(); p++) {
+      opndcoll_rfu_t::input_port_t &inp = (*m_in_ports_ptr)[p];
+      std::cout << "  Execute: " << "port_idx: " << p << std::endl;
+      for (unsigned i = 0; i < inp.m_out.size(); i++) {
+        if ((*inp.m_out[i]).has_ready()) {
+          // print the ready instn
+          std::cout << "  Ready instn in inp.m_out[" << i << "]: " << std::endl;
+          (*inp.m_out[i]).print();
+        }
+      }
+    }
+    
+
+    /**********************************************************************************************/
+    /***                                                                                        ***/
     /***                                      Read Operands.                                    ***/
     /***                                                                                        ***/
     /**********************************************************************************************/
     for (unsigned _iter = 0; _iter < get_reg_file_port_throughput(); _iter++) {
       std::cout << "  Read Operands: " << "reg_file_port_idx: " << _iter << std::endl;
       m_operand_collector->step();
-      
-
-
-
-
-
-
-
-
-
-
-
-
     }
 
 
