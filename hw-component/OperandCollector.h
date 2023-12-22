@@ -85,6 +85,8 @@ class opndcoll_rfu_t {  // operand collector based register file unit
 
   // PrivateSM *shader_core() { return m_shader; }
 
+  
+
  private:
   void process_banks() { m_arbiter.reset_alloction(); }
 
@@ -453,6 +455,7 @@ class opndcoll_rfu_t {  // operand collector based register file unit
     RegisterBankAllocator* m_reg_bank_allocator;
   };
 
+ public:
   class input_port_t {
    public:
     input_port_t(port_vector_t &input, port_vector_t &output,
@@ -466,6 +469,7 @@ class opndcoll_rfu_t {  // operand collector based register file unit
     uint_vector_t m_cu_sets;
   };
 
+ private:
   class collector_unit_t {
    public:
     // constructors
@@ -675,6 +679,19 @@ class opndcoll_rfu_t {  // operand collector based register file unit
   hw_config* m_hw_cfg;
   RegisterBankAllocator* m_reg_bank_allocator;
   trace_parser* m_tracer;
+
+ public:
+  // for (unsigned p = 0; p < m_in_ports.size(); p++) 
+  //   input_port_t &inp = m_in_ports[p];
+  //   for (unsigned i = 0; i < inp.m_out.size(); i++) {
+  //     if ((*inp.m_out[i]).has_ready()) {
+  //       // do something
+  //     }
+  //   }
+
+  std::vector<input_port_t>* get_m_in_ports() {
+    return &m_in_ports;
+  }
 };
 
 #endif
