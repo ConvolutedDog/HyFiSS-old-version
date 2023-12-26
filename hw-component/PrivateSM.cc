@@ -218,6 +218,47 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
   
   m_operand_collector->init(m_hw_cfg, m_reg_bank_allocator, this->tracer);
   
+  // m_fu
+
+  for (unsigned k = 0; k < m_hw_cfg->get_num_sp_units(); k++) {
+    m_fu.push_back(new sp_unit(&m_pipeline_reg[EX_WB], k, m_hw_cfg, this->tracer));
+    m_dispatch_port.push_back(ID_OC_SP);
+    m_issue_port.push_back(OC_EX_SP);
+  }
+
+  for (unsigned k = 0; k < m_hw_cfg->get_num_dp_units(); k++) {
+    m_fu.push_back(new dp_unit(&m_pipeline_reg[EX_WB], k, m_hw_cfg, this->tracer));
+    m_dispatch_port.push_back(ID_OC_DP);
+    m_issue_port.push_back(OC_EX_DP);
+  }
+
+  for (unsigned k = 0; k < m_hw_cfg->get_num_sfu_units(); k++) {
+    m_fu.push_back(new sfu(&m_pipeline_reg[EX_WB], k, m_hw_cfg, this->tracer));
+    m_dispatch_port.push_back(ID_OC_SFU);
+    m_issue_port.push_back(OC_EX_SFU);
+  }
+
+  for (unsigned k = 0; k < m_hw_cfg->get_num_tensor_core_units(); k++) {
+    m_fu.push_back(new tensor_core(&m_pipeline_reg[EX_WB], k, m_hw_cfg, this->tracer));
+    m_dispatch_port.push_back(ID_OC_TENSOR_CORE);
+    m_issue_port.push_back(OC_EX_TENSOR_CORE);
+  }
+
+  for (unsigned k = 0; k < m_hw_cfg->get_num_int_units(); k++) {
+    m_fu.push_back(new int_unit(&m_pipeline_reg[EX_WB], k, m_hw_cfg, this->tracer));
+    m_dispatch_port.push_back(ID_OC_INT);
+    m_issue_port.push_back(OC_EX_INT);
+  }
+
+  for (unsigned k = 0; k < m_hw_cfg->get_specialized_unit_size(); k++) {
+    m_fu.push_back(new specialized_unit(&m_pipeline_reg[EX_WB], k, m_hw_cfg, this->tracer, k));
+    m_dispatch_port.push_back(N_PIPELINE_STAGES + 0 + k);
+    m_issue_port.push_back(N_PIPELINE_STAGES + 3 + k);
+  }
+
+  m_fu.push_back(new mem_unit(&m_pipeline_reg[EX_WB], 0, m_hw_cfg, this->tracer));
+  m_dispatch_port.push_back(ID_OC_MEM);
+  m_issue_port.push_back(OC_EX_MEM);
 }
 
 /* Here, wid is local wid. */
@@ -272,6 +313,10 @@ PrivateSM::~PrivateSM() {
   
   for (auto ptr : m_pipeline_reg) {
     ptr.release_register_set();
+  }
+
+  for (auto ptr : m_fu) {
+    delete ptr;
   }
 }
 
@@ -376,6 +421,9 @@ void PrivateSM::run(){
       unsigned _wid = it->wid;
       unsigned _uid = it->uid;
       /*
+      
+      */
+      /*  A -> B -> C
       // get the dst reg id of the instn (_kid, _pc, _wid, _uid)
       auto _inst_trace = tracer->get_one_kernel_one_warp_one_instn(_kid, _wid, _uid)->inst_trace;
       unsigned dst_reg_num = _inst_trace->reg_dsts_num;
@@ -525,7 +573,34 @@ void PrivateSM::run(){
         if ((*inp.m_out[i]).has_ready()) {
           // print the ready instn
           std::cout << "  Ready instn in inp.m_out[" << i << "]: " << std::endl;
-          (*inp.m_out[i]).print();
+          // (*inp.m_out[i]).print();
+          std::vector<unsigned> ready_reg_ids = (*inp.m_out[i]).get_ready_reg_ids();
+          for (unsigned j = 0; j < ready_reg_ids.size(); j++) {
+            unsigned reg_id = ready_reg_ids[j];
+            unsigned _kid = (*inp.m_out[i]).get_kid(reg_id);
+            unsigned _pc = (*inp.m_out[i]).get_pc(reg_id);
+            unsigned _wid = (*inp.m_out[i]).get_wid(reg_id);
+            unsigned _uid = (*inp.m_out[i]).get_uid(reg_id);
+            std::cout << "    Ready instn "
+                         "(pc, gwid, kid, fetch_instn_id): (" << _pc << ", " 
+                                                              << _wid << ", " 
+                                                              << _kid << ", " 
+                                                              << _uid << ")" 
+                                                              << std::endl;
+            // remove the instn from (*inp.m_out[i]) and add it to execute stages
+            compute_instn* tmp = 
+              tracer->get_one_kernel_one_warp_one_instn(_kid, _wid, _uid);
+            _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
+            // if (tmp_inst_trace->get_func_unit() == SFU_UNIT) {
+            // }
+
+            std::cout << "tmp_inst_trace->get_func_unit(): " 
+                      << tmp_inst_trace->get_func_unit() << std::endl;
+
+            if (tmp_inst_trace->get_func_unit() == INT_UNIT) {
+              m_pipeline_reg[ID_OC_INT].move_in(m_hw_cfg->get_sub_core_model(), 0, tmp);
+            }
+          }
         }
       }
     }
