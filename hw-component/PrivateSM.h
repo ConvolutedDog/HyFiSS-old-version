@@ -15,6 +15,8 @@
 
 #include "OperandCollector.h"
 
+#include "PipelineUnit.h"
+
 #ifndef PRIVATESM_H
 #define PRIVATESM_H
 
@@ -180,6 +182,10 @@ class PrivateSM {
   std::vector<stage_instns_identifier> warp_exit_stage_instns;
 
   hw_config* m_hw_cfg;
+
+  std::vector<pipelined_simd_unit*> m_fu;
+  std::vector<unsigned> m_dispatch_port;
+  std::vector<unsigned> m_issue_port;
 };
 
 #endif
