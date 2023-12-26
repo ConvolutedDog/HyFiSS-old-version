@@ -513,6 +513,20 @@ class hw_config {
   unsigned get_opcode_latency_initiation_spec_op_3(int id) const {
     return trace_opcode_latency_initiation_spec_op_3[id];
   }
+
+  unsigned get_opcode_latency_initiation_spec_unit(unsigned index, int id) const {
+    switch (index) {
+      case 0:
+        return trace_opcode_latency_initiation_spec_op_1[id];
+      case 1:
+        return trace_opcode_latency_initiation_spec_op_2[id];
+      case 2:
+        return trace_opcode_latency_initiation_spec_op_3[id];
+      default:
+        assert(0);
+    }
+  }
+
   unsigned get_specialized_unit_size() const {
     return m_specialized_unit_size;
   }
