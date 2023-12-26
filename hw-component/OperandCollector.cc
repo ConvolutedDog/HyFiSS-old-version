@@ -124,7 +124,7 @@ void opndcoll_rfu_t::dispatch_ready_cu() {
 
 void opndcoll_rfu_t::allocate_cu(unsigned port_num) {
   input_port_t &inp = m_in_ports[port_num];
-  std::cout << "    port_num: " << port_num << std::endl;
+  std::cout << "    for allocate_cu port_num: " << port_num << std::endl;
   for (unsigned i = 0; i < inp.m_in.size(); i++) {
     // std::cout << "    i: " << i << " inp.m_in.size(): " << inp.m_in.size() << std::endl;
     if ((*inp.m_in[i]).has_ready()) {
