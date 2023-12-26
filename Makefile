@@ -54,7 +54,7 @@ endif
 
 OBJS = $(OBJ_PATH)/splay.o $(OBJ_PATH)/process_args.o $(OBJ_PATH)/parda_print.o $(OBJ_PATH)/narray.o $(OBJ_PATH)/parda.o
 OBJS += $(OBJ_PATH)/hw-parser.o $(OBJ_PATH)/Scoreboard.o $(OBJ_PATH)/RegisterBankAllocator.o
-OBJS += $(OBJ_PATH)/IBuffer.o 
+OBJS += $(OBJ_PATH)/IBuffer.o $(OBJ_PATH)/PipelineUnit.o
 OBJS += $(OBJ_PATH)/PrivateSM.o $(OBJ_PATH)/OperandCollector.o
 OBJS += $(OBJ_PATH)/hw-stt.o $(OBJ_PATH)/inst-stt.o 
 OBJS += $(OBJ_PATH)/memory-space.o $(OBJ_PATH)/inst-memadd-info.o $(OBJ_PATH)/sass-inst.o $(OBJ_PATH)/inst-trace.o
@@ -92,6 +92,9 @@ $(OBJ_PATH)/kernel-trace.o: trace-driven/kernel-trace.cc
 
 # $(OBJ_PATH)/trace-driven.o: trace-driven/trace-driven.cc
 # 	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
+
+$(OBJ_PATH)/PipelineUnit.o: hw-component/PipelineUnit.cc
+	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
 
 $(OBJ_PATH)/Scoreboard.o: hw-component/Scoreboard.cc
 	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
