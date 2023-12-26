@@ -272,6 +272,31 @@ class register_set {
     }
     std::cout << std::endl;
   }
+  std::vector<unsigned> get_ready_reg_ids() {
+    std::vector<unsigned> ready_reg_ids;
+    for (unsigned i = 0; i < regs.size(); i++) {
+      if (regs[i]->m_valid) {
+        ready_reg_ids.push_back(i);
+      }
+    }
+    return ready_reg_ids;
+  }
+  unsigned get_kid(unsigned reg_id) {
+    assert(regs[reg_id]->m_valid);
+    return regs[reg_id]->kid;
+  }
+  unsigned get_wid(unsigned reg_id) {
+    assert(regs[reg_id]->m_valid);
+    return regs[reg_id]->wid;
+  }
+  unsigned get_uid(unsigned reg_id) {
+    assert(regs[reg_id]->m_valid);
+    return regs[reg_id]->uid;
+  }
+  unsigned get_pc(unsigned reg_id) {
+    assert(regs[reg_id]->m_valid);
+    return regs[reg_id]->pc;
+  }
 
  private:
   //将寄存器集合中的所有寄存器用一个向量保存。
