@@ -18,6 +18,12 @@ make DEBUG=1
 valgrind --leak-check=full --show-leak-kinds=all --allow-mismatched-debuginfo=yes --read-inline-info=yes --read-var-info=yes --track-origins=yes --quiet --verbose -v --log-file=valgrind.log ./memory_model.x --configs ./traces/vectoradd/configs/ --sort 0 --log 0 --tmp 0 --dump_histogram 0 > tmp.txt
 ```
 
+or 
+
+```shell
+valgrind --leak-check=full --track-origins=yes --log-file=valgrind.log ./memory_model.x --configs ./traces/vectoradd-multiblock/configs/ --sort 0 --log 0 --dump_histogram 0 --clog 0 --config_file DEV-Def/QV100.config --tmp 0 > tmp.txt
+```
+
 ### ***Use Perf to Analyze Code***
 
 Both of the following commands are running an MPI program, which requires 6 processes to run. The difference between these two commands is how they collect the program's performance data.
