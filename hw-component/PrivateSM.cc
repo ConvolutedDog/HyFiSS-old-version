@@ -396,7 +396,7 @@ void PrivateSM::run(){
 
   std::cout << "# cycle: " << m_cycle << std::endl;
 
-  if (m_cycle >= 200) {
+  if (m_cycle >= 76) {
     active = false;
   }
 
