@@ -15,6 +15,7 @@
 #define INST_TRACE_H
 
 enum FUNC_UNITS_NAME {
+  // In PrivateSM.cc, m_fu[SP_UNIT-1] => SP_UNIT_PIPELINE.
   NON_UNIT = 0,
   SP_UNIT,
   SFU_UNIT,
