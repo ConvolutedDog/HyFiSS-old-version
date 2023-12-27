@@ -59,7 +59,7 @@ class pipelined_simd_unit {
       }
   */
   // accessors
-  /* virtual */bool stallable() const { return false; }
+  virtual bool stallable() const { return false; }
   //判断一条指令能否发射，即判断m_dispatch_reg是否为空，其在occupied对应的标识位是否为空。
   virtual bool can_issue(unsigned latency) const;
   virtual bool is_issue_partitioned() = 0;
@@ -82,6 +82,8 @@ class pipelined_simd_unit {
       }
     }
   }
+
+  void cycle();
 
   virtual unsigned clock_multiplier() const { return 1; };
   //获取SIMD单元的名称。
@@ -133,6 +135,7 @@ class sfu : public pipelined_simd_unit {
   virtual unsigned clock_multiplier() const { return 1; }
   virtual void issue(register_set &source_reg);
   bool is_issue_partitioned() { return true; }
+  virtual bool stallable() const { return false; }
 };
 
 
@@ -151,6 +154,7 @@ class dp_unit : public pipelined_simd_unit {
   virtual unsigned clock_multiplier() const { return 1; }
   virtual void issue(register_set &source_reg);
   bool is_issue_partitioned() { return true; }
+  virtual bool stallable() const { return false; }
 };
 
 class sp_unit : public pipelined_simd_unit {
@@ -168,6 +172,7 @@ class sp_unit : public pipelined_simd_unit {
   virtual unsigned clock_multiplier() const { return 1; }
   virtual void issue(register_set &source_reg);
   bool is_issue_partitioned() { return true; }
+  virtual bool stallable() const { return false; }
 };
 
 class tensor_core : public pipelined_simd_unit {
@@ -185,6 +190,7 @@ class tensor_core : public pipelined_simd_unit {
   virtual unsigned clock_multiplier() const { return 1; }
   virtual void issue(register_set &source_reg);
   bool is_issue_partitioned() { return true; }
+  virtual bool stallable() const { return false; }
 };
 
 class int_unit : public pipelined_simd_unit {
@@ -202,6 +208,7 @@ class int_unit : public pipelined_simd_unit {
   virtual unsigned clock_multiplier() const { return 1; }
   virtual void issue(register_set &source_reg);
   bool is_issue_partitioned() { return true; }
+  virtual bool stallable() const { return false; }
 };
 
 class specialized_unit : public pipelined_simd_unit {
@@ -220,6 +227,7 @@ class specialized_unit : public pipelined_simd_unit {
   virtual unsigned clock_multiplier() const { return 1; }
   virtual void issue(register_set &source_reg);
   bool is_issue_partitioned() { return true; }
+  virtual bool stallable() const { return false; }
 
  private:
   unsigned m_index;
@@ -230,7 +238,8 @@ class mem_unit : public pipelined_simd_unit {
   mem_unit(register_set *result_port, unsigned issue_reg_id,
            hw_config* hw_cfg, trace_parser* tracer)
            : pipelined_simd_unit(result_port, 
-                                 0, 
+                                 10,  
+                                 // TODO: should be latency of L1 miss + L2 miss + DRAM access time
                                  issue_reg_id,
                                  hw_cfg, tracer) {
     m_name = "MEM";
@@ -240,6 +249,7 @@ class mem_unit : public pipelined_simd_unit {
   virtual unsigned clock_multiplier() const { return 1; }
   virtual void issue(register_set &source_reg);
   bool is_issue_partitioned() { return false; }
+  virtual bool stallable() const { return true; }
 };
 
 #endif
