@@ -129,6 +129,7 @@ class register_set {
     dest->wid = src->wid;
     dest->kid = src->kid;
     dest->uid = src->uid;
+    dest->latency = src->latency;
     dest->m_valid = true;
     std::cout << "    dest: " 
                           << dest->kid << ", " 
@@ -136,6 +137,7 @@ class register_set {
                           << dest->wid << ", " 
                           << dest->uid << std::endl;
     // src->clear();
+    src->m_valid = false;
   }
 
   //获取一个非空寄存器，并将一条指令存入。
@@ -181,6 +183,11 @@ class register_set {
       return move_out_to(dest);
     }
     inst_fetch_buffer_entry **ready = get_ready(sub_core_model, reg_id);
+    std::cout << "    ready: " << ready << std::endl;
+    std::cout << "    (*ready): kid, " << (*ready)->kid << std::endl
+              << "               pc, " << (*ready)->pc << std::endl
+              << "              wid, " << (*ready)->wid << std::endl
+              << "              uid, " << (*ready)->uid << std::endl;
     assert(ready != NULL);
     move_warp(dest, *ready);
   }
@@ -206,6 +213,7 @@ class register_set {
     ready = NULL;
     assert(reg_id < regs.size());
     if (regs[reg_id]->m_valid) ready = &regs[reg_id];
+    // std::cout << "get_ready111: " << ready << std::endl;
     return ready;
   }
   //打印寄存器集合中的所有寄存器。
@@ -296,6 +304,14 @@ class register_set {
   unsigned get_pc(unsigned reg_id) {
     assert(regs[reg_id]->m_valid);
     return regs[reg_id]->pc;
+  }
+  void set_latency(unsigned latency, unsigned reg_id) {
+    assert(regs[reg_id]->m_valid);
+    regs[reg_id]->latency = latency;
+  }
+  void set_initial_interval(unsigned initial_interval, unsigned reg_id) {
+    assert(regs[reg_id]->m_valid);
+    regs[reg_id]->initial_interval = initial_interval;
   }
 
  private:
