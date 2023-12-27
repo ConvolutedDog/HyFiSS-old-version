@@ -226,22 +226,10 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
     m_issue_port.push_back(OC_EX_SP);
   }
 
-  for (unsigned k = 0; k < m_hw_cfg->get_num_dp_units(); k++) {
-    m_fu.push_back(new dp_unit(&m_pipeline_reg[EX_WB], k, m_hw_cfg, this->tracer));
-    m_dispatch_port.push_back(ID_OC_DP);
-    m_issue_port.push_back(OC_EX_DP);
-  }
-
   for (unsigned k = 0; k < m_hw_cfg->get_num_sfu_units(); k++) {
     m_fu.push_back(new sfu(&m_pipeline_reg[EX_WB], k, m_hw_cfg, this->tracer));
     m_dispatch_port.push_back(ID_OC_SFU);
     m_issue_port.push_back(OC_EX_SFU);
-  }
-
-  for (unsigned k = 0; k < m_hw_cfg->get_num_tensor_core_units(); k++) {
-    m_fu.push_back(new tensor_core(&m_pipeline_reg[EX_WB], k, m_hw_cfg, this->tracer));
-    m_dispatch_port.push_back(ID_OC_TENSOR_CORE);
-    m_issue_port.push_back(OC_EX_TENSOR_CORE);
   }
 
   for (unsigned k = 0; k < m_hw_cfg->get_num_int_units(); k++) {
@@ -250,15 +238,32 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
     m_issue_port.push_back(OC_EX_INT);
   }
 
+  for (unsigned k = 0; k < m_hw_cfg->get_num_dp_units(); k++) {
+    m_fu.push_back(new dp_unit(&m_pipeline_reg[EX_WB], k, m_hw_cfg, this->tracer));
+    m_dispatch_port.push_back(ID_OC_DP);
+    m_issue_port.push_back(OC_EX_DP);
+  }
+
+  for (unsigned k = 0; k < m_hw_cfg->get_num_tensor_core_units(); k++) {
+    m_fu.push_back(new tensor_core(&m_pipeline_reg[EX_WB], k, m_hw_cfg, this->tracer));
+    m_dispatch_port.push_back(ID_OC_TENSOR_CORE);
+    m_issue_port.push_back(OC_EX_TENSOR_CORE);
+  }
+
+  m_fu.push_back(new mem_unit(&m_pipeline_reg[EX_WB], 0, m_hw_cfg, this->tracer));
+  m_dispatch_port.push_back(ID_OC_MEM);
+  m_issue_port.push_back(OC_EX_MEM);
+
   for (unsigned k = 0; k < m_hw_cfg->get_specialized_unit_size(); k++) {
     m_fu.push_back(new specialized_unit(&m_pipeline_reg[EX_WB], k, m_hw_cfg, this->tracer, k));
     m_dispatch_port.push_back(N_PIPELINE_STAGES + 0 + k);
     m_issue_port.push_back(N_PIPELINE_STAGES + 3 + k);
   }
 
-  m_fu.push_back(new mem_unit(&m_pipeline_reg[EX_WB], 0, m_hw_cfg, this->tracer));
-  m_dispatch_port.push_back(ID_OC_MEM);
-  m_issue_port.push_back(OC_EX_MEM);
+  num_result_bus = hw_cfg->get_pipe_widths(static_cast<pipeline_stage_name_t>(EX_WB));
+  for (unsigned _ = 0; _ < num_result_bus; _++) {
+    m_result_bus.push_back(new std::bitset<MAX_ALU_LATENCY>());
+  }
 }
 
 /* Here, wid is local wid. */
@@ -316,6 +321,10 @@ PrivateSM::~PrivateSM() {
   }
 
   for (auto ptr : m_fu) {
+    delete ptr;
+  }
+
+  for (auto ptr : m_result_bus) {
     delete ptr;
   }
 }
@@ -387,7 +396,7 @@ void PrivateSM::run(){
 
   std::cout << "# cycle: " << m_cycle << std::endl;
 
-  if (m_cycle >= 20) {
+  if (m_cycle >= 100) {
     active = false;
   }
 
@@ -565,10 +574,32 @@ void PrivateSM::run(){
     /***                                                                                        ***/
     /**********************************************************************************************/
     
+    for (unsigned i = 0; i < num_result_bus; i++) {
+      *(m_result_bus[i]) >>= 1;
+    }
+
+    for (unsigned n = 0; n < m_fu.size(); n++) {
+      for (auto _ = 0; _ < m_fu[n]->clock_multiplier(); _++) m_fu[n]->cycle();
+    }
+
     std::vector<opndcoll_rfu_t::input_port_t>* m_in_ports_ptr = m_operand_collector->get_m_in_ports();
+    /* m_in_ports:
+     *   m_in_ports[0]: GEN_CUS, &m_pipeline_reg[ID_OC_SP], &m_pipeline_reg[ID_OC_DP], ... => m_in
+     *                           &m_pipeline_reg[OC_EX_SP], &m_pipeline_reg[OC_EX_DP], ... => m_out
+     *   m_in_ports[1~7]: ... */
     for (unsigned p = 0; p < m_in_ports_ptr->size(); p++) {
+      /* inp => m_in_ports[p]:
+       *   GEN_CUS, &m_pipeline_reg[ID_OC_SP], &m_pipeline_reg[ID_OC_DP], ... => m_in
+       *            &m_pipeline_reg[OC_EX_SP], &m_pipeline_reg[OC_EX_DP], ... => m_out 
+       * We have put the instns that have completed the read operands process into 
+       * m_pipeline_reg[OC_EX_SP] or m_pipeline_reg[OC_EX_DP] or ..., so here we will 
+       * traverse all the inp.m_out[.] to find ready instns and send them to the execute
+       * process. */
       opndcoll_rfu_t::input_port_t &inp = (*m_in_ports_ptr)[p];
-      std::cout << "  Execute: " << "port_idx: " << p << std::endl;
+      std::cout << "  **Execute: " << "port_idx: " << p << std::endl;
+      /* inp.m_out: 
+       *   &m_pipeline_reg[OC_EX_SP], 
+       *   &m_pipeline_reg[OC_EX_DP], ... */
       for (unsigned i = 0; i < inp.m_out.size(); i++) {
         if ((*inp.m_out[i]).has_ready()) {
           // print the ready instn
@@ -591,14 +622,249 @@ void PrivateSM::run(){
             compute_instn* tmp = 
               tracer->get_one_kernel_one_warp_one_instn(_kid, _wid, _uid);
             _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
-            // if (tmp_inst_trace->get_func_unit() == SFU_UNIT) {
-            // }
 
             std::cout << "tmp_inst_trace->get_func_unit(): " 
                       << tmp_inst_trace->get_func_unit() << std::endl;
+            
+            unsigned offset_fu = 0;
+            bool schedule_wb_now = false;
+            int resbus = -1;
 
-            if (tmp_inst_trace->get_func_unit() == INT_UNIT) {
-              m_pipeline_reg[ID_OC_INT].move_in(m_hw_cfg->get_sub_core_model(), 0, tmp);
+            switch (tmp_inst_trace->get_func_unit()) {
+              // In PrivateSM.cc, m_fu[SP_UNIT-1] => SP_UNIT_PIPELINE.
+              case SP_UNIT:
+                std::cout << "    SP unit latency: " 
+                          << tmp_inst_trace->get_latency() 
+                          << std::endl;
+                std::cout << "    SP unit initiation interval: " 
+                         << tmp_inst_trace->get_initiation_interval() 
+                         << std::endl;
+                (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
+                (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+
+                offset_fu = 0;
+                for (unsigned _ = 0; _ < m_hw_cfg->get_num_sp_units(); _++) {
+                  if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
+                    schedule_wb_now = !m_fu[offset_fu + _]->stallable();
+                    resbus = -1;
+                    std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    std::cout << "@@@@@@" 
+                              << (*inp.m_out[i]).get_size() << std::endl;
+                    std::cout << "######" 
+                              << m_hw_cfg->get_num_sp_units() << std::endl;
+                  }
+                }
+                break;
+              case DP_UNIT:
+                std::cout << "    DP unit latency: " 
+                          << tmp_inst_trace->get_latency() 
+                          << std::endl;
+                std::cout << "    DP unit initiation interval: " 
+                         << tmp_inst_trace->get_initiation_interval() 
+                         << std::endl;
+                (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
+                (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+
+                offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units() 
+                            + m_hw_cfg->get_num_int_units();
+                for (unsigned _ = 0; _ < m_hw_cfg->get_num_dp_units(); _++) {
+                  if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
+                    schedule_wb_now = !m_fu[offset_fu + _]->stallable();
+                    resbus = -1;
+                    std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    std::cout << "@@@@@@" 
+                              << (*inp.m_out[i]).get_size() << std::endl;
+                    std::cout << "######" 
+                              << m_hw_cfg->get_num_dp_units() << std::endl;
+                  }
+                }
+                break;
+              case SFU_UNIT:
+                std::cout << "    SFU unit latency: " 
+                          << tmp_inst_trace->get_latency() 
+                          << std::endl;
+                std::cout << "    SFU unit initiation interval: " 
+                         << tmp_inst_trace->get_initiation_interval() 
+                         << std::endl;
+                (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
+                (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+
+                offset_fu = m_hw_cfg->get_num_sp_units();
+                for (unsigned _ = 0; _ < m_hw_cfg->get_num_sfu_units(); _++) {
+                  if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
+                    schedule_wb_now = !m_fu[offset_fu + _]->stallable();
+                    resbus = -1;
+                    std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    std::cout << "@@@@@@" 
+                              << (*inp.m_out[i]).get_size() << std::endl;
+                    std::cout << "######" 
+                              << m_hw_cfg->get_num_sfu_units() << std::endl;
+                  }
+                }
+                break;
+              case TENSOR_CORE_UNIT:
+                std::cout << "    TENSOR_CORE unit latency: " 
+                          << tmp_inst_trace->get_latency() 
+                          << std::endl;
+                std::cout << "    TENSOR_CORE unit initiation interval: " 
+                         << tmp_inst_trace->get_initiation_interval() 
+                         << std::endl;
+                (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
+                (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+
+                offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units() 
+                            + m_hw_cfg->get_num_int_units() + m_hw_cfg->get_num_dp_units();
+                for (unsigned _ = 0; _ < m_hw_cfg->get_num_tensor_core_units(); _++) {
+                  if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
+                    schedule_wb_now = !m_fu[offset_fu + _]->stallable();
+                    resbus = -1;
+                    std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    std::cout << "@@@@@@" 
+                              << (*inp.m_out[i]).get_size() << std::endl;
+                    std::cout << "######" 
+                              << m_hw_cfg->get_num_tensor_core_units() << std::endl;
+                  }
+                }
+                break;
+              case INT_UNIT:
+                std::cout << "    INT unit latency: " 
+                          << tmp_inst_trace->get_latency() 
+                          << std::endl;
+                std::cout << "    INT unit initiation interval: " 
+                         << tmp_inst_trace->get_initiation_interval() 
+                         << std::endl;
+                (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
+                (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+
+                offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units();
+                for (unsigned _ = 0; _ < m_hw_cfg->get_num_int_units(); _++) {
+                  if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
+                    schedule_wb_now = !m_fu[offset_fu + _]->stallable();
+                    resbus = -1;
+                    std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    // std::cout << "@@@@@@" << (*inp.m_out[i]).get_size() << std::endl;
+                    // std::cout << "######" << m_hw_cfg->get_num_int_units() << std::endl;
+                  }
+                }
+                break;
+              case LDST_UNIT:
+                std::cout << "    LDST unit latency: " 
+                          << tmp_inst_trace->get_latency() 
+                          << std::endl;
+                std::cout << "    LDST unit initiation interval: " 
+                         << tmp_inst_trace->get_initiation_interval() 
+                         << std::endl;
+                // TODO: get latency from memory_model from reuse distance.
+                (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
+                (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+
+                offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units() 
+                            + m_hw_cfg->get_num_int_units() + m_hw_cfg->get_num_dp_units()
+                            + m_hw_cfg->get_num_tensor_core_units();
+                for (unsigned _ = 0; _ < 1; _++) {
+                  if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
+                    schedule_wb_now = !m_fu[offset_fu + _]->stallable();
+                    resbus = -1;
+                    std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    std::cout << "@@@@@@" 
+                              << (*inp.m_out[i]).get_size() << std::endl;
+                    std::cout << "######" 
+                              << 1 << std::endl;
+                  }
+                }
+
+                break;
+              case SPEC_UNIT_1:
+                std::cout << "    SPEC_UNIT_1 unit latency: " 
+                          << tmp_inst_trace->get_latency() 
+                          << std::endl;
+                std::cout << "    SPEC_UNIT_1 initiation interval: " 
+                         << tmp_inst_trace->get_initiation_interval() 
+                         << std::endl;
+                (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
+                (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+
+                offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units() 
+                            + m_hw_cfg->get_num_int_units() + m_hw_cfg->get_num_dp_units()
+                            + m_hw_cfg->get_num_tensor_core_units()
+                            + 1;
+                for (unsigned _ = 0; _ < 1; _++) {
+                  if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
+                    schedule_wb_now = !m_fu[offset_fu + _]->stallable();
+                    resbus = -1;
+                    std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    std::cout << "@@@@@@" 
+                              << (*inp.m_out[i]).get_size() << std::endl;
+                    std::cout << "######" 
+                              << 1 << std::endl;
+                  }
+                }
+                break;
+              case SPEC_UNIT_2:
+                std::cout << "    SPEC_UNIT_2 unit latency: " 
+                          << tmp_inst_trace->get_latency() 
+                          << std::endl;
+                std::cout << "    SPEC_UNIT_2 initiation interval: " 
+                         << tmp_inst_trace->get_initiation_interval() 
+                         << std::endl;
+                (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
+                (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+
+                offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units() 
+                            + m_hw_cfg->get_num_int_units() + m_hw_cfg->get_num_dp_units()
+                            + m_hw_cfg->get_num_tensor_core_units()
+                            + 1;
+                for (unsigned _ = 1; _ < 2; _++) {
+                  if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
+                    schedule_wb_now = !m_fu[offset_fu + _]->stallable();
+                    resbus = -1;
+                    std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    std::cout << "@@@@@@" 
+                              << (*inp.m_out[i]).get_size() << std::endl;
+                    std::cout << "######" 
+                              << 1 << std::endl;
+                  }
+                }
+                break;
+              case SPEC_UNIT_3:
+                std::cout << "    SPEC_UNIT_3 unit latency: " 
+                          << tmp_inst_trace->get_latency() 
+                          << std::endl;
+                std::cout << "    SPEC_UNIT_3 initiation interval: " 
+                         << tmp_inst_trace->get_initiation_interval() 
+                         << std::endl;
+                (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
+                (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+
+                offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units() 
+                            + m_hw_cfg->get_num_int_units() + m_hw_cfg->get_num_dp_units()
+                            + m_hw_cfg->get_num_tensor_core_units()
+                            + 1;
+                for (unsigned _ = 2; _ < 3; _++) {
+                  if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
+                    schedule_wb_now = !m_fu[offset_fu + _]->stallable();
+                    resbus = -1;
+                    std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    std::cout << "@@@@@@" 
+                              << (*inp.m_out[i]).get_size() << std::endl;
+                    std::cout << "######" 
+                              << 1 << std::endl;
+                  }
+                }
+                break;
+              default:
+                std::cout << "Error: tmp_inst_trace->get_func_unit(): " 
+                          << tmp_inst_trace->get_func_unit() << std::endl;
+                assert(false);
             }
           }
         }
@@ -612,7 +878,7 @@ void PrivateSM::run(){
     /***                                                                                        ***/
     /**********************************************************************************************/
     for (unsigned _iter = 0; _iter < get_reg_file_port_throughput(); _iter++) {
-      std::cout << "  Read Operands: " << "reg_file_port_idx: " << _iter << std::endl;
+      std::cout << "  **Read Operands: " << "reg_file_port_idx: " << _iter << std::endl;
       m_operand_collector->step();
     }
 
@@ -625,7 +891,7 @@ void PrivateSM::run(){
     
 
     unsigned max_issue_per_warp = m_hw_cfg->get_max_insn_issue_per_warp();
-
+    std::cout << "  **ISSUE stage: " << std::endl;
     for (unsigned _sched_id = 0; _sched_id < num_scheds; _sched_id++) {
       auto sched_id = (last_issue_sched_id + _sched_id) % num_scheds;
       std::cout << "    D: issue sched_id: " << sched_id << std::endl;
@@ -1052,13 +1318,13 @@ void PrivateSM::run(){
           m_ibuffer->push_back(global_all_kernels_warp_id, _entry);
           
           m_inst_fetch_buffer->m_valid = false;
-          std::cout << "    DECODE: ";
+          std::cout << "  **DECODE: ";
           m_ibuffer->print_ibuffer(_wid);
         } else {
-          std::cout << "    No DECODE cause m_ibuffer->has_free_slot() == false" << std::endl;
+          std::cout << "  **No DECODE cause m_ibuffer->has_free_slot() == false" << std::endl;
         }
       } else {
-        std::cout << "    No DECODE cause m_inst_fetch_buffer->m_valid == false" << std::endl;
+        std::cout << "  **No DECODE cause m_inst_fetch_buffer->m_valid == false" << std::endl;
       }
       
       // std::cout << "D: gwarp_id_start, gwarp_id_end: " << gwarp_id_start << " " << gwarp_id_end << std::endl;
@@ -1108,7 +1374,7 @@ void PrivateSM::run(){
             m_inst_fetch_buffer->m_valid = true;
             // std::cout << "D: @@@" << std::endl;
             
-            std::cout << "  Fetch instn (pc, gwid, kid, fetch_instn_id): " << "(" << tmp_inst_trace->m_pc << ", " 
+            std::cout << "  **Fetch instn (pc, gwid, kid, fetch_instn_id): " << "(" << tmp_inst_trace->m_pc << ", " 
                                                                               << wid << ", " 
                                                                               << kid << ", " 
                                                                               << fetch_instn_id << ")" << std::endl;
@@ -1119,7 +1385,7 @@ void PrivateSM::run(){
         
         if (fetch_instn) break;
         else {
-          std::cout << "    No FETCH" << std::endl;
+          std::cout << "  **No FETCH" << std::endl;
         }
 
       }
