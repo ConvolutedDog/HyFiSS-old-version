@@ -30,18 +30,114 @@ bool pipelined_simd_unit::can_issue(unsigned latency) const {
   return !m_dispatch_reg->m_valid && !occupied.test(latency);
 }
 
+void pipelined_simd_unit::cycle() {
+  if (m_pipeline_reg[0]->m_valid) {
+    m_result_port->move_in(m_pipeline_reg[0]);
+    assert(active_insts_in_pipeline > 0);
+    active_insts_in_pipeline--;
+  }
+
+  if (active_insts_in_pipeline) {
+    // for (unsigned stage = 0; stage < m_pipeline_depth - 1; stage++) {
+    //   m_pipeline_reg[stage]->move_in(m_pipeline_reg[stage + 1]);
+    // }
+    std::rotate(m_pipeline_reg.begin(), m_pipeline_reg.begin() + 1, m_pipeline_reg.end());
+    m_pipeline_reg[m_pipeline_depth - 1]->m_valid = false;
+  }
+
+  bool print_status = false;
+  for (auto &reg : m_pipeline_reg) {
+    if (reg->m_valid) {
+      print_status = true;
+      break;
+    }
+  }
+  if (print_status) {
+    std::cout << "    UNIT " << m_name << " 's m_pipeline_reg status:" << std::endl;
+    for (auto &reg : m_pipeline_reg) {
+      std::cout << "    reg: valid-" << reg->m_valid 
+                << ",pc-" << reg->pc 
+                << ",kid-" << reg->kid 
+                << ",wid-" << reg->wid 
+                << ",uid-" << reg->uid << std::endl;
+    }
+  }
+
+  if (m_dispatch_reg->m_valid) {
+    if (m_dispatch_reg->latency == 0) {
+      // m_pipeline_reg[0]->move_in(m_dispatch_reg);
+      int start_stage =
+          m_dispatch_reg->latency - m_dispatch_reg->initial_interval;
+      assert(start_stage >= 0 && start_stage < m_pipeline_depth);
+      // m_pipeline_reg[start_stage]->move_in(m_dispatch_reg);
+      if (m_pipeline_reg[start_stage]->m_valid == false) {
+        m_dispatch_reg->m_valid = false;
+        active_insts_in_pipeline++;
+        m_pipeline_reg[start_stage]->m_valid = true;
+        m_pipeline_reg[start_stage]->pc = m_dispatch_reg->pc;
+        m_pipeline_reg[start_stage]->wid = m_dispatch_reg->wid;
+        m_pipeline_reg[start_stage]->kid = m_dispatch_reg->kid;
+        m_pipeline_reg[start_stage]->uid = m_dispatch_reg->uid;
+        m_pipeline_reg[start_stage]->latency = m_dispatch_reg->latency;
+        m_pipeline_reg[start_stage]->initial_interval = m_dispatch_reg->initial_interval;
+      }
+    } else {
+      m_dispatch_reg->latency--;
+    }
+  }
+
+  occupied >>= 1;
+}
+
 void pipelined_simd_unit::issue(register_set &source_reg) {
   bool partition_issue =
     m_hw_cfg->get_sub_core_model() && this->is_issue_partitioned();
   inst_fetch_buffer_entry **ready_reg =
     source_reg.get_ready(partition_issue, m_issue_reg_id);
-  // simd_function_unit::issue(source_reg);
+  std::cout << "    partition_issue: " << partition_issue << std::endl
+            << "    m_issue_reg_id: " << m_issue_reg_id << std::endl
+            << "    ready_reg: " << ready_reg << std::endl
+            << "    NULL: " << NULL << std::endl;
 
-  //source_reg即为流水线寄存器，目的是找到一个非空的指令，将其移入m_dispatch_reg。
-  source_reg.move_out_to(partition_issue, this->get_issue_reg_id(),
-                         m_dispatch_reg);
-  //设置m_dispatch_reg的标识占用位图的状态，m_dispatch_reg是warp_inst_t类型，可获取该指令的延迟。
-  occupied.set(m_dispatch_reg->latency);
+  if (ready_reg != NULL) {
+    std::cout << "    (*ready_reg): " << (*ready_reg)->kid 
+              << " " << (*ready_reg)->wid 
+              << " " << (*ready_reg)->uid << std::endl
+              << std::endl;
+  
+    // simd_function_unit::issue(source_reg);
+
+    //source_reg即为流水线寄存器，目的是找到一个非空的指令，将其移入m_dispatch_reg。
+    std::cout << "    source_reg.move_out_to.m_dispatch_reg" << std::endl;
+
+    std::cout << "    Before Move: " << "valid: " << m_dispatch_reg->m_valid << std::endl
+              << "                         kid: " << m_dispatch_reg->kid << std::endl
+              << "                         wid: " << m_dispatch_reg->wid << std::endl 
+              << "                         uid: " << m_dispatch_reg->uid << std::endl;
+    std::cout << "    source before move: " << (*ready_reg)->m_valid << std::endl;
+
+    source_reg.move_out_to(partition_issue, this->get_issue_reg_id(),
+                          m_dispatch_reg);
+
+    std::cout << "    After Move: " << "valid: " << m_dispatch_reg->m_valid << std::endl
+              << "                        kid: " << m_dispatch_reg->kid << std::endl
+              << "                        wid: " << m_dispatch_reg->wid << std::endl 
+              << "                        uid: " << m_dispatch_reg->uid << std::endl;
+
+    std::cout << "    source after move: " << (*ready_reg)->m_valid << std::endl;
+
+    //设置m_dispatch_reg的标识占用位图的状态，m_dispatch_reg是warp_inst_t类型，可获取该指令的延迟。
+    std::cout << "\n    occupied.set" << std::endl;
+    occupied.set(m_dispatch_reg->latency);
+
+    std::cout << "  ### pipelined_simd_unit::issue() end:" << std::endl
+              << "    Instn[pc:" << m_dispatch_reg->pc << ","
+              << "kid:" << m_dispatch_reg->kid << ","
+              << "wid:" << m_dispatch_reg->wid << ","
+              << "uid:" << m_dispatch_reg->uid << "] has been issued to UNIT " 
+              << m_name << std::endl;
+
+  }
 }
 
 bool sfu::can_issue(const inst_fetch_buffer_entry &inst) const {
