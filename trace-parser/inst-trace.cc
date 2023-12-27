@@ -185,8 +185,8 @@ void _inst_trace_t::parse_opcode_latency_info() {
         break;
       case LOAD_OP: // TODO: need to be modified
       case STORE_OP: // TODO: need to be modified
-        latency = 100; // TODO: need to be modified
-        initiation_interval = 100; // TODO: need to be modified
+        latency = 10; // TODO: need to be modified
+        initiation_interval = 10; // TODO: need to be modified
         func_unit = LDST_UNIT;
         break;
       default:
