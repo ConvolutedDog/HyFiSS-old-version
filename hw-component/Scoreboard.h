@@ -18,6 +18,7 @@ class Scoreboard {
   void reserveRegisters(const unsigned wid, std::vector<int> regnums, bool is_load);
   //当指令完成写回时，其目标寄存器将被释放。
   void releaseRegisters(const unsigned wid, std::vector<int> regnums);
+  void releaseRegisters(const unsigned wid, const int regnum);
   //将单个目标寄存器释放。
   void releaseRegister(const unsigned wid, const int regnum);
   //检测冒险，检测某个指令使用的寄存器是否被保留在记分板中，如果有的话就是发生了 WAW 或 RAW 冒险。
