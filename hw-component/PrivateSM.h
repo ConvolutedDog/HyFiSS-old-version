@@ -21,6 +21,7 @@
 #define PRIVATESM_H
 
 #define PRED_NUM_OFFSET 65536
+#define MAX_ALU_LATENCY 512
 
 enum exec_unit_type_t {
   NONE = 0,
@@ -119,6 +120,15 @@ class PrivateSM {
 
   RegisterBankAllocator* get_reg_bank_allocator() { return m_reg_bank_allocator; }
 
+  unsigned test_result_bus(unsigned latency) {
+    for (unsigned i = 0; i < num_result_bus; i++) {
+      if (!m_result_bus[i]->test(latency)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
  private:
   unsigned m_smid;
   unsigned long long m_cycle;
@@ -186,6 +196,9 @@ class PrivateSM {
   std::vector<pipelined_simd_unit*> m_fu;
   std::vector<unsigned> m_dispatch_port;
   std::vector<unsigned> m_issue_port;
+
+  unsigned num_result_bus;
+  std::vector<std::bitset<MAX_ALU_LATENCY>*> m_result_bus;
 };
 
 #endif
