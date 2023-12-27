@@ -10,6 +10,7 @@ struct inst_fetch_buffer_entry {
     kid = 0;
     uid = 0;
     latency = -1;
+    initial_interval = -1;
   };
   inst_fetch_buffer_entry(unsigned _pc, unsigned _wid, unsigned _kid, unsigned _uid) {
     pc = _pc;
@@ -19,13 +20,15 @@ struct inst_fetch_buffer_entry {
     m_valid = true;
     latency = -1;
   };
-  void set_latenct(unsigned _latency) {latency = _latency;}
+  void set_latency(unsigned _latency) {latency = _latency;}
+  void set_initial_interval(unsigned _initial_interval) {initial_interval = _initial_interval;}
   unsigned pc;
   unsigned wid;
   unsigned kid;
   unsigned uid;
   bool m_valid;
   unsigned latency;
+  unsigned initial_interval;
 };
 
 struct curr_instn_id_per_warp_entry {
