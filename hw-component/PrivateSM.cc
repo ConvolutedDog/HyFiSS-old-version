@@ -646,9 +646,20 @@ void PrivateSM::run(){
                 for (unsigned _ = 0; _ < m_hw_cfg->get_num_sp_units(); _++) {
                   if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
                     schedule_wb_now = !m_fu[offset_fu + _]->stallable();
-                    resbus = -1;
-                    std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
-                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    resbus = test_result_bus(tmp_inst_trace->get_latency());
+                    std::cout << "num_result_bus: " << num_result_bus << std::endl;
+                    std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl
+                              << "resbus: " << resbus << std::endl;
+                    if (schedule_wb_now &&
+                        (resbus != -1)) {
+                      m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else if (!schedule_wb_now) {
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else {
+                      /* stall issue (cannot reserve result bus) */
+                    }
+
                     std::cout << "@@@@@@" 
                               << (*inp.m_out[i]).get_size() << std::endl;
                     std::cout << "######" 
@@ -671,9 +682,18 @@ void PrivateSM::run(){
                 for (unsigned _ = 0; _ < m_hw_cfg->get_num_dp_units(); _++) {
                   if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
                     schedule_wb_now = !m_fu[offset_fu + _]->stallable();
-                    resbus = -1;
+                    resbus = test_result_bus(tmp_inst_trace->get_latency());
                     std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
-                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    if (schedule_wb_now &&
+                        (resbus != -1)) {
+                      m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else if (!schedule_wb_now) {
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else {
+                      /* stall issue (cannot reserve result bus) */
+                    }
+
                     std::cout << "@@@@@@" 
                               << (*inp.m_out[i]).get_size() << std::endl;
                     std::cout << "######" 
@@ -695,9 +715,18 @@ void PrivateSM::run(){
                 for (unsigned _ = 0; _ < m_hw_cfg->get_num_sfu_units(); _++) {
                   if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
                     schedule_wb_now = !m_fu[offset_fu + _]->stallable();
-                    resbus = -1;
+                    resbus = test_result_bus(tmp_inst_trace->get_latency());
                     std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
-                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    if (schedule_wb_now &&
+                        (resbus != -1)) {
+                      m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else if (!schedule_wb_now) {
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else {
+                      /* stall issue (cannot reserve result bus) */
+                    }
+
                     std::cout << "@@@@@@" 
                               << (*inp.m_out[i]).get_size() << std::endl;
                     std::cout << "######" 
@@ -720,9 +749,18 @@ void PrivateSM::run(){
                 for (unsigned _ = 0; _ < m_hw_cfg->get_num_tensor_core_units(); _++) {
                   if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
                     schedule_wb_now = !m_fu[offset_fu + _]->stallable();
-                    resbus = -1;
+                    resbus = test_result_bus(tmp_inst_trace->get_latency());
                     std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
-                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    if (schedule_wb_now &&
+                        (resbus != -1)) {
+                      m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else if (!schedule_wb_now) {
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else {
+                      /* stall issue (cannot reserve result bus) */
+                    }
+
                     std::cout << "@@@@@@" 
                               << (*inp.m_out[i]).get_size() << std::endl;
                     std::cout << "######" 
@@ -744,9 +782,18 @@ void PrivateSM::run(){
                 for (unsigned _ = 0; _ < m_hw_cfg->get_num_int_units(); _++) {
                   if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
                     schedule_wb_now = !m_fu[offset_fu + _]->stallable();
-                    resbus = -1;
+                    resbus = test_result_bus(tmp_inst_trace->get_latency());
                     std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
-                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    if (schedule_wb_now &&
+                        (resbus != -1)) {
+                      m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else if (!schedule_wb_now) {
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else {
+                      /* stall issue (cannot reserve result bus) */
+                    }
+
                     // std::cout << "@@@@@@" << (*inp.m_out[i]).get_size() << std::endl;
                     // std::cout << "######" << m_hw_cfg->get_num_int_units() << std::endl;
                   }
@@ -769,9 +816,18 @@ void PrivateSM::run(){
                 for (unsigned _ = 0; _ < 1; _++) {
                   if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
                     schedule_wb_now = !m_fu[offset_fu + _]->stallable();
-                    resbus = -1;
+                    resbus = test_result_bus(tmp_inst_trace->get_latency());
                     std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
-                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    if (schedule_wb_now &&
+                        (resbus != -1)) {
+                      m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else if (!schedule_wb_now) {
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else {
+                      /* stall issue (cannot reserve result bus) */
+                    }
+
                     std::cout << "@@@@@@" 
                               << (*inp.m_out[i]).get_size() << std::endl;
                     std::cout << "######" 
@@ -797,9 +853,18 @@ void PrivateSM::run(){
                 for (unsigned _ = 0; _ < 1; _++) {
                   if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
                     schedule_wb_now = !m_fu[offset_fu + _]->stallable();
-                    resbus = -1;
+                    resbus = test_result_bus(tmp_inst_trace->get_latency());
                     std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
-                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    if (schedule_wb_now &&
+                        (resbus != -1)) {
+                      m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else if (!schedule_wb_now) {
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else {
+                      /* stall issue (cannot reserve result bus) */
+                    }
+
                     std::cout << "@@@@@@" 
                               << (*inp.m_out[i]).get_size() << std::endl;
                     std::cout << "######" 
@@ -824,9 +889,18 @@ void PrivateSM::run(){
                 for (unsigned _ = 1; _ < 2; _++) {
                   if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
                     schedule_wb_now = !m_fu[offset_fu + _]->stallable();
-                    resbus = -1;
+                    resbus = test_result_bus(tmp_inst_trace->get_latency());
                     std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
-                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    if (schedule_wb_now &&
+                        (resbus != -1)) {
+                      m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else if (!schedule_wb_now) {
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else {
+                      /* stall issue (cannot reserve result bus) */
+                    }
+
                     std::cout << "@@@@@@" 
                               << (*inp.m_out[i]).get_size() << std::endl;
                     std::cout << "######" 
@@ -851,9 +925,18 @@ void PrivateSM::run(){
                 for (unsigned _ = 2; _ < 3; _++) {
                   if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
                     schedule_wb_now = !m_fu[offset_fu + _]->stallable();
-                    resbus = -1;
+                    resbus = test_result_bus(tmp_inst_trace->get_latency());
                     std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
-                    m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    if (schedule_wb_now &&
+                        (resbus != -1)) {
+                      m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else if (!schedule_wb_now) {
+                      m_fu[offset_fu + _]->issue((*inp.m_out[i]));
+                    } else {
+                      /* stall issue (cannot reserve result bus) */
+                    }
+
                     std::cout << "@@@@@@" 
                               << (*inp.m_out[i]).get_size() << std::endl;
                     std::cout << "######" 
