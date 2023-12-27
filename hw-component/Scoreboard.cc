@@ -78,6 +78,13 @@ void Scoreboard::releaseRegisters(const unsigned wid, std::vector<int> regnums) 
   }
 }
 
+void Scoreboard::releaseRegisters(const unsigned wid, const int regnum) {
+  if (regnum > 0) {
+    releaseRegister(wid, regnum);
+    longopregs[wid].erase(regnum);
+  }
+}
+
 bool Scoreboard::checkCollision(const unsigned wid, std::vector<int> regnums, 
                                 int pred, int ar1, int ar2) const {
   // Get list of all input and output registers
