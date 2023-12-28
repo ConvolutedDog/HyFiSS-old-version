@@ -34,6 +34,14 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
   // number of warps per kernel that are allocated to this SM
   m_num_warps_per_sm.resize(appcfg->get_kernels_num(), 0);
 
+  m_warp_active_status.reserve(kernel_block_pair.size());
+  for (auto it = kernel_block_pair.begin(); it != kernel_block_pair.end(); it++) {
+    unsigned kid = it->first - 1;
+    unsigned block_id = it->second;
+    unsigned _warps_per_block = appcfg->get_num_warp_per_block(kid);
+    m_warp_active_status.push_back(std::vector<bool>(_warps_per_block, false));
+  }
+
   // m_num_warps_per_sm[i] stores the i-th kernel's warps number that are allocated to this SM
   for (auto it = kernel_block_pair.begin(); it != kernel_block_pair.end(); it++) {
     unsigned kid = it->first - 1;
@@ -396,12 +404,15 @@ void PrivateSM::run(){
 
   std::cout << "# cycle: " << m_cycle << std::endl;
 
-  if (m_cycle >= 76) {
+  if (m_cycle >= 100) {
     active = false;
   }
 
   // for (auto it = kernel_block_pair.begin(); it != kernel_block_pair.end(); it++){
-  auto it_kernel_block_pair = kernel_block_pair.begin();
+  
+  // TODO: here only first kid-bid pair is considered
+  auto it_kernel_block_pair = kernel_block_pair.begin(); 
+
     unsigned kid = it_kernel_block_pair->first - 1;
     
     unsigned block_id = it_kernel_block_pair->second;
@@ -416,6 +427,13 @@ void PrivateSM::run(){
     // std::cout << "$ SM-" << m_smid << " Kernel-" << kid << " Block-" << block_id 
     //           << ", gwarp_id_start: " << gwarp_id_start << ", gwarp_id_end: " 
     //           << gwarp_id_end << std::endl;
+
+    for (unsigned _wid_ = 0; _wid_ < warps_per_block; _wid_++) {
+      if (m_cycle == 1 && m_warp_active_status[kid][_wid_] == false) {
+        m_warp_active_status[kid][_wid_] = true;
+        std::cout << "  **First time to activate warp (kid, wid): (" << kid << ", " << _wid_ << ")" << std::endl;
+      }
+    }
 
 
     /**********************************************************************************************/
@@ -643,6 +661,12 @@ void PrivateSM::run(){
 
         // remove the instn from writeback_stage_instns
         pipe_reg->m_valid = false;
+
+        /* If the instn string of (_kid, _wid, _pc) is "EXIT", should deactivate this warp. */
+        if (_trace_warp_inst.get_opcode() == OP_EXIT) {
+          m_warp_active_status[_kid][_wid - gwarp_id_start] = false;
+        }
+
       } else {
         std::cout << "  **Try to but fail to Write back "
                      "instn (pc, gwid, kid, fetch_instn_id): (" << std::hex 
@@ -1289,6 +1313,11 @@ void PrivateSM::run(){
                                            ar2);
             std::cout << "  check_is_scoreboard_collision: " 
                       << check_is_scoreboard_collision << std::endl;
+
+            if (tmp_trace_warp_inst->get_opcode() == OP_EXIT && 
+                m_scoreboard->regs_size(global_all_kernels_warp_id) > 0) {
+              check_is_scoreboard_collision = true;
+            }
             
             if (check_is_scoreboard_collision) {
               checked_num++;
@@ -1736,4 +1765,14 @@ void PrivateSM::run(){
 
   // std::cout << "$ SM-" << m_smid << " Kernel NUM: " 
   //           << tracer->get_appcfg()->get_kernels_num() << std::endl;
+
+  for (unsigned _w_id_ = 0; _w_id_ <= gwarp_id_end - gwarp_id_start; _w_id_++) {
+    std::cout << "D: SM-" << m_smid << " Kernel-" << kid << " Warp-" << _w_id_ << " active status: " << m_warp_active_status[kid][_w_id_] << std::endl;
+    if (m_warp_active_status[kid][_w_id_]) break;
+    else if (!m_warp_active_status[kid][_w_id_] && _w_id_ == gwarp_id_end - gwarp_id_start) {
+      active = false;
+      std::cout << "D: SM-" << m_smid << " Kernel-" << kid << " is finished." << std::endl;
+    }
+  }
+
 }
