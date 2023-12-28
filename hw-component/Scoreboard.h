@@ -32,6 +32,8 @@ class Scoreboard {
   
   const bool islongop(const unsigned wid, const int regnum);
 
+  const unsigned regs_size(const unsigned wid) const { return reg_table[wid].size(); }
+
  private:
   //将单个目标寄存器保留在相应硬件warp的记分牌中。
   void reserveRegister(const unsigned wid, const int regnum);
