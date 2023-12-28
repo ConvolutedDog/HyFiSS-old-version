@@ -199,6 +199,8 @@ class PrivateSM {
 
   unsigned num_result_bus;
   std::vector<std::bitset<MAX_ALU_LATENCY>*> m_result_bus;
+
+  std::vector<std::vector<bool>> m_warp_active_status;
 };
 
 #endif
