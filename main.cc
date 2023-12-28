@@ -727,6 +727,9 @@ START_TIMER(5);
     std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" << std::endl;
   }
 
+STOP_AND_REPORT_TIMER_rank(world.rank(), 5);
+
+START_TIMER(6);
   /**********************************************************************************************/
   /***                                                                                        ***/
   /***                              The computation simulation.                               ***/
@@ -800,7 +803,7 @@ START_TIMER(5);
   }
   
 
-STOP_AND_REPORT_TIMER_rank(world.rank(), 5);
+STOP_AND_REPORT_TIMER_rank(world.rank(), 6);
 
   fflush(stdout);
 
