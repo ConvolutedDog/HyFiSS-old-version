@@ -377,10 +377,14 @@ bool _inst_trace_t::parse_from_string(std::string trace,
   assert(reg_dsts_num <= MAX_DST);
   for (unsigned i = 0; i < reg_dsts_num; ++i) {
     ss >> temp;
-    if (temp.find("P") == 0)
+    if (temp.find("P") == 0) {
       sscanf(temp.c_str(), "P%u", &reg_dest[i]);
-    else if (temp.find("R") == 0)
+      reg_dest_is_pred[i] = true;
+    }
+    else if (temp.find("R") == 0) {
       sscanf(temp.c_str(), "R%u", &reg_dest[i]);
+      reg_dest_is_pred[i] = false;
+    }
     else if (temp.find("[") == 0)
       // This condition will not occur in the trace file.
       sscanf(temp.c_str(), "[R%u]", &reg_dest[i]);
