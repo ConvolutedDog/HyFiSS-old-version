@@ -67,6 +67,11 @@ struct _inst_trace_t {
     kernel_id = _kernel_id;
     m_pc = _pc;
     instn_str = _instn_str;
+
+    for (unsigned it = 0; it < MAX_DST; it++) {
+      reg_dest_is_pred[it] = false;
+    }
+
     memadd_info = NULL;
     parse_from_string(_instn_str, _kernel_id);
 
@@ -93,6 +98,11 @@ struct _inst_trace_t {
     kernel_id = _kernel_id;
     m_pc = _pc;
     instn_str = _instn_str;
+
+    for (unsigned it = 0; it < MAX_DST; it++) {
+      reg_dest_is_pred[it] = false;
+    }
+
     memadd_info = NULL;
     parse_from_string(_instn_str, _kernel_id);
 
@@ -129,6 +139,7 @@ struct _inst_trace_t {
   unsigned mask = 0x0; // invalid
   unsigned reg_dsts_num;
   int reg_dest[MAX_DST];
+  bool reg_dest_is_pred[MAX_DST];
   std::string opcode;
   // bool read_or_wirte;
   unsigned reg_srcs_num;
