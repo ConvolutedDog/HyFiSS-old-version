@@ -617,8 +617,6 @@ void PrivateSM::run(){
           if (m_reg_bank_allocator->getBankState(bank_id) == FREE) {
             m_reg_bank_allocator->setBankState(bank_id, ON_WRITING);
             
-            need_write_back_regs_num.push_back(dst_reg_id);
-            
             _trace_warp_inst.set_arch_reg_dst(i, -1);
             std::cout << "    setBankState(" << bank_id 
                       << ", WRITING)   dst_reg_id : " << _trace_warp_inst.get_arch_reg_dst(i) << std::endl;
@@ -684,7 +682,12 @@ void PrivateSM::run(){
           need_write_back_regs_num.push_back(tmp_inst_trace->reg_src[i]);
         }
         for (unsigned i = 0; i < tmp_inst_trace->reg_dsts_num; i++) {
-          need_write_back_regs_num.push_back(tmp_inst_trace->reg_dest[i]);
+          if (tmp_inst_trace->reg_dest_is_pred[i]) {
+            need_write_back_regs_num.push_back(tmp_inst_trace->reg_dest[i] + PRED_NUM_OFFSET);
+          }
+          else {
+            need_write_back_regs_num.push_back(tmp_inst_trace->reg_dest[i]);
+          }
         }
         auto pred = _trace_warp_inst.get_pred();
         need_write_back_regs_num.push_back((pred < 0) ? pred : pred + PRED_NUM_OFFSET);
@@ -1300,7 +1303,10 @@ void PrivateSM::run(){
               regnums.push_back(tmp_inst_trace->reg_src[i]);
             }
             for (unsigned i = 0; i < tmp_inst_trace->reg_dsts_num; i++) {
-              regnums.push_back(tmp_inst_trace->reg_dest[i]);
+              if (tmp_inst_trace->reg_dest_is_pred[i]) 
+                regnums.push_back(tmp_inst_trace->reg_dest[i] + PRED_NUM_OFFSET);
+              else
+                regnums.push_back(tmp_inst_trace->reg_dest[i]);
             }
 
             bool check_is_scoreboard_collision = false;
