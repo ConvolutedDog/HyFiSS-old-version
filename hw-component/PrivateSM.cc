@@ -410,8 +410,8 @@ void PrivateSM::run(){
 
   // for (auto it = kernel_block_pair.begin(); it != kernel_block_pair.end(); it++){
   
-  // TODO: here only first kid-bid pair is considered
-  auto it_kernel_block_pair = kernel_block_pair.begin(); 
+    // TODO: here only first kid-bid pair is considered
+    auto it_kernel_block_pair = kernel_block_pair.begin(); 
 
     unsigned kid = it_kernel_block_pair->first - 1;
     
@@ -435,127 +435,6 @@ void PrivateSM::run(){
       }
     }
 
-
-    /**********************************************************************************************/
-    /***                                                                                        ***/
-    /***                              Write back to register banks.                             ***/
-    /***                                                                                        ***/
-    /**********************************************************************************************/
-/***************************************************************************************************
-    std::vector<std::vector<stage_instns_identifier>::iterator> writeback_stage_instns_to_remove;
-    // traverse writeback_stage_instns
-    for (auto it = writeback_stage_instns.begin(); it != writeback_stage_instns.end(); it++) {
-      unsigned _kid = it->kid;
-      unsigned _pc = it->pc;
-      unsigned _wid = it->wid;
-      unsigned _uid = it->uid;
-
-      // get the dst reg id of the instn (_kid, _pc, _wid, _uid)
-      auto _trace_warp_inst = tracer->get_one_kernel_one_warp_one_instn(_kid, _wid, _uid)->trace_warp_inst;
-      unsigned dst_reg_num = _trace_warp_inst.get_outcount();
-      for (unsigned i = 0; i < dst_reg_num; i++){
-        int dst_reg_id = _trace_warp_inst.get_arch_reg_dst(i);
-        // std::cout << "    dst_reg_id[" << i << "]: " << dst_reg_id << std::endl;
-        // Calculate the scheduler id of the dst reg id
-        if (dst_reg_id >= 0) {
-          auto local_wid = (unsigned)(_wid % warps_per_block);
-          auto sched_id = (unsigned)(local_wid % num_scheds);
-          // Calculate the bank id of the dst reg id
-          auto bank_id = register_bank(dst_reg_id, local_wid, sched_id);
-          std::cout << "    kid, wid, uid, dst_reg_num, dst_reg_id, bank_id, sched_id: " << _kid << ", " 
-                                                                    << _wid << " (local:" 
-                                                                    << local_wid << "), "
-                                                                    << _uid << ", " 
-                                                                    << dst_reg_num << ", " 
-                                                                    << dst_reg_id << ", " 
-                                                                    << bank_id << ", " 
-                                                                    << sched_id << std::endl;
-          // Now we set the bank_id of the dst reg id to be on_write (for dst reg id, it is on_wite).
-          if (m_reg_bank_allocator->getBankState(bank_id) == FREE) {
-            m_reg_bank_allocator->setBankState(bank_id, ON_WRITING);
-            
-            _trace_warp_inst.set_arch_reg_dst(i, -1);
-            std::cout << "    setBankState(" << bank_id 
-                      << ", WRITING)   dst_reg_id : " << _trace_warp_inst.get_arch_reg_dst(i) << std::endl;
-          }
-        }
-      }
-
-      bool all_write_back = true;
-      for (unsigned i = 0; i < dst_reg_num; i++){
-        if (_trace_warp_inst.get_arch_reg_dst(i) != -1) {
-          all_write_back = false;
-          break;
-        }
-      }
-
-      // if all dst reg ids are written back, then we can release the bank states and
-      // remove the instn from writeback_stage_instns
-      if (all_write_back) {
-        // std::cout << "    all_write_back" << std::endl;
-        std::cout << "  Write back instn (pc, gwid, kid, fetch_instn_id): (" << _pc << ", " 
-                                                                             << _wid << ", " 
-                                                                             << _kid << ", " 
-                                                                             << _uid << ")" << std::endl;
-        
-        // This should be done in the read operand stage.
-        // for (unsigned i = 0; i < dst_reg_num; i++){
-        //   int dst_reg_id = _trace_warp_inst.get_out(i);
-        //   if (dst_reg_id >= 0) {
-        //     auto local_wid = (unsigned)(_wid % warps_per_block);
-        //     auto sched_id = (unsigned)(local_wid % num_scheds);
-        //     // Calculate the bank id of the dst reg id
-        //     auto bank_id = register_bank(dst_reg_id, local_wid, sched_id);
-        //     std::cout << "    releaseBankState(" << bank_id << ")" << std::endl;
-        //     m_reg_bank_allocator->releaseBankState(bank_id);
-        //   }
-        // }
-
-        // remove the instn from writeback_stage_instns
-        // writeback_stage_instns.erase(it);
-        writeback_stage_instns_to_remove.push_back(it);
-      }
-
-    }
-
-    // remove the instns from writeback_stage_instns
-    for (auto it = writeback_stage_instns_to_remove.begin(); 
-              it != writeback_stage_instns_to_remove.end(); it++){
-      writeback_stage_instns.erase(*it);
-    }
-***************************************************************************************************/
-    /**********************************************************************************************/
-    /***                                                                                        ***/
-    /***                       Transfer instns to writeback_stage_instns.                       ***/
-    /***                                                                                        ***/
-    /**********************************************************************************************/
-/***************************************************************************************************
-    // std::cout << "D: kid: " << kid << " m_valid: " << m_inst_fetch_buffer->m_valid << std::endl;
-    for (auto gwid = gwarp_id_start; gwid <= gwarp_id_end; gwid++) {
-      auto global_all_kernels_warp_id = gwid + std::accumulate(m_num_warps_per_sm.begin(), m_num_warps_per_sm.begin() + kid, 0);
-      // check if the ibuffer has free slot
-      // std::cout << "D: global_all_kernels_warp_id: " << global_all_kernels_warp_id << std::endl;
-      // std::cout << "D: m_ibuffer->is_not_empty(global_all_kernels_warp_id): " << m_ibuffer->is_not_empty(global_all_kernels_warp_id) << std::endl;
-      if (m_ibuffer->is_not_empty(global_all_kernels_warp_id)) {
-        // pop the instn from ibuffer
-        // TODO
-        // ibuffer_entry entry = m_ibuffer->pop_front(global_all_kernels_warp_id);
-        ibuffer_entry entry = m_ibuffer->front(global_all_kernels_warp_id);
-        unsigned _fetch_instn_id = entry.uid;
-        unsigned _pc = entry.pc;
-        unsigned _gwid = entry.wid;
-        unsigned _kid = entry.kid;
-        // TODO
-        // writeback_stage_instns.push_back(stage_instns_identifier(_kid, _pc, _gwid, _fetch_instn_id));
-        std::cout << "  Transfer instn (pc, gwid, kid, fetch_instn_id): (" << _pc << ", " 
-                                                                           << _gwid << ", " 
-                                                                           << _kid << ", " 
-                                                                           << _fetch_instn_id << ")" << std::endl;
-        m_ibuffer->print_ibuffer(gwid);
-      }
-    }
-
-***************************************************************************************************/
     /**********************************************************************************************/
     /***                                                                                        ***/
     /***                              Write back to register banks.                             ***/
@@ -1766,19 +1645,19 @@ void PrivateSM::run(){
       }
     }
 
-  // std::cout << "D: !!!!" << std::endl;
-  // }
+    // std::cout << "D: !!!!" << std::endl;
+    // }
 
-  // std::cout << "$ SM-" << m_smid << " Kernel NUM: " 
-  //           << tracer->get_appcfg()->get_kernels_num() << std::endl;
+    // std::cout << "$ SM-" << m_smid << " Kernel NUM: " 
+    //           << tracer->get_appcfg()->get_kernels_num() << std::endl;
 
-  for (unsigned _w_id_ = 0; _w_id_ <= gwarp_id_end - gwarp_id_start; _w_id_++) {
-    std::cout << "D: SM-" << m_smid << " Kernel-" << kid << " Warp-" << _w_id_ << " active status: " << m_warp_active_status[kid][_w_id_] << std::endl;
-    if (m_warp_active_status[kid][_w_id_]) break;
-    else if (!m_warp_active_status[kid][_w_id_] && _w_id_ == gwarp_id_end - gwarp_id_start) {
-      active = false;
-      std::cout << "D: SM-" << m_smid << " Kernel-" << kid << " is finished." << std::endl;
+    for (unsigned _w_id_ = 0; _w_id_ <= gwarp_id_end - gwarp_id_start; _w_id_++) {
+      std::cout << "D: SM-" << m_smid << " Kernel-" << kid << " Warp-" << _w_id_ << " active status: " << m_warp_active_status[kid][_w_id_] << std::endl;
+      if (m_warp_active_status[kid][_w_id_]) break;
+      else if (!m_warp_active_status[kid][_w_id_] && _w_id_ == gwarp_id_end - gwarp_id_start) {
+        active = false;
+        std::cout << "D: SM-" << m_smid << " Kernel-" << kid << " is finished." << std::endl;
+      }
     }
-  }
 
 }
