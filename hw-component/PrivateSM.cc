@@ -42,17 +42,30 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
     m_warp_active_status.push_back(std::vector<bool>(_warps_per_block, false));
   }
 
-  // m_num_warps_per_sm[i] stores the i-th kernel's warps number that are allocated to this SM
+  /* m_num_warps_per_sm[i] stores the i-th kernel's warps number that are 
+   * allocated to this SM. m_num_warps_per_sm's first dim is the total num 
+   * of kernels that are executed on the GPU, and its second dim is the 
+   * number of warps that blongs to the current SM. for example, 
+   *   -trace_issued_sm_id_0 5,0,(1,80),(1,160),(1,0),(2,0),(2,80)
+   * and the 1st kernel has 3 warps per thread block, the 2nd kernel has 2 
+   * warps per thread block, then:
+   *   m_num_warps_per_sm[0] = 9, m_num_warps_per_sm[1] = 6.
+   */
   for (auto it = kernel_block_pair.begin(); it != kernel_block_pair.end(); it++) {
     unsigned kid = it->first - 1;
     unsigned _warps_per_block = appcfg->get_num_warp_per_block(kid);
     m_num_warps_per_sm[kid] += _warps_per_block;
   }
 
+  m_num_blocks_per_kernel.resize(appcfg->get_kernels_num(), 0);
+
   /* curr_instn_id_per_warp stores the current instn id of each warp */
   for (auto it = kernel_block_pair.begin(); it != kernel_block_pair.end(); it++) {
     unsigned kid = it->first - 1;
     unsigned block_id = it->second;
+
+    m_num_blocks_per_kernel[kid] += 1;
+
     unsigned _warps_per_block = appcfg->get_num_warp_per_block(kid);
     for (unsigned _i = 0; _i < _warps_per_block; _i++) {
       // std::cout << "D: Initial curr_instn_id_per_warp: " << kid << " " << block_id << " " << _i << " to 0." << std::endl;
@@ -66,13 +79,19 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
     std::cout << "m_num_warps_per_sm: " << *it << std::endl;
   }
 
+  /* last_fetch_warp_id: key - kid : value - wid */
+  for (auto i = 0; i< m_num_warps_per_sm.size(); i++){
+    last_fetch_warp_id[i] = 0;
+  }
+
   // sum of std::vector<unsigned> m_num_warps_per_sm
   all_warps_num = std::accumulate(m_num_warps_per_sm.begin(), m_num_warps_per_sm.end(), 0);
-
+  std::cout << "Initial Ibuffer size: " << all_warps_num << std::endl;
   // when accessing the ibuffer, the index is:
   //     global_all_kernels_warp_id = gwarp_id + sum_{kid = 0,1,...,kernel_id-1}(m_num_warps_per_sm[kid])
   m_ibuffer = new IBuffer(m_smid, all_warps_num);
-  last_fetch_warp_id = 0;
+  // last_fetch_warp_id = 0;
+  distance_last_fetch_kid = 0;
   last_issue_sched_id = 0;
   
   m_scoreboard = new Scoreboard(m_smid, all_warps_num);
@@ -92,7 +111,9 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
 
   warps_per_sched = (unsigned)(all_warps_num / num_scheds);
 
-  last_issue_warp_ids.resize(num_scheds, 0);
+  // last_issue_warp_ids.resize(num_scheds, 0);
+
+  last_issue_block_index_per_sched.resize(num_scheds, 0);
 
   m_reg_bank_allocator = new RegisterBankAllocator(m_smid, 
                                                    num_banks, 
@@ -404,15 +425,40 @@ void PrivateSM::run(){
 
   std::cout << "# cycle: " << m_cycle << std::endl;
 
-  if (m_cycle >= 100) {
+  if (m_cycle >= 200) {
     active = false;
   }
 
-  // for (auto it = kernel_block_pair.begin(); it != kernel_block_pair.end(); it++){
+  // for (auto it_kernel_block_pair = kernel_block_pair.begin(); 
+  //           it_kernel_block_pair != kernel_block_pair.end(); 
+  //           it_kernel_block_pair++) {
+
+
+    /* Variables that depend on it_kernel_block_pair:
+     *   kid, block_id, warps_per_block, gwarp_id_start, gwarp_id_end
+     * The following code is to get these variables:
+     *   unsigned index = std::distance(kernel_block_pair.begin(), it_kernel_block_pair);
+     *   unsigned kid = it_kernel_block_pair->first - 1;
+     *   unsigned block_id = it_kernel_block_pair->second;
+     *   unsigned warps_per_block = appcfg->get_num_warp_per_block(kid);
+     *   unsigned gwarp_id_start = warps_per_block * block_id;
+     *   unsigned gwarp_id_end = gwarp_id_start + warps_per_block - 1;
+     */
+
+    /* -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
+     * Here, kernel_block_pair is (1,80), (1,160), (1,0), (2,0), (3,0), (4,0)
+     * for it_kernel_block_pair : kernel_block_pair:
+     *   index           =   0,   1,   2,   3,   4,   5
+     *   kid             =   0,   0,   0,   1,   2,   3
+     *   block_id        =  80, 160,   0,   0,   0,   0
+     *   warps_per_block =   2,   2,   2,   2,   2,   2
+     *   gwarp_id_start  =  80, 160,   0,   0,   0,   0
+     *   gwarp_id_end    =  81, 161,   1,   1,   1,   1
+     */
   
     // TODO: here only first kid-bid pair is considered
     auto it_kernel_block_pair = kernel_block_pair.begin(); 
-
+    
     unsigned kid = it_kernel_block_pair->first - 1;
     
     unsigned block_id = it_kernel_block_pair->second;
@@ -427,11 +473,45 @@ void PrivateSM::run(){
     // std::cout << "$ SM-" << m_smid << " Kernel-" << kid << " Block-" << block_id 
     //           << ", gwarp_id_start: " << gwarp_id_start << ", gwarp_id_end: " 
     //           << gwarp_id_end << std::endl;
-
-    for (unsigned _wid_ = 0; _wid_ < warps_per_block; _wid_++) {
-      if (m_cycle == 1 && m_warp_active_status[kid][_wid_] == false) {
-        m_warp_active_status[kid][_wid_] = true;
-        std::cout << "  **First time to activate warp (kid, wid): (" << kid << ", " << _wid_ << ")" << std::endl;
+    
+    for (auto it_kernel_block_pair = kernel_block_pair.begin(); 
+              (it_kernel_block_pair != kernel_block_pair.end()) &&
+              (it_kernel_block_pair->first - 1 == KERNEL_EVALUATION); // TODO: here only first kernel is considered
+              it_kernel_block_pair++) {
+      /* -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
+       * Here, kernel_block_pair is (1,80), (1,160), (1,0), (2,0), (3,0), (4,0)
+       * for it_kernel_block_pair : kernel_block_pair:
+       *   index           =   0,   1,   2,   3,   4,   5
+       *   kid             =   0,   0,   0,   1,   2,   3
+       *   block_id        =  80, 160,   0,   0,   0,   0
+       *   warps_per_block =   2,   2,   2,   2,   2,   2
+       *   gwarp_id_start  =  80, 160,   0,   0,   0,   0
+       *   gwarp_id_end    =  81, 161,   1,   1,   1,   1
+       */
+      unsigned _index_ = std::distance(kernel_block_pair.begin(), it_kernel_block_pair);
+      unsigned _kid_ = it_kernel_block_pair->first - 1;
+      unsigned _block_id_ = it_kernel_block_pair->second;
+      unsigned _warps_per_block_ = appcfg->get_num_warp_per_block(_kid_);
+      for (unsigned _wid_ = 0; _wid_ < _warps_per_block_; _wid_++) {
+        /* m_warp_active_status[
+         *                      0 ~ kernel_block_pair.size()
+         *                     ]
+         *                     [
+         *                      0 ~ warps_per_block_of_it_kernel_block_pair
+         *                     ] 
+         * In fact, m_warp_active_status's 1st dim is the index of (kid, block_id) pairs
+         * that are issued to the current SM, and the 2nd dim is the number of warps in 
+         * the thread block - (kid, block_id), and equals to the warp_per_block of the 
+         * kernel - kid. */
+        if (m_cycle == 1 && m_warp_active_status[_index_][_wid_] == false) {
+          m_warp_active_status[_index_][_wid_] = true;
+          std::cout << "  **First time to activate warp (_index_, wid): (" 
+                    << _index_ << ", " << _wid_ << ")" 
+                    << " <=> (kid, block_id, wid): (" 
+                    << _kid_ << "," 
+                    << _block_id_ << "," 
+                    << _wid_ << ")" << std::endl;
+        }
       }
     }
 
@@ -463,8 +543,25 @@ void PrivateSM::run(){
       // m_operand_collector.writeback(*pipe_reg);
       unsigned _kid = pipe_reg->kid;
       unsigned _pc = pipe_reg->pc;
+      /* MOST IMPORTANT: Here, _wid is the global warp id in the whole kernel, for example,
+       *   -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
+       * and there are 3 warps per block in the 1st kernel, then:
+       * wid during the transfer in the pipeline is 
+       *   80 * 3 = 240     or 
+       *   80 * 3 + 1 = 241 or
+       *   80 * 3 + 2 = 242.
+       */
       unsigned _wid = pipe_reg->wid;
       unsigned _uid = pipe_reg->uid;
+
+      unsigned _warps_per_block = appcfg->get_num_warp_per_block(_kid);
+      /* We have noticed that _wid is the global warp id in the whole kernel, So, _block_id
+       * here is just the block id of this instn. With the above supposition, _block_id is
+       * 80. */
+      unsigned _block_id = (unsigned)(_wid / _warps_per_block);
+      /* _gwarp_id_start is the global warp id of the first warp in the block, for example,
+       *   80 * 3 = 240. */
+      unsigned _gwarp_id_start = _warps_per_block * _block_id;
 
       auto _compute_instn = tracer->get_one_kernel_one_warp_one_instn(_kid, _wid, _uid);
       auto _trace_warp_inst = 
@@ -478,7 +575,7 @@ void PrivateSM::run(){
         // std::cout << "    dst_reg_id[" << i << "]: " << dst_reg_id << std::endl;
         // Calculate the scheduler id of the dst reg id
         if (dst_reg_id >= 0) {
-          auto local_wid = (unsigned)(_wid % warps_per_block);
+          auto local_wid = (unsigned)(_wid % _warps_per_block);
           auto sched_id = (unsigned)(local_wid % num_scheds);
           // Calculate the bank id of the dst reg id
           auto bank_id = register_bank(dst_reg_id, local_wid, sched_id);
@@ -520,28 +617,48 @@ void PrivateSM::run(){
                                                                                << _wid << ", " 
                                                                                << _kid << ", " 
                                                                                << _uid << ")" << std::endl;
-        
-        
 
-        // This should be done in the read operand stage.
-        // for (unsigned i = 0; i < dst_reg_num; i++){
-        //   int dst_reg_id = _trace_warp_inst.get_out(i);
-        //   if (dst_reg_id >= 0) {
-        //     auto local_wid = (unsigned)(_wid % warps_per_block);
-        //     auto sched_id = (unsigned)(local_wid % num_scheds);
-        //     // Calculate the bank id of the dst reg id
-        //     auto bank_id = register_bank(dst_reg_id, local_wid, sched_id);
-        //     std::cout << "    releaseBankState(" << bank_id << ")" << std::endl;
-        //     m_reg_bank_allocator->releaseBankState(bank_id);
-        //   }
-        // }
+        std::cout << "    Write back instn (kid, gwid, fetch_instn_id): (" << _kid << ", "
+                                                                           << _wid << ", "
+                                                                           << _uid << ")" << std::endl;
 
         // remove the instn from writeback_stage_instns
         pipe_reg->m_valid = false;
 
         /* If the instn string of (_kid, _wid, _pc) is "EXIT", should deactivate this warp. */
         if (_trace_warp_inst.get_opcode() == OP_EXIT) {
-          m_warp_active_status[_kid][_wid - gwarp_id_start] = false;
+          /* m_warp_active_status[
+           *                      0 ~ kernel_block_pair.size()
+           *                     ]
+           *                     [
+           *                      0 ~ warps_per_block_of_it_kernel_block_pair
+           *                     ] 
+           * In fact, m_warp_active_status's 1st dim is the index of (kid, block_id) pairs
+           * that are issued to the current SM, and the 2nd dim is the number of warps in 
+           * the thread block - (kid, block_id), and equals to the warp_per_block of the 
+           * kernel - kid. */
+          /* We now need to calculate the index of kernel - block pair (_kid, _block_id). */
+          unsigned _index = 0;
+          for (auto _it_kernel_block_pair = kernel_block_pair.begin(); 
+                    _it_kernel_block_pair != kernel_block_pair.end(); 
+                    _it_kernel_block_pair++) {
+            if (_it_kernel_block_pair->first - 1 == _kid && 
+                _it_kernel_block_pair->second == _block_id) {
+              _index = std::distance(kernel_block_pair.begin(), _it_kernel_block_pair);
+              break;
+            }
+          }
+          /* MOST IMPORTANT: Here, _wid is the global warp id in the whole kernel, for example,
+           *   -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
+           * and there are 3 warps per block in the 1st kernel, then:
+           * wid during the transfer in the pipeline is 
+           *   80 * 3 = 240     or 
+           *   80 * 3 + 1 = 241 or
+           *   80 * 3 + 2 = 242.
+           * _gwarp_id_start is the global warp id of the first warp in the block, for example,
+           * 80 * 3 = 240.
+           */
+          m_warp_active_status[_index][_wid - _gwarp_id_start] = false;
         }
 
       } else {
@@ -552,6 +669,51 @@ void PrivateSM::run(){
                   << _kid << ", " 
                   << _uid << ")" << std::endl;
       }
+
+      /* m_num_warps_per_sm's first dim is the total num of kernels that are executed on
+       * the GPU, and its second dim is the number of warps that blongs to the current SM.
+       * for example, 
+       *   -trace_issued_sm_id_0 5,0,(1,80),(1,160),(1,0),(2,0),(2,80)
+       *   and the 1st kernel has 3 warps per thread block, the 2nd kernel has 2 warps per
+       *   thread block, then:
+       *     m_num_warps_per_sm[0] = 9, m_num_warps_per_sm[1] = 6.
+       * So, the following code is to get the global warp id of the total kernels 
+       * (global_all_kernels_warp_id). For example, we have 2 kernels in the whole SM, and 
+       * the 1st kernel has 3 warps per thread block, then the 2nd kernel has 2 warps per 
+       * thread block, thus the global_all_kernels_warp_id of the 2st kernel's 2nd warp is 
+       * 9 + 2 = 11.
+       * 
+       * And with the above assumption, the IBuffer's slots are allocated in the following:
+       *  0 slot => warp 0 from kernel 0
+       *  1 slot => warp 1 from kernel 0
+       *  ......
+       *  8 slot => warp 8 from kernel 0
+       *  9 slot => warp 0 from kernel 1
+       * 10 slot => warp 1 from kernel 1
+       * ......
+       * 14 slot => warp 5 from kernel 1
+       */
+
+      /* Count the entries in the kernel_block_pair that are smaller than _block_id with
+       * the same _kid. */
+      unsigned _kid_block_id_count = 0;
+      for (auto _it_kernel_block_pair = kernel_block_pair.begin(); 
+                _it_kernel_block_pair != kernel_block_pair.end(); 
+                _it_kernel_block_pair++) {
+        if (_it_kernel_block_pair->first - 1 == _kid) {
+          if (_it_kernel_block_pair->second < _block_id) {
+            _kid_block_id_count++;
+          }
+        }
+      }
+
+      /* With the above assumption, for _wid from (2,80), global_all_kernels_warp_id:
+       * slot 12/13/14 in the IBuffer will be filled.  */
+      auto global_all_kernels_warp_id = 
+        (unsigned)(_wid % _warps_per_block) + 
+        _kid_block_id_count * _warps_per_block +
+        std::accumulate(m_num_warps_per_sm.begin(), 
+                        m_num_warps_per_sm.begin() + _kid, 0);
 
       if (all_write_back) {
         m_scoreboard->printContents();
@@ -573,7 +735,8 @@ void PrivateSM::run(){
 
         for (auto regnum : need_write_back_regs_num) {
           // void Scoreboard::releaseRegisters(const unsigned wid, std::vector<int> regnums)
-          m_scoreboard->releaseRegisters(_wid, regnum);
+          // m_scoreboard->releaseRegisters(_wid, regnum);
+          m_scoreboard->releaseRegisters(global_all_kernels_warp_id, regnum);
         }
 
         m_scoreboard->printContents();
@@ -590,7 +753,7 @@ void PrivateSM::run(){
     /***                                         Execute.                                       ***/
     /***                                                                                        ***/
     /**********************************************************************************************/
-    
+
     for (unsigned i = 0; i < num_result_bus; i++) {
       *(m_result_bus[i]) >>= 1;
     }
@@ -1080,7 +1243,15 @@ void PrivateSM::run(){
     /***                               Issue intns to issue_port.                               ***/
     /***                                                                                        ***/
     /**********************************************************************************************/
-    
+    /* Variables that depend on it_kernel_block_pair:
+     *   kid, block_id, warps_per_block, gwarp_id_start, gwarp_id_end
+     * The following code is to get these variables:
+     *   unsigned kid = it_kernel_block_pair->first - 1;
+     *   unsigned block_id = it_kernel_block_pair->second;
+     *   unsigned warps_per_block = appcfg->get_num_warp_per_block(kid);
+     *   unsigned gwarp_id_start = warps_per_block * block_id;
+     *   unsigned gwarp_id_end = gwarp_id_start + warps_per_block - 1;
+     */
 
     unsigned max_issue_per_warp = m_hw_cfg->get_max_insn_issue_per_warp();
     std::cout << "  **ISSUE stage: " << std::endl;
@@ -1088,411 +1259,523 @@ void PrivateSM::run(){
       auto sched_id = (last_issue_sched_id + _sched_id) % num_scheds;
       std::cout << "    D: issue sched_id: " << sched_id << std::endl;
       
-      
-      // LRR warp sheduling
-      for (auto gwid = gwarp_id_start; 
-           (gwid <= gwarp_id_end) && 
-           (gwid % num_scheds == sched_id); 
-           gwid++) {
-        // std::cout << last_issue_warp_ids.size() << std::endl;
-        // for (auto it = last_issue_warp_ids.begin(); it != last_issue_warp_ids.end(); it++) {
-        //   std::cout << *it << std::endl;
-        // }
-        auto wid = (last_issue_warp_ids[sched_id] + gwid) % warps_per_block + gwarp_id_start;
-        auto global_all_kernels_warp_id = wid + std::accumulate(m_num_warps_per_sm.begin(), m_num_warps_per_sm.begin() + kid, 0);
-        // std::cout << "D: global_all_kernels_warp_id: " << global_all_kernels_warp_id << std::endl;
-        // std::cout << "D: m_ibuffer->is_not_empty(global_all_kernels_warp_id): " << m_ibuffer->is_not_empty(global_all_kernels_warp_id) << std::endl;
+      for (unsigned i = 0; i < kernel_block_pair.size(); i++) {
+        auto it_kernel_block_pair = 
+          kernel_block_pair.begin() + 
+          (last_issue_block_index_per_sched[sched_id] + i) % kernel_block_pair.size();
+
+        if (it_kernel_block_pair->first - 1 != KERNEL_EVALUATION) continue;
+
+
+      // for (auto it_kernel_block_pair = kernel_block_pair.begin(); 
+      //           (it_kernel_block_pair != kernel_block_pair.end()) &&
+      //           // (it_kernel_block_pair->second == 80) && // NEED TO DELETE
+      //           (it_kernel_block_pair->first - 1 == KERNEL_EVALUATION); // TODO: here only first kernel is considered
+      //           it_kernel_block_pair++) {
         
-        unsigned issued_num = 0;
-        unsigned checked_num = 0;
+        /* -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
+         * Here, kernel_block_pair is (1,80), (1,160), (1,0), (2,0), (3,0), (4,0)
+         * for it_kernel_block_pair : kernel_block_pair:
+         *   _kid             =   0,   0,   0,   1,   2,   3
+         *   _block_id        =  80, 160,   0,   0,   0,   0
+         *   _warps_per_block =   3,   3,   3,   3,   3,   3
+         *   _gwarp_id_start  = 240, 480,   0,   0,   0,   0
+         *   _gwarp_id_end    = 242, 482,   1,   1,   1,   1
+         */
+        
+        unsigned _kid = it_kernel_block_pair->first - 1;
+        unsigned _block_id = it_kernel_block_pair->second;
+        unsigned _warps_per_block = appcfg->get_num_warp_per_block(_kid);
+        unsigned _gwarp_id_start = _warps_per_block * _block_id;
+        unsigned _gwarp_id_end = _gwarp_id_start + _warps_per_block - 1;
 
-        exec_unit_type_t previous_issued_inst_exec_type = exec_unit_type_t::NONE;
+        /* Find if <_kid, _block_id> exits in last_issue_warp_ids, if true: get its value; if 
+         * false, set 0. Its defination:
+         *   // Key: <kid, block_id>, value: warp_id.
+         *   std::map<std::pair<int, int>, int> last_issue_warp_ids; */
+        unsigned last_issue_warp_id;
 
-        while (
-          (issued_num < max_issue_per_warp) &&
-          (checked_num <= issued_num)
-        ) {
-          bool warp_inst_issued = false;
+        auto find_last_issue_warp_id = last_issue_warp_ids.find(std::make_pair(_kid, _block_id));
+          
+        if (find_last_issue_warp_id == last_issue_warp_ids.end()) {
+          last_issue_warp_ids[std::make_pair(_kid, _block_id)] = 0;
+          last_issue_warp_id = 0;
+        } else {
+          last_issue_warp_id = find_last_issue_warp_id->second;
+        }
+      
+        /* LRR warp sheduling */
+        for (auto gwid = _gwarp_id_start; 
+            (gwid <= _gwarp_id_end) 
+            // && (gwid % num_scheds == sched_id)
+            ; 
+            gwid++) {
+          // std::cout << last_issue_warp_ids.size() << std::endl;
+          // for (auto it = last_issue_warp_ids.begin(); it != last_issue_warp_ids.end(); it++) {
+          //   std::cout << *it << std::endl;
+          // }
 
-          std::vector<int> regnums;
-          int pred;
-          int ar1;
-          int ar2;
+          /* Here, wid is actually in the bound [_gwarp_id_start, _gwarp_id_end]. */
+          auto wid = (last_issue_warp_id + gwid) % _warps_per_block + _gwarp_id_start;
+          /* What we need to note here is that x % num_scheds != sched_id, the x variable should 
+           * be the index the wid is in the current SM. So we should first calculate the index
+           * wid is. */
+          unsigned _idx_wid_in_SM = wid - _gwarp_id_start;
+          for (auto _ = kernel_block_pair.begin(); _ != kernel_block_pair.end(); _++) {
+            if ((_->first - 1 < _kid) || (_->first - 1 == _kid && _->second < _block_id)) 
+              _idx_wid_in_SM += appcfg->get_num_warp_per_block(_->first - 1);
+          }
+          if (_idx_wid_in_SM % num_scheds != sched_id) {
+            std::cout << "      $Kid-" << _kid << ", block_id-" << _block_id 
+                      << ", wid-" << wid << ", idx_wid_in_SM-" << _idx_wid_in_SM 
+                      << " NOT BELONG TO sched_id-" << sched_id << std::endl;
+            continue;
+          }
+          /* m_num_warps_per_sm's first dim is the total num of kernels that are executed on
+           * the GPU, and its second dim is the number of warps that blongs to the current SM.
+           * for example, 
+           *   -trace_issued_sm_id_0 5,0,(1,80),(1,160),(1,0),(2,0),(2,80)
+           *   and the 1st kernel has 3 warps per thread block, the 2nd kernel has 2 warps per
+           *   thread block, then:
+           *     m_num_warps_per_sm[0] = 9, m_num_warps_per_sm[1] = 6.
+           * So, the following code is to get the global warp id of the total kernels 
+           * (global_all_kernels_warp_id). For example, we have 2 kernels in the whole SM, and 
+           * the 1st kernel has 3 warps per thread block, then the 2nd kernel has 2 warps per 
+           * thread block, thus the global_all_kernels_warp_id of the 2st kernel's 2nd warp is 
+           * 9 + 2 = 11.
+           * 
+           * And with the above assumption, the IBuffer's slots are allocated in the following:
+           *  0 slot => warp 0 from kernel 0
+           *  1 slot => warp 1 from kernel 0
+           *  ......
+           *  8 slot => warp 8 from kernel 0
+           *  9 slot => warp 0 from kernel 1
+           * 10 slot => warp 1 from kernel 1
+           * ......
+           * 14 slot => warp 5 from kernel 1
+           */
 
-          if (m_ibuffer->is_not_empty(global_all_kernels_warp_id)) {
-            
-            std::cout << "  Before pop,m_ibuffer:" << std::endl;
-            m_ibuffer->print_ibuffer(wid);
-            // pop the instn from ibuffer
-            ibuffer_entry entry = m_ibuffer->front(global_all_kernels_warp_id);
-            std::cout << "  pop_front(uid,pc,wid,kid): " 
-                                        << entry.uid << " " 
-                                        << entry.pc << " " 
-                                        << entry.wid << " " 
-                                        << entry.kid << std::endl;
-            std::cout << "  After pop,m_ibuffer:" << std::endl;
-            m_ibuffer->print_ibuffer(entry.wid);
-            unsigned _fetch_instn_id = entry.uid;
-            unsigned _pc = entry.pc;
-            unsigned _gwid = entry.wid;
-            unsigned _kid = entry.kid;
-            std::cout << "  try to issue: " << _fetch_instn_id << " " 
-                                            << _pc << " " 
-                                            << _gwid << " " 
-                                            << _kid << std::endl;
-            
-            
-            
-            // get instn by entry
-            compute_instn* tmp = tracer->get_one_kernel_one_warp_one_instn(_kid, _gwid, _fetch_instn_id);
-            _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
-            trace_warp_inst_t* tmp_trace_warp_inst = &(tmp->trace_warp_inst);
-            std::cout << "    instn: " << tmp_inst_trace->instn_str << std::endl;
-            
-            std::cout << "    opcode: " << tmp_trace_warp_inst->get_opcode() << " " 
-                      << tmp_trace_warp_inst->get_op() << std::endl;
-            std::cout << "            " << OP_SHFL << " " << ALU_OP << std::endl;
-            auto latency = tmp_inst_trace->get_latency();
-            std::cout << "    latency: " << latency << std::endl;
-            auto init_latency = tmp_inst_trace->get_initiation_interval();
-            std::cout << "    init_latency: " << init_latency << std::endl;
-
-
-            std::cout << "  @ pred: " << tmp_trace_warp_inst->get_pred() << " " << std::endl;
-            std::cout << "  @ ar1: " << tmp_trace_warp_inst->get_ar1() << " " << std::endl;
-            std::cout << "  @ ar2: " << tmp_trace_warp_inst->get_ar2() << " " << std::endl;
-            std::cout << "  @ srcs: ";
-            for (unsigned i = 0; i < tmp_inst_trace->reg_srcs_num; i++) {
-              std::cout << tmp_inst_trace->reg_src[i] << " ";
+          /* Count the entries in the kernel_block_pair that are smaller than _block_id with
+          * the same _kid. */
+          unsigned _kid_block_id_count = 0;
+          for (auto _it_kernel_block_pair = kernel_block_pair.begin(); 
+                    _it_kernel_block_pair != kernel_block_pair.end(); 
+                    _it_kernel_block_pair++) {
+            if (_it_kernel_block_pair->first - 1 == _kid) {
+              if (_it_kernel_block_pair->second < _block_id) {
+                _kid_block_id_count++;
+              }
             }
-            std::cout << std::endl;
-            std::cout << "  @ dsts: ";
-            for (unsigned i = 0; i < tmp_inst_trace->reg_dsts_num; i++) {
-              std::cout << tmp_inst_trace->reg_dest[i] << " ";
-            }
-            std::cout << std::endl;
+          }
 
-            
-            pred = tmp_trace_warp_inst->get_pred();
-            ar1 = tmp_trace_warp_inst->get_ar1();
-            ar2 = tmp_trace_warp_inst->get_ar2();
-            
-            
-            for (unsigned i = 0; i < tmp_inst_trace->reg_srcs_num; i++) {
-              regnums.push_back(tmp_inst_trace->reg_src[i]);
-            }
-            for (unsigned i = 0; i < tmp_inst_trace->reg_dsts_num; i++) {
-              if (tmp_inst_trace->reg_dest_is_pred[i]) 
-                regnums.push_back(tmp_inst_trace->reg_dest[i] + PRED_NUM_OFFSET);
-              else
-                regnums.push_back(tmp_inst_trace->reg_dest[i]);
-            }
+          /* With the above assumption, for _wid from (2,80), global_all_kernels_warp_id:
+           * slot 12/13/14 in the IBuffer will be filled.  */
+          auto global_all_kernels_warp_id = 
+            (unsigned)(wid % _warps_per_block) + 
+            _kid_block_id_count * _warps_per_block +
+            std::accumulate(m_num_warps_per_sm.begin(), 
+                            m_num_warps_per_sm.begin() + _kid, 0);
 
-            bool check_is_scoreboard_collision = false;
-            check_is_scoreboard_collision = 
-              m_scoreboard->checkCollision(global_all_kernels_warp_id, 
-                                           regnums, 
-                                           /* set PRED+NUM_OFFSET to avoid collision with regnums */
-                                           (pred < 0) ? pred : pred + PRED_NUM_OFFSET, 
-                                           ar1,
-                                           ar2);
-            std::cout << "  check_is_scoreboard_collision: " 
-                      << check_is_scoreboard_collision << std::endl;
+          // auto global_all_kernels_warp_id = wid + std::accumulate(m_num_warps_per_sm.begin(), m_num_warps_per_sm.begin() + _kid, 0);
+          // std::cout << "D: global_all_kernels_warp_id: " << global_all_kernels_warp_id << std::endl;
+          // std::cout << "D: m_ibuffer->is_not_empty(global_all_kernels_warp_id): " 
+          //           << m_ibuffer->is_not_empty(global_all_kernels_warp_id) << std::endl;
+          
+          unsigned issued_num = 0;
+          unsigned checked_num = 0;
 
-            if (tmp_trace_warp_inst->get_opcode() == OP_EXIT && 
-                m_scoreboard->regs_size(global_all_kernels_warp_id) > 0) {
-              check_is_scoreboard_collision = true;
-            }
-            
-            if (check_is_scoreboard_collision) {
-              checked_num++;
-              continue;
-            }
-            
-            // get the function unit of the instn
-            auto fu = tmp_inst_trace->get_func_unit();
-            std::cout << "  Execute on FU: ";
-            
-            /* Identify the availability of function units. */
-            bool sp_pipe_avail = false;
-            bool sfu_pipe_avail = false;
-            bool int_pipe_avail = false;
-            bool dp_pipe_avail = false;
-            bool tensor_core_pipe_avail = false;
-            bool ldst_pipe_avail = false;
-            bool spec_1_pipe_avail = false;
-            bool spec_2_pipe_avail = false;
-            bool spec_3_pipe_avail = false;
-            /*
-            enum exec_unit_type_t {
-              NONE = 0,
-              SP = 1,
-              SFU = 2,
-              LDST = 3,
-              DP = 4,
-              INT = 5,
-              TENSOR = 6,
-              SPECIALIZED = 7
-            };
-            */
-            switch (fu) {
-              case NON_UNIT:
-                std::cout << "NON_UNIT" << std::endl;
-                assert(0);
-                break;
-              case SP_UNIT:
-                std::cout << "SP_UNIT" << std::endl;
-                sp_pipe_avail = 
-                  (m_hw_cfg->get_num_sp_units() > 0) &&
-                  m_sp_out->has_free(m_hw_cfg->get_sub_core_model(), 
-                                    sched_id) &&
-                  (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
-                  previous_issued_inst_exec_type != exec_unit_type_t::SP);
-                std::cout << "sp_pipe_avail: " << sp_pipe_avail << std::endl;
-                if (sp_pipe_avail) {
-                  // issue
-                  warp_inst_issued = true;
-                  issued_num++;
-                  issue_warp(*m_sp_out, entry, sched_id);
-                  previous_issued_inst_exec_type = exec_unit_type_t::SP;
-                  
-                  m_sp_out->print();
-                }
-                break;
-              case SFU_UNIT:
-                std::cout << "SFU_UNIT" << std::endl;
-                sfu_pipe_avail = 
-                  (m_hw_cfg->get_num_sfu_units() > 0) &&
-                  m_sfu_out->has_free(m_hw_cfg->get_sub_core_model(), 
+          exec_unit_type_t previous_issued_inst_exec_type = exec_unit_type_t::NONE;
+
+          while (
+            (issued_num < max_issue_per_warp) &&
+            (checked_num <= issued_num)
+          ) {
+            bool warp_inst_issued = false;
+
+            std::vector<int> regnums;
+            int pred;
+            int ar1;
+            int ar2;
+
+            if (m_ibuffer->is_not_empty(global_all_kernels_warp_id)) {
+              
+              std::cout << "  Before pop,m_ibuffer:" << std::endl;
+              std::cout << "wid:" << wid;
+              m_ibuffer->print_ibuffer(wid);
+              // pop the instn from ibuffer
+              ibuffer_entry entry = m_ibuffer->front(global_all_kernels_warp_id);
+              std::cout << "  pop_front(uid,pc,wid,kid): " 
+                                          << entry.uid << " " 
+                                          << entry.pc << " " 
+                                          << entry.wid << " " 
+                                          << entry.kid << std::endl;
+              std::cout << "  After pop,m_ibuffer:" << std::endl;
+              m_ibuffer->print_ibuffer(entry.wid);
+              unsigned _fetch_instn_id = entry.uid;
+              unsigned _pc = entry.pc;
+              unsigned _gwid = entry.wid;
+              unsigned _kid = entry.kid;
+              std::cout << "  try to issue: " << _fetch_instn_id << " " 
+                                              << _pc << " " 
+                                              << _gwid << " " 
+                                              << _kid << std::endl;
+              
+              
+              
+              // get instn by entry
+              compute_instn* tmp = tracer->get_one_kernel_one_warp_one_instn(_kid, _gwid, _fetch_instn_id);
+              _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
+              trace_warp_inst_t* tmp_trace_warp_inst = &(tmp->trace_warp_inst);
+              std::cout << "    instn: " << tmp_inst_trace->instn_str << std::endl;
+              
+              std::cout << "    opcode: " << tmp_trace_warp_inst->get_opcode() << " " 
+                        << tmp_trace_warp_inst->get_op() << std::endl;
+              std::cout << "            " << OP_SHFL << " " << ALU_OP << std::endl;
+              auto latency = tmp_inst_trace->get_latency();
+              std::cout << "    latency: " << latency << std::endl;
+              auto init_latency = tmp_inst_trace->get_initiation_interval();
+              std::cout << "    init_latency: " << init_latency << std::endl;
+
+
+              std::cout << "  @ pred: " << tmp_trace_warp_inst->get_pred() << " " << std::endl;
+              std::cout << "  @ ar1: " << tmp_trace_warp_inst->get_ar1() << " " << std::endl;
+              std::cout << "  @ ar2: " << tmp_trace_warp_inst->get_ar2() << " " << std::endl;
+              std::cout << "  @ srcs: ";
+              for (unsigned i = 0; i < tmp_inst_trace->reg_srcs_num; i++) {
+                std::cout << tmp_inst_trace->reg_src[i] << " ";
+              }
+              std::cout << std::endl;
+              std::cout << "  @ dsts: ";
+              for (unsigned i = 0; i < tmp_inst_trace->reg_dsts_num; i++) {
+                std::cout << tmp_inst_trace->reg_dest[i] << " ";
+              }
+              std::cout << std::endl;
+
+              
+              pred = tmp_trace_warp_inst->get_pred();
+              ar1 = tmp_trace_warp_inst->get_ar1();
+              ar2 = tmp_trace_warp_inst->get_ar2();
+              
+              
+              for (unsigned i = 0; i < tmp_inst_trace->reg_srcs_num; i++) {
+                regnums.push_back(tmp_inst_trace->reg_src[i]);
+              }
+              for (unsigned i = 0; i < tmp_inst_trace->reg_dsts_num; i++) {
+                if (tmp_inst_trace->reg_dest_is_pred[i]) 
+                  regnums.push_back(tmp_inst_trace->reg_dest[i] + PRED_NUM_OFFSET);
+                else
+                  regnums.push_back(tmp_inst_trace->reg_dest[i]);
+              }
+
+              bool check_is_scoreboard_collision = false;
+              check_is_scoreboard_collision = 
+                m_scoreboard->checkCollision(global_all_kernels_warp_id, 
+                                             regnums, 
+                                             /* set PRED+NUM_OFFSET to avoid collision with regnums */
+                                             (pred < 0) ? pred : pred + PRED_NUM_OFFSET, 
+                                             ar1,
+                                             ar2);
+              std::cout << "  check_is_scoreboard_collision: " 
+                        << check_is_scoreboard_collision << std::endl;
+
+              if (tmp_trace_warp_inst->get_opcode() == OP_EXIT && 
+                  m_scoreboard->regs_size(global_all_kernels_warp_id) > 0) {
+                check_is_scoreboard_collision = true;
+              }
+              
+              if (check_is_scoreboard_collision) {
+                checked_num++;
+                continue;
+              }
+              
+              // get the function unit of the instn
+              auto fu = tmp_inst_trace->get_func_unit();
+              std::cout << "  Execute on FU: ";
+              
+              /* Identify the availability of function units. */
+              bool sp_pipe_avail = false;
+              bool sfu_pipe_avail = false;
+              bool int_pipe_avail = false;
+              bool dp_pipe_avail = false;
+              bool tensor_core_pipe_avail = false;
+              bool ldst_pipe_avail = false;
+              bool spec_1_pipe_avail = false;
+              bool spec_2_pipe_avail = false;
+              bool spec_3_pipe_avail = false;
+              /*
+              enum exec_unit_type_t {
+                NONE = 0,
+                SP = 1,
+                SFU = 2,
+                LDST = 3,
+                DP = 4,
+                INT = 5,
+                TENSOR = 6,
+                SPECIALIZED = 7
+              };
+              */
+              switch (fu) {
+                case NON_UNIT:
+                  std::cout << "NON_UNIT" << std::endl;
+                  assert(0);
+                  break;
+                case SP_UNIT:
+                  std::cout << "SP_UNIT" << std::endl;
+                  sp_pipe_avail = 
+                    (m_hw_cfg->get_num_sp_units() > 0) &&
+                    m_sp_out->has_free(m_hw_cfg->get_sub_core_model(), 
                                       sched_id) &&
-                  (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
-                  previous_issued_inst_exec_type != exec_unit_type_t::SFU);
-                std::cout << "sfu_pipe_avail: " << sfu_pipe_avail << std::endl;
-                if (sfu_pipe_avail) {
-                  // issue
-                  warp_inst_issued = true;
-                  issued_num++;
-                  issue_warp(*m_sfu_out, entry, sched_id);
-                  previous_issued_inst_exec_type = exec_unit_type_t::SFU;
-                  
-                  m_sfu_out->print();
-                }
-                break;
-              case INT_UNIT:
-                std::cout << "INT_UNIT" << std::endl;
-                int_pipe_avail = 
-                  (m_hw_cfg->get_num_int_units() > 0) &&
-                  m_int_out->has_free(m_hw_cfg->get_sub_core_model(), 
+                    (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
+                    previous_issued_inst_exec_type != exec_unit_type_t::SP);
+                  std::cout << "sp_pipe_avail: " << sp_pipe_avail << std::endl;
+                  if (sp_pipe_avail) {
+                    // issue
+                    warp_inst_issued = true;
+                    issued_num++;
+                    issue_warp(*m_sp_out, entry, sched_id);
+                    previous_issued_inst_exec_type = exec_unit_type_t::SP;
+                    
+                    m_sp_out->print();
+                  }
+                  break;
+                case SFU_UNIT:
+                  std::cout << "SFU_UNIT" << std::endl;
+                  sfu_pipe_avail = 
+                    (m_hw_cfg->get_num_sfu_units() > 0) &&
+                    m_sfu_out->has_free(m_hw_cfg->get_sub_core_model(), 
+                                        sched_id) &&
+                    (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
+                    previous_issued_inst_exec_type != exec_unit_type_t::SFU);
+                  std::cout << "sfu_pipe_avail: " << sfu_pipe_avail << std::endl;
+                  if (sfu_pipe_avail) {
+                    // issue
+                    warp_inst_issued = true;
+                    issued_num++;
+                    issue_warp(*m_sfu_out, entry, sched_id);
+                    previous_issued_inst_exec_type = exec_unit_type_t::SFU;
+                    
+                    m_sfu_out->print();
+                  }
+                  break;
+                case INT_UNIT:
+                  std::cout << "INT_UNIT" << std::endl;
+                  int_pipe_avail = 
+                    (m_hw_cfg->get_num_int_units() > 0) &&
+                    m_int_out->has_free(m_hw_cfg->get_sub_core_model(), 
+                                        sched_id) &&
+                    (!m_hw_cfg->get_dual_issue_diff_exec_units() || 
+                    previous_issued_inst_exec_type != exec_unit_type_t::INT);
+                  std::cout << "  int_pipe_avail: " << int_pipe_avail << std::endl;
+                  if (int_pipe_avail) {
+                    // issue
+                    warp_inst_issued = true;
+                    issued_num++;
+                    issue_warp(*m_int_out, entry, sched_id);
+                    previous_issued_inst_exec_type = exec_unit_type_t::INT;
+                    
+                    m_int_out->print();
+                  }
+                  break;
+                case DP_UNIT:
+                  std::cout << "DP_UNIT" << std::endl;
+                  dp_pipe_avail = 
+                    (m_hw_cfg->get_num_dp_units() > 0) &&
+                    m_dp_out->has_free(m_hw_cfg->get_sub_core_model(), 
                                       sched_id) &&
-                  (!m_hw_cfg->get_dual_issue_diff_exec_units() || 
-                  previous_issued_inst_exec_type != exec_unit_type_t::INT);
-                std::cout << "  int_pipe_avail: " << int_pipe_avail << std::endl;
-                if (int_pipe_avail) {
-                  // issue
-                  warp_inst_issued = true;
-                  issued_num++;
-                  issue_warp(*m_int_out, entry, sched_id);
-                  previous_issued_inst_exec_type = exec_unit_type_t::INT;
-                  
-                  m_int_out->print();
-                }
-                break;
-              case DP_UNIT:
-                std::cout << "DP_UNIT" << std::endl;
-                dp_pipe_avail = 
-                  (m_hw_cfg->get_num_dp_units() > 0) &&
-                  m_dp_out->has_free(m_hw_cfg->get_sub_core_model(), 
-                                    sched_id) &&
-                  (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
-                  previous_issued_inst_exec_type != exec_unit_type_t::DP);
-                std::cout << "  dp_pipe_avail: " << dp_pipe_avail << std::endl;
-                if (dp_pipe_avail) {
-                  // issue
-                  warp_inst_issued = true;
-                  issued_num++;
-                  issue_warp(*m_dp_out, entry, sched_id);
-                  previous_issued_inst_exec_type = exec_unit_type_t::DP;
-                  
-                  m_dp_out->print();
-                }
-                break;
-              case TENSOR_CORE_UNIT:
-                std::cout << "TENSOR_CORE_UNIT" << std::endl;
-                tensor_core_pipe_avail = 
-                  (m_hw_cfg->get_num_tensor_core_units() > 0) &&
-                  m_tensor_core_out->has_free(m_hw_cfg->get_sub_core_model(), 
-                                              sched_id) &&
-                  (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
-                  previous_issued_inst_exec_type != exec_unit_type_t::TENSOR);
-                std::cout << "  tensor_core_pipe_avail: " << tensor_core_pipe_avail << std::endl;
-                if (tensor_core_pipe_avail) {
-                  // issue
-                  warp_inst_issued = true;
-                  issued_num++;
-                  issue_warp(*m_tensor_core_out, entry, sched_id);
-                  previous_issued_inst_exec_type = exec_unit_type_t::TENSOR;
-                  
-                  m_tensor_core_out->print();
-                }
-                break;
-              case LDST_UNIT:
-                std::cout << "LDST_UNIT" << std::endl;
-                ldst_pipe_avail = 
-                  m_mem_out->has_free(m_hw_cfg->get_sub_core_model(), 
-                                      sched_id) &&
-                  (!m_hw_cfg->get_dual_issue_diff_exec_units() || 
-                  previous_issued_inst_exec_type != exec_unit_type_t::LDST);
-                std::cout << "  ldst_pipe_avail: " << ldst_pipe_avail << std::endl;
-                if (ldst_pipe_avail) {
-                  // issue
-                  warp_inst_issued = true;
-                  issued_num++;
-                  issue_warp(*m_mem_out, entry, sched_id);
-                  previous_issued_inst_exec_type = exec_unit_type_t::LDST;
-                  
-                  m_mem_out->print();
-                }
-                break;
-              case SPEC_UNIT_1:
-                std::cout << "SPEC_UNIT_1" << std::endl;
-                spec_1_pipe_avail = 
-                  (m_hw_cfg->get_specialized_unit_1_enabled()) &&
-                  m_spec_cores_out[0]->has_free(m_hw_cfg->get_sub_core_model(), 
+                    (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
+                    previous_issued_inst_exec_type != exec_unit_type_t::DP);
+                  std::cout << "  dp_pipe_avail: " << dp_pipe_avail << std::endl;
+                  if (dp_pipe_avail) {
+                    // issue
+                    warp_inst_issued = true;
+                    issued_num++;
+                    issue_warp(*m_dp_out, entry, sched_id);
+                    previous_issued_inst_exec_type = exec_unit_type_t::DP;
+                    
+                    m_dp_out->print();
+                  }
+                  break;
+                case TENSOR_CORE_UNIT:
+                  std::cout << "TENSOR_CORE_UNIT" << std::endl;
+                  tensor_core_pipe_avail = 
+                    (m_hw_cfg->get_num_tensor_core_units() > 0) &&
+                    m_tensor_core_out->has_free(m_hw_cfg->get_sub_core_model(), 
                                                 sched_id) &&
-                  (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
-                  previous_issued_inst_exec_type != exec_unit_type_t::SPECIALIZED);
-                std::cout << "  spec_1_pipe_avail: " << spec_1_pipe_avail << std::endl;
-                if (spec_1_pipe_avail) {
-                  // issue
-                  warp_inst_issued = true;
-                  issued_num++;
-                  issue_warp(*m_spec_cores_out[0], entry, sched_id);
-                  previous_issued_inst_exec_type = exec_unit_type_t::SPECIALIZED;
-                  
-                  m_spec_cores_out[0]->print();
-                }
-                break;
-              case SPEC_UNIT_2:
-                std::cout << "SPEC_UNIT_2" << std::endl;
-                spec_2_pipe_avail = 
-                  (m_hw_cfg->get_specialized_unit_2_enabled()) &&
-                  m_spec_cores_out[1]->has_free(m_hw_cfg->get_sub_core_model(), 
-                                                sched_id) &&
-                  (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
-                  previous_issued_inst_exec_type != exec_unit_type_t::SPECIALIZED);
-                std::cout << "  spec_2_pipe_avail: " << spec_2_pipe_avail << std::endl;
-                if (spec_2_pipe_avail) {
-                  // issue
-                  warp_inst_issued = true;
-                  issued_num++;
-                  issue_warp(*m_spec_cores_out[1], entry, sched_id);
-                  previous_issued_inst_exec_type = exec_unit_type_t::SPECIALIZED;
-                  
-                  m_spec_cores_out[1]->print();
-                }
-                break;
-              case SPEC_UNIT_3:
-                std::cout << "SPEC_UNIT_3" << std::endl;
-                spec_3_pipe_avail = 
-                  (m_hw_cfg->get_specialized_unit_3_enabled()) &&
-                  m_spec_cores_out[2]->has_free(m_hw_cfg->get_sub_core_model(), 
-                                                sched_id) &&
-                  (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
-                  previous_issued_inst_exec_type != exec_unit_type_t::SPECIALIZED);
-                std::cout << "  spec_3_pipe_avail: " << spec_3_pipe_avail << std::endl;
-                if (spec_3_pipe_avail) {
-                  // issue
-                  warp_inst_issued = true;
-                  issued_num++;
-                  issue_warp(*m_spec_cores_out[2], entry, sched_id);
-                  previous_issued_inst_exec_type = exec_unit_type_t::SPECIALIZED;
-                  
-                  m_spec_cores_out[2]->print();
-                }
-                break;
-              default:
-                std::cout << "default UNIT" << std::endl;
-                assert(0);
-            }
-
-
-
-            // traverse m_pipeline_reg
-            if (false) {
-              std::cout << "==================================================" << std::endl;
-              for (auto it = m_pipeline_reg.begin(); it != m_pipeline_reg.end(); it++) {
-                std::cout << "  ||name: " << it->get_name() << std::endl;
-                std::cout << "    has_ready: " << it->has_ready() << std::endl;
-                std::cout << "    has_free: " << it->has_free() << std::endl;
+                    (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
+                    previous_issued_inst_exec_type != exec_unit_type_t::TENSOR);
+                  std::cout << "  tensor_core_pipe_avail: " << tensor_core_pipe_avail << std::endl;
+                  if (tensor_core_pipe_avail) {
+                    // issue
+                    warp_inst_issued = true;
+                    issued_num++;
+                    issue_warp(*m_tensor_core_out, entry, sched_id);
+                    previous_issued_inst_exec_type = exec_unit_type_t::TENSOR;
+                    
+                    m_tensor_core_out->print();
+                  }
+                  break;
+                case LDST_UNIT:
+                  std::cout << "LDST_UNIT" << std::endl;
+                  ldst_pipe_avail = 
+                    m_mem_out->has_free(m_hw_cfg->get_sub_core_model(), 
+                                        sched_id) &&
+                    (!m_hw_cfg->get_dual_issue_diff_exec_units() || 
+                    previous_issued_inst_exec_type != exec_unit_type_t::LDST);
+                  std::cout << "  ldst_pipe_avail: " << ldst_pipe_avail << std::endl;
+                  if (ldst_pipe_avail) {
+                    // issue
+                    warp_inst_issued = true;
+                    issued_num++;
+                    issue_warp(*m_mem_out, entry, sched_id);
+                    previous_issued_inst_exec_type = exec_unit_type_t::LDST;
+                    
+                    m_mem_out->print();
+                  }
+                  break;
+                case SPEC_UNIT_1:
+                  std::cout << "SPEC_UNIT_1" << std::endl;
+                  spec_1_pipe_avail = 
+                    (m_hw_cfg->get_specialized_unit_1_enabled()) &&
+                    m_spec_cores_out[0]->has_free(m_hw_cfg->get_sub_core_model(), 
+                                                  sched_id) &&
+                    (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
+                    previous_issued_inst_exec_type != exec_unit_type_t::SPECIALIZED);
+                  std::cout << "  spec_1_pipe_avail: " << spec_1_pipe_avail << std::endl;
+                  if (spec_1_pipe_avail) {
+                    // issue
+                    warp_inst_issued = true;
+                    issued_num++;
+                    issue_warp(*m_spec_cores_out[0], entry, sched_id);
+                    previous_issued_inst_exec_type = exec_unit_type_t::SPECIALIZED;
+                    
+                    m_spec_cores_out[0]->print();
+                  }
+                  break;
+                case SPEC_UNIT_2:
+                  std::cout << "SPEC_UNIT_2" << std::endl;
+                  spec_2_pipe_avail = 
+                    (m_hw_cfg->get_specialized_unit_2_enabled()) &&
+                    m_spec_cores_out[1]->has_free(m_hw_cfg->get_sub_core_model(), 
+                                                  sched_id) &&
+                    (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
+                    previous_issued_inst_exec_type != exec_unit_type_t::SPECIALIZED);
+                  std::cout << "  spec_2_pipe_avail: " << spec_2_pipe_avail << std::endl;
+                  if (spec_2_pipe_avail) {
+                    // issue
+                    warp_inst_issued = true;
+                    issued_num++;
+                    issue_warp(*m_spec_cores_out[1], entry, sched_id);
+                    previous_issued_inst_exec_type = exec_unit_type_t::SPECIALIZED;
+                    
+                    m_spec_cores_out[1]->print();
+                  }
+                  break;
+                case SPEC_UNIT_3:
+                  std::cout << "SPEC_UNIT_3" << std::endl;
+                  spec_3_pipe_avail = 
+                    (m_hw_cfg->get_specialized_unit_3_enabled()) &&
+                    m_spec_cores_out[2]->has_free(m_hw_cfg->get_sub_core_model(), 
+                                                  sched_id) &&
+                    (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
+                    previous_issued_inst_exec_type != exec_unit_type_t::SPECIALIZED);
+                  std::cout << "  spec_3_pipe_avail: " << spec_3_pipe_avail << std::endl;
+                  if (spec_3_pipe_avail) {
+                    // issue
+                    warp_inst_issued = true;
+                    issued_num++;
+                    issue_warp(*m_spec_cores_out[2], entry, sched_id);
+                    previous_issued_inst_exec_type = exec_unit_type_t::SPECIALIZED;
+                    
+                    m_spec_cores_out[2]->print();
+                  }
+                  break;
+                default:
+                  std::cout << "default UNIT" << std::endl;
+                  assert(0);
               }
 
 
-              std::cout << "  ||name: " << m_sp_out->get_name() << std::endl;
-              std::cout << "    has_ready: " << m_sp_out->has_ready() << std::endl;
-              std::cout << "    has_free: " << m_sp_out->has_free() << std::endl;
-              // m_sp_out->print();
-              std::cout << "  ||name: " << m_dp_out->get_name() << std::endl;
-              std::cout << "    has_ready: " << m_dp_out->has_ready() << std::endl;
-              std::cout << "    has_free: " << m_dp_out->has_free() << std::endl;
-              // m_dp_out->print();
-              std::cout << "  ||name: " << m_sfu_out->get_name() << std::endl;
-              std::cout << "    has_ready: " << m_sfu_out->has_ready() << std::endl;
-              std::cout << "    has_free: " << m_sfu_out->has_free() << std::endl;
-              // m_sfu_out->print();
-              std::cout << "  ||name: " << m_int_out->get_name() << std::endl;
-              std::cout << "    has_ready: " << m_int_out->has_ready() << std::endl;
-              std::cout << "    has_free: " << m_int_out->has_free() << std::endl;
-              // m_int_out->print();
-              std::cout << "  ||name: " << m_tensor_core_out->get_name() << std::endl;
-              std::cout << "    has_ready: " << m_tensor_core_out->has_ready() << std::endl;
-              std::cout << "    has_free: " << m_tensor_core_out->has_free() << std::endl;
-              // m_tensor_core_out->print();
-              std::cout << "  ||name: " << m_mem_out->get_name() << std::endl;
-              std::cout << "    has_ready: " << m_mem_out->has_ready() << std::endl;
-              std::cout << "    has_free: " << m_mem_out->has_free() << std::endl;
-              // m_mem_out->print();
-              std::cout << "  ||name: " << m_spec_cores_out[0]->get_name() << std::endl;
-              std::cout << "    has_ready: " << m_spec_cores_out[0]->has_ready() << std::endl;
-              std::cout << "    has_free: " << m_spec_cores_out[0]->has_free() << std::endl;
-              // m_spec_cores_out[0]->print();
-              std::cout << "  ||name: " << m_spec_cores_out[1]->get_name() << std::endl;
-              std::cout << "    has_ready: " << m_spec_cores_out[1]->has_ready() << std::endl;
-              std::cout << "    has_free: " << m_spec_cores_out[1]->has_free() << std::endl;
-              // m_spec_cores_out[1]->print();
-              std::cout << "  ||name: " << m_spec_cores_out[2]->get_name() << std::endl;
-              std::cout << "    has_ready: " << m_spec_cores_out[2]->has_ready() << std::endl;
-              std::cout << "    has_free: " << m_spec_cores_out[2]->has_free() << std::endl;
-              // m_spec_cores_out[2]->print();
-              std::cout << "==================================================" << std::endl;
+
+              // traverse m_pipeline_reg
+              if (false) {
+                std::cout << "==================================================" << std::endl;
+                for (auto it = m_pipeline_reg.begin(); it != m_pipeline_reg.end(); it++) {
+                  std::cout << "  ||name: " << it->get_name() << std::endl;
+                  std::cout << "    has_ready: " << it->has_ready() << std::endl;
+                  std::cout << "    has_free: " << it->has_free() << std::endl;
+                }
+
+
+                std::cout << "  ||name: " << m_sp_out->get_name() << std::endl;
+                std::cout << "    has_ready: " << m_sp_out->has_ready() << std::endl;
+                std::cout << "    has_free: " << m_sp_out->has_free() << std::endl;
+                // m_sp_out->print();
+                std::cout << "  ||name: " << m_dp_out->get_name() << std::endl;
+                std::cout << "    has_ready: " << m_dp_out->has_ready() << std::endl;
+                std::cout << "    has_free: " << m_dp_out->has_free() << std::endl;
+                // m_dp_out->print();
+                std::cout << "  ||name: " << m_sfu_out->get_name() << std::endl;
+                std::cout << "    has_ready: " << m_sfu_out->has_ready() << std::endl;
+                std::cout << "    has_free: " << m_sfu_out->has_free() << std::endl;
+                // m_sfu_out->print();
+                std::cout << "  ||name: " << m_int_out->get_name() << std::endl;
+                std::cout << "    has_ready: " << m_int_out->has_ready() << std::endl;
+                std::cout << "    has_free: " << m_int_out->has_free() << std::endl;
+                // m_int_out->print();
+                std::cout << "  ||name: " << m_tensor_core_out->get_name() << std::endl;
+                std::cout << "    has_ready: " << m_tensor_core_out->has_ready() << std::endl;
+                std::cout << "    has_free: " << m_tensor_core_out->has_free() << std::endl;
+                // m_tensor_core_out->print();
+                std::cout << "  ||name: " << m_mem_out->get_name() << std::endl;
+                std::cout << "    has_ready: " << m_mem_out->has_ready() << std::endl;
+                std::cout << "    has_free: " << m_mem_out->has_free() << std::endl;
+                // m_mem_out->print();
+                std::cout << "  ||name: " << m_spec_cores_out[0]->get_name() << std::endl;
+                std::cout << "    has_ready: " << m_spec_cores_out[0]->has_ready() << std::endl;
+                std::cout << "    has_free: " << m_spec_cores_out[0]->has_free() << std::endl;
+                // m_spec_cores_out[0]->print();
+                std::cout << "  ||name: " << m_spec_cores_out[1]->get_name() << std::endl;
+                std::cout << "    has_ready: " << m_spec_cores_out[1]->has_ready() << std::endl;
+                std::cout << "    has_free: " << m_spec_cores_out[1]->has_free() << std::endl;
+                // m_spec_cores_out[1]->print();
+                std::cout << "  ||name: " << m_spec_cores_out[2]->get_name() << std::endl;
+                std::cout << "    has_ready: " << m_spec_cores_out[2]->has_ready() << std::endl;
+                std::cout << "    has_free: " << m_spec_cores_out[2]->has_free() << std::endl;
+                // m_spec_cores_out[2]->print();
+                std::cout << "==================================================" << std::endl;
+              }
+              
             }
-            
+
+            if (warp_inst_issued) {
+              m_ibuffer->pop_front(global_all_kernels_warp_id);
+              // check_is_scoreboard_collision = 
+              //   m_scoreboard->checkCollision(global_all_kernels_warp_id, 
+              //                                regnums, 
+              //                                /* set PRED+NUM_OFFSET to avoid collision with regnums */
+              //                                pred + PRED_NUM_OFFSET, 
+              //                                ar1,
+              //                                ar2);
+
+              // reserveRegisters(const unsigned wid, std::vector<int> regnums, bool is_load)
+              
+              regnums.push_back((pred < 0) ? pred : pred + PRED_NUM_OFFSET); 
+              // BUG: need to change pred < 0 to "P?"
+              regnums.push_back(ar1);
+              regnums.push_back(ar2);
+              std::cout << "  NOW reserveRegisters for warp " << global_all_kernels_warp_id << std::endl;
+              m_scoreboard->reserveRegisters(global_all_kernels_warp_id, regnums, false);
+              m_scoreboard->printContents();
+            }
+
+            checked_num++;
           }
-
-          if (warp_inst_issued) {
-            m_ibuffer->pop_front(global_all_kernels_warp_id);
-            // check_is_scoreboard_collision = 
-            //   m_scoreboard->checkCollision(global_all_kernels_warp_id, 
-            //                                regnums, 
-            //                                /* set PRED+NUM_OFFSET to avoid collision with regnums */
-            //                                pred + PRED_NUM_OFFSET, 
-            //                                ar1,
-            //                                ar2);
-
-            // reserveRegisters(const unsigned wid, std::vector<int> regnums, bool is_load)
-            
-            regnums.push_back((pred < 0) ? pred : pred + PRED_NUM_OFFSET); 
-            // BUG: need to change pred < 0 to "P?"
-            regnums.push_back(ar1);
-            regnums.push_back(ar2);
-            m_scoreboard->reserveRegisters(global_all_kernels_warp_id, regnums, false);
-            m_scoreboard->printContents();
-          }
-
-          checked_num++;
         }
+        last_issue_warp_ids[std::make_pair(_kid, _block_id)] = 
+          (last_issue_warp_ids[std::make_pair(_kid, _block_id)] + 1) % _warps_per_block;
       }
-
-
+      last_issue_block_index_per_sched[sched_id] = 
+        (last_issue_block_index_per_sched[sched_id] + 1) % kernel_block_pair.size();
     }
 
     last_issue_sched_id = (last_issue_sched_id + 1) % num_scheds;
@@ -1502,16 +1785,97 @@ void PrivateSM::run(){
     /***                           Fetch and Decode instns to Fbuffer.                          ***/
     /***                                                                                        ***/
     /**********************************************************************************************/
+    /* Variables that depend on it_kernel_block_pair:
+     *   kid, block_id, warps_per_block, gwarp_id_start, gwarp_id_end
+     * The following code is to get these variables:
+     *   unsigned kid = it_kernel_block_pair->first - 1;
+     *   unsigned block_id = it_kernel_block_pair->second;
+     *   unsigned warps_per_block = appcfg->get_num_warp_per_block(kid);
+     *   unsigned gwarp_id_start = warps_per_block * block_id;
+     *   unsigned gwarp_id_end = gwarp_id_start + warps_per_block - 1;
+     */
+    /*
+    for (auto it_kernel_block_pair = kernel_block_pair.begin(); 
+                (it_kernel_block_pair != kernel_block_pair.end()) &&
+                // (it_kernel_block_pair->second == 80) && // NEED TO DELETE
+                (it_kernel_block_pair->first - 1 == KERNEL_EVALUATION); // TODO: here only first kernel is considered
+                it_kernel_block_pair++) {
+
+        unsigned _kid = it_kernel_block_pair->first - 1;
+        unsigned _block_id = it_kernel_block_pair->second;
+        unsigned _warps_per_block = appcfg->get_num_warp_per_block(_kid);
+        unsigned _gwarp_id_start = _warps_per_block * _block_id;
+        unsigned _gwarp_id_end = _gwarp_id_start + _warps_per_block - 1;
+    */
+
     for (unsigned _ = 0; _ < get_inst_fetch_throughput(); _++) {
-      // DECODE
+      /* DECODE */
       
       if (m_inst_fetch_buffer->m_valid) {
         auto _pc = m_inst_fetch_buffer->pc;
+        /* MOST IMPORTANT: From here that <kid, wid, uid, pc> that are transferred in the 
+         * pipeline is defined. The most important thing is that, the wid is the global
+         * warp id in the whole kernel, for example,
+         *   -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
+         * and there are 3 warps per block in the 1st kernel, then:
+         * wid during the transfer in the pipeline is 
+         *   80 * 3 = 240     or 
+         *   80 * 3 + 1 = 241 or
+         *   80 * 3 + 2 = 242.
+         */
         auto _wid = m_inst_fetch_buffer->wid;
         auto _kid = m_inst_fetch_buffer->kid;
         auto _uid = m_inst_fetch_buffer->uid;
 
-        auto global_all_kernels_warp_id = _wid + std::accumulate(m_num_warps_per_sm.begin(), m_num_warps_per_sm.begin() + _kid, 0);
+        /* m_num_warps_per_sm's first dim is the total num of kernels that are executed on
+         * the GPU, and its second dim is the number of warps that blongs to the current SM.
+         * for example, 
+         *   -trace_issued_sm_id_0 5,0,(1,80),(1,160),(1,0),(2,0),(2,80)
+         *   and the 1st kernel has 3 warps per thread block, the 2nd kernel has 2 warps per
+         *   thread block, then:
+         *     m_num_warps_per_sm[0] = 9, m_num_warps_per_sm[1] = 6.
+         * So, the following code is to get the global warp id of the total kernels 
+         * (global_all_kernels_warp_id). For example, we have 2 kernels in the whole SM, and 
+         * the 1st kernel has 3 warps per thread block, then the 2nd kernel has 2 warps per 
+         * thread block, thus the global_all_kernels_warp_id of the 2st kernel's 2nd warp is 
+         * 9 + 2 = 11.
+         * 
+         * And with the above assumption, the IBuffer's slots are allocated in the following:
+         *    0 slot => warp 0 from kernel 0
+         *    1 slot => warp 1 from kernel 0
+         *    ......
+         *    8 slot => warp 8 from kernel 0
+         *    9 slot => warp 0 from kernel 1
+         *   10 slot => warp 1 from kernel 1
+         *   ......
+         *   14 slot => warp 5 from kernel 1
+         */
+
+        /* Get warps_per_block of instn <_pc, _wid, _kid, _uid>. */
+        unsigned _warps_per_block = appcfg->get_num_warp_per_block(_kid);
+        /* Calculate the block id. */
+        unsigned _block_id = (unsigned)(_wid / _warps_per_block);
+
+        /* Count the entries in the kernel_block_pair that are smaller than _block_id with
+         * the same _kid. */
+        unsigned _kid_block_id_count = 0;
+        for (auto _it_kernel_block_pair = kernel_block_pair.begin(); 
+                  _it_kernel_block_pair != kernel_block_pair.end(); 
+                  _it_kernel_block_pair++) {
+          if (_it_kernel_block_pair->first - 1 == _kid) {
+            if (_it_kernel_block_pair->second < _block_id) {
+              _kid_block_id_count++;
+            }
+          }
+        }
+
+        /* With the above assumption, for _wid from (2,80), global_all_kernels_warp_id:
+         * slot 12/13/14 in the IBuffer will be filled.  */
+        auto global_all_kernels_warp_id = 
+          (unsigned)(_wid % _warps_per_block) + 
+          _kid_block_id_count * _warps_per_block +
+          std::accumulate(m_num_warps_per_sm.begin(), 
+                          m_num_warps_per_sm.begin() + _kid, 0);
         
         if (m_ibuffer->has_free_slot(global_all_kernels_warp_id)) {
           auto _entry = ibuffer_entry(_pc, _wid, _kid, _uid);
@@ -1519,7 +1883,7 @@ void PrivateSM::run(){
           
           m_inst_fetch_buffer->m_valid = false;
           std::cout << "  **DECODE: ";
-          m_ibuffer->print_ibuffer(_wid);
+          m_ibuffer->print_ibuffer(global_all_kernels_warp_id);
         } else {
           std::cout << "  **No DECODE cause m_ibuffer->has_free_slot() == false" << std::endl;
         }
@@ -1527,110 +1891,128 @@ void PrivateSM::run(){
         std::cout << "  **No DECODE cause m_inst_fetch_buffer->m_valid == false" << std::endl;
       }
       
-      // std::cout << "D: gwarp_id_start, gwarp_id_end: " << gwarp_id_start << " " << gwarp_id_end << std::endl;
+      // std::cout << "D: _gwarp_id_start, _gwarp_id_end: " << _gwarp_id_start << " " << _gwarp_id_end << std::endl;
 
-      // FETCH
-      for (auto gwid = gwarp_id_start; gwid <= gwarp_id_end; gwid++) {
-        // Round-robin issue
-        auto wid = (last_fetch_warp_id + gwid) % warps_per_block + gwarp_id_start;
-
-        // auto curr_warp_id = wid + gwarp_id_start;
-        // std::cout << "D: last_fetch_warp_id, gwid, wid: " << last_fetch_warp_id << " " << gwid << " " << wid << std::endl;
-        // access ibuffer and access curr_instn_id_per_warp
-        // auto global_all_kernels_warp_id = gwid + std::accumulate(m_num_warps_per_sm.begin(), m_num_warps_per_sm.begin() + kid, 0);
-        auto global_all_kernels_warp_id = wid + std::accumulate(m_num_warps_per_sm.begin(), m_num_warps_per_sm.begin() + kid, 0);
-        
-        
-        // std::cout << "D: kid, global_all_kernels_warp_id: " << kid << ", " << global_all_kernels_warp_id << std::endl;
-        // check if the ibuffer has free slot
-        bool fetch_instn = false;
-        while (!m_inst_fetch_buffer->m_valid) {
-          // curr_instn_id_per_warp stores the current instn id of each warp
-          // std::cout << "D: Access curr_instn_id_per_warp: " << kid << " " <<  block_id << " " << gwid - gwarp_id_start << std::endl;
-          curr_instn_id_per_warp_entry _entry = curr_instn_id_per_warp_entry(kid, block_id, gwid - gwarp_id_start);
-          unsigned fetch_instn_id = curr_instn_id_per_warp[_entry];
-          // std::cout << "D: fetch_instn_id: " << fetch_instn_id << std::endl;
-          
-          if (tracer->get_one_kernel_one_warp_instn_size(kid, wid) <= fetch_instn_id) break;
-
-          compute_instn* tmp = tracer->get_one_kernel_one_warp_one_instn(kid, wid, fetch_instn_id);
-          // std::cout << "D: @@@ " << tmp << std::endl;
-          _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
-          // m_inst_fetch_buffer = inst_fetch_buffer_entry(tmp_inst_trace->m_pc, wid, kid, fetch_instn_id);
-          // if (tmp_inst_trace != nullptr) {
-          
-            if (!tmp_inst_trace->m_valid) {
-              
-              // std::cout << "D: tmp_inst_trace == NULL" << std::endl;
-              break;
-            }
-
-            // std::cout << "D: @@@ "  << tmp_inst_trace->m_pc << std::endl;
-          
-            m_inst_fetch_buffer->pc = tmp_inst_trace->m_pc;
-            m_inst_fetch_buffer->wid = wid;
-            m_inst_fetch_buffer->kid = kid;
-            m_inst_fetch_buffer->uid = fetch_instn_id;
-            m_inst_fetch_buffer->m_valid = true;
-            // std::cout << "D: @@@" << std::endl;
-            
-            std::cout << "  **Fetch instn (pc, gwid, kid, fetch_instn_id): " << "(" << tmp_inst_trace->m_pc << ", " 
-                                                                              << wid << ", " 
-                                                                              << kid << ", " 
-                                                                              << fetch_instn_id << ")" << std::endl;
-            fetch_instn = true;
-            curr_instn_id_per_warp[_entry]++;
-          // }
-        }
-        
-        if (fetch_instn) break;
-        else {
-          std::cout << "  **No FETCH" << std::endl;
-        }
-
+      /* Continue the loop in advance based on the state. */
+      if (m_inst_fetch_buffer->m_valid) {
+        std::cout << "  **No fetch cauz m_inst_fetch_buffer->m_valid == true" << std::endl;
+        continue;
       }
 
-      last_fetch_warp_id = (last_fetch_warp_id + 1) % warps_per_block;
-
-      // for (auto gwid = gwarp_id_start; gwid <= gwarp_id_end; gwid++) {
-      //   // Round-robin issue
-      //   auto wid = (last_fetch_warp_id + gwid + 1) % warps_per_block + gwarp_id_start;
-
-      //   // auto curr_warp_id = wid + gwarp_id_start;
-
-      //   // access ibuffer and access curr_instn_id_per_warp
-      //   // auto global_all_kernels_warp_id = gwid + std::accumulate(m_num_warps_per_sm.begin(), m_num_warps_per_sm.begin() + kid, 0);
-      //   auto global_all_kernels_warp_id = wid + std::accumulate(m_num_warps_per_sm.begin(), m_num_warps_per_sm.begin() + kid, 0);
-      //   // check if the ibuffer has free slot
-      //   bool fetch_instn = false;
-      //   while (m_ibuffer->has_free_slot(global_all_kernels_warp_id)) {
-      //     // curr_instn_id_per_warp stores the current instn id of each warp
-      //     unsigned fetch_instn_id = curr_instn_id_per_warp[global_all_kernels_warp_id];
-      //     // compute_instn* tmp = tracer->get_one_kernel_one_warp_one_instn(kid, gwid, fetch_instn_id);
-      //     compute_instn* tmp = tracer->get_one_kernel_one_warp_one_instn(kid, wid, fetch_instn_id);
-      //     _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
-      //     trace_warp_inst_t* tmp_trace_warp_inst = &(tmp->trace_warp_inst);
-      //     // auto _entry = ibuffer_entry(tmp_inst_trace->m_pc, gwid, kid, fetch_instn_id);
-      //     auto _entry = ibuffer_entry(tmp_inst_trace->m_pc, wid, kid, fetch_instn_id);
-      //     m_ibuffer->push_back(global_all_kernels_warp_id, _entry);
-
-          
-      //     std::cout << "  Fetch instn (pc, gwid, kid, fetch_instn_id): " << "(" << tmp_inst_trace->m_pc << ", " 
-      //                                                                       << wid << ", " 
-      //                                                                       << kid << ", " 
-      //                                                                       << fetch_instn_id << ")" << std::endl;
-      //     fetch_instn = true;
-      //     curr_instn_id_per_warp[global_all_kernels_warp_id]++;
-      //     last_fetch_warp_id = wid;
-      //   }
-
-      //   // m_ibuffer->print_ibuffer(gwid);
-      //   m_ibuffer->print_ibuffer(wid);
-
+      for (auto it_kernel_block_pair = kernel_block_pair.begin(); 
+                (it_kernel_block_pair != kernel_block_pair.end()) &&
+                // (it_kernel_block_pair->second == 80) && // NEED TO DELETE
+                (it_kernel_block_pair->first - 1 == KERNEL_EVALUATION); // TODO: here only first kernel is considered
+                it_kernel_block_pair++) {
+        /* Calculate the distance of it_kernel_block_pair to kernel_block_pair.begin(). */
+        unsigned _index = std::distance(kernel_block_pair.begin(), it_kernel_block_pair);
+        if (_index != distance_last_fetch_kid) continue;
         
-      //   if (fetch_instn) break;
+        /* Terminate the loop in advance based on the state. */
+        if (m_inst_fetch_buffer->m_valid) break;
+        
+        /* -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
+         * Here, kernel_block_pair is (1,80), (1,160), (1,0), (2,0), (3,0), (4,0)
+         * for it_kernel_block_pair : kernel_block_pair:
+         *   _index           =   0,   1,   2,   3,   4,   5
+         *   _kid             =   0,   0,   0,   1,   2,   3
+         *   _block_id        =  80, 160,   0,   0,   0,   0
+         *   _warps_per_block =   3,   3,   3,   3,   3,   3
+         *   _gwarp_id_start  = 240, 480,   0,   0,   0,   0
+         *   _gwarp_id_end    = 242, 482,   1,   1,   1,   1
+         */
 
-      // }
+        unsigned _kid = it_kernel_block_pair->first - 1;
+        unsigned _block_id = it_kernel_block_pair->second;
+        unsigned _warps_per_block = appcfg->get_num_warp_per_block(_kid);
+        unsigned _gwarp_id_start = _warps_per_block * _block_id;
+        unsigned _gwarp_id_end = _gwarp_id_start + _warps_per_block - 1;
+
+        /* FETCH */
+        /* Here, gwid is the global warp id in the whole kernel, for example,
+         *   -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
+         * and there are 3 warps per block in the 1st kernel, then in the following loop:
+         *   _gwarp_id_start = 80 * 3 = 240, 
+         *   _gwarp_id_end   = 80 + 3 - 1 = 242,
+         *   gwid = 240, 241, 242. */
+        for (auto gwid = _gwarp_id_start; gwid <= _gwarp_id_end; gwid++) {
+          /* Round-robin issue */
+          /* In fact, here wid is still in the bound [_gwarp_id_start, _gwarp_id_end], and
+           * it is just a reorder of the loop to simulate the round-robin issue. So with the 
+           * last supposition, gwid = 240 or 241 or 242. 
+           * The reason that here we need the global warp id in the whole kernel, is that, we
+           * will get new instns, where the get_one_kernel_one_warp_instn_size function should
+           * be passed the parameter (kernel id, global warp id in the whole kernel). */
+          auto wid = (last_fetch_warp_id[_kid] + gwid) % _warps_per_block + _gwarp_id_start;
+
+          // std::cout << "D: last_fetch_warp_id[_kid], gwid, wid: " 
+          //           << last_fetch_warp_id[_kid] << " " << gwid << " " << wid << std::endl;
+          
+          /* check if the ibuffer has free slot */
+          bool fetch_instn = false;
+          while (!m_inst_fetch_buffer->m_valid) {
+            /* curr_instn_id_per_warp stores the current instn id of each warp, which is indexed 
+             * using the object curr_instn_id_per_warp_entry(_kid,_block_id,gwid-_gwarp_id_start).
+             * After accessing a new instn, the value curr_instn_id_per_warp[_entry] should plus 1. */
+            
+            // std::cout << "D: Access curr_instn_id_per_warp: " << _kid << " " <<  _block_id << " " << gwid - _gwarp_id_start << std::endl;
+            
+            curr_instn_id_per_warp_entry _entry = curr_instn_id_per_warp_entry(_kid, _block_id, gwid - _gwarp_id_start);
+            unsigned fetch_instn_id = curr_instn_id_per_warp[_entry];
+            
+            // std::cout << "D: fetch_instn_id: " << fetch_instn_id << std::endl;
+            
+            if (tracer->get_one_kernel_one_warp_instn_size(_kid, wid) <= fetch_instn_id) break;
+
+            compute_instn* tmp = tracer->get_one_kernel_one_warp_one_instn(_kid, wid, fetch_instn_id);
+            
+            // std::cout << "D: @@@ " << tmp << std::endl;
+            _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
+            
+            // m_inst_fetch_buffer = inst_fetch_buffer_entry(tmp_inst_trace->m_pc, wid, _kid, fetch_instn_id);
+            // if (tmp_inst_trace != nullptr) {
+            
+              if (!tmp_inst_trace->m_valid) break;
+
+              // std::cout << "D: @@@ "  << tmp_inst_trace->m_pc << std::endl;
+            
+              m_inst_fetch_buffer->pc = tmp_inst_trace->m_pc;
+              /* MOST IMPORTANT: From here that <kid, wid, uid, pc> that are transferred in the 
+               * pipeline is defined. The most important thing is that, the wid is the global
+               * warp id in the whole kernel, for example,
+               *   -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
+               * and there are 3 warps per block in the 1st kernel, then:
+               * wid during the transfer in the pipeline is 
+               *   80 * 3 = 240     or 
+               *   80 * 3 + 1 = 241 or
+               *   80 * 3 + 2 = 242.
+               */
+              m_inst_fetch_buffer->wid = wid;
+              m_inst_fetch_buffer->kid = _kid;
+              m_inst_fetch_buffer->uid = fetch_instn_id;
+              m_inst_fetch_buffer->m_valid = true;
+              
+              std::cout << "  **Fetch instn (pc, gwid, kid, fetch_instn_id): " << "(" << tmp_inst_trace->m_pc << ", " 
+                                                                                << wid << ", " 
+                                                                                << _kid << ", " 
+                                                                                << fetch_instn_id << ")" << std::endl;
+              fetch_instn = true;
+              curr_instn_id_per_warp[_entry]++;
+            // }
+          }
+          
+          if (fetch_instn) break;
+          else {
+            std::cout << "  **No FETCH" << std::endl;
+          }
+
+        }
+
+        // last_fetch_warp_id = (last_fetch_warp_id + 1) % _warps_per_block;
+        last_fetch_warp_id[_kid] = (last_fetch_warp_id[_kid] + 1) % _warps_per_block;
+      }
+
+      distance_last_fetch_kid = (distance_last_fetch_kid + 1) % m_num_blocks_per_kernel[KERNEL_EVALUATION];
     }
     
     /**********************************************************************************************/
@@ -1638,6 +2020,7 @@ void PrivateSM::run(){
     /***                            Release all register bank state.                            ***/
     /***                                                                                        ***/
     /**********************************************************************************************/
+    /* At the end of a single cycle, we should release all the bank to start a new cycle. */
     for (unsigned i = 0; i < num_banks; i++) {
       if (m_reg_bank_allocator->getBankState(i) == ON_WRITING || 
           m_reg_bank_allocator->getBankState(i) == ON_READING) {
@@ -1645,19 +2028,75 @@ void PrivateSM::run(){
       }
     }
 
-    // std::cout << "D: !!!!" << std::endl;
-    // }
+    bool all_warps_finished = true;
 
-    // std::cout << "$ SM-" << m_smid << " Kernel NUM: " 
-    //           << tracer->get_appcfg()->get_kernels_num() << std::endl;
+    for (auto it_kernel_block_pair = kernel_block_pair.begin(); 
+              (it_kernel_block_pair != kernel_block_pair.end());
+              it_kernel_block_pair++) {
+      
+      /* -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
+       * Here, kernel_block_pair is (1,80), (1,160), (1,0), (2,0), (3,0), (4,0)
+       * for it_kernel_block_pair : kernel_block_pair:
+       *   _index           =   0,   1,   2,   3,   4,   5
+       *   _kid             =   0,   0,   0,   1,   2,   3
+       *   _block_id        =  80, 160,   0,   0,   0,   0
+       *   _warps_per_block =   3,   3,   3,   3,   3,   3
+       *   _gwarp_id_start  = 240, 480,   0,   0,   0,   0
+       *   _gwarp_id_end    = 242, 482,   1,   1,   1,   1
+       */
+      unsigned _index= std::distance(kernel_block_pair.begin(), it_kernel_block_pair);
+      unsigned _kid = it_kernel_block_pair->first - 1;
+      unsigned _block_id = it_kernel_block_pair->second;
+      unsigned _warps_per_block = appcfg->get_num_warp_per_block(_kid);
+      unsigned _gwarp_id_start = _warps_per_block * _block_id;
+      unsigned _gwarp_id_end = _gwarp_id_start + _warps_per_block - 1;
 
-    for (unsigned _w_id_ = 0; _w_id_ <= gwarp_id_end - gwarp_id_start; _w_id_++) {
-      std::cout << "D: SM-" << m_smid << " Kernel-" << kid << " Warp-" << _w_id_ << " active status: " << m_warp_active_status[kid][_w_id_] << std::endl;
-      if (m_warp_active_status[kid][_w_id_]) break;
-      else if (!m_warp_active_status[kid][_w_id_] && _w_id_ == gwarp_id_end - gwarp_id_start) {
-        active = false;
-        std::cout << "D: SM-" << m_smid << " Kernel-" << kid << " is finished." << std::endl;
+      /* In fact, here _w_id_ is the local warp id of the thread block (_kid, _block_id). */
+      for (unsigned _w_id_ = 0; _w_id_ < _warps_per_block; _w_id_++) {
+        
+        /* m_warp_active_status[
+         *                      0 ~ kernel_block_pair.size()
+         *                     ]
+         *                     [
+         *                      0 ~ warps_per_block_of_it_kernel_block_pair
+         *                     ]
+         * In fact, m_warp_active_status's 1st dim is the index of (kid, block_id) pairs
+         * that are issued to the current SM, and the 2nd dim is the number of warps in 
+         * the thread block - (kid, block_id), and equals to the warp_per_block of the 
+         * kernel - kid. */
+        /* We now need to calculate the index of kernel - block pair (_kid, _block_id). */
+
+        
+        
+        /* MOST IMPORTANT: Here, _wid is the global warp id in the whole kernel, for example,
+         *   -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
+         * and there are 3 warps per block in the 1st kernel, then:
+         * wid during the transfer in the pipeline is 
+         *   80 * 3 = 240     or 
+         *   80 * 3 + 1 = 241 or
+         *   80 * 3 + 2 = 242.
+         * _gwarp_id_start is the global warp id of the first warp in the block, for example,
+         * 80 * 3 = 240.
+         */
+
+        std::cout << "D: SM-" << m_smid 
+                  << " Kernel-" << _kid 
+                  << " Warp-" << _w_id_ 
+                  << " active status: " 
+                  << m_warp_active_status[_index][_w_id_] << std::endl;
+
+        if (m_warp_active_status[_index][_w_id_]) {
+          all_warps_finished = false;
+          break;
+        }
       }
+
+      if (!all_warps_finished) break;
     }
 
+    if (all_warps_finished) {
+      active = false;
+      std::cout << "D: SM-" << m_smid << " is finished." << std::endl;
+    }
+  // } /* end of it_kernel_block_pair */
 }
