@@ -23,6 +23,8 @@
 #define PRED_NUM_OFFSET 65536
 #define MAX_ALU_LATENCY 512
 
+#define KERNEL_EVALUATION 0
+
 enum exec_unit_type_t {
   NONE = 0,
   SP = 1,
@@ -145,6 +147,8 @@ class PrivateSM {
   // number of warps per kernel that are allocated to this SM
   std::vector<unsigned> m_num_warps_per_sm;
 
+  std::vector<unsigned> m_num_blocks_per_kernel;
+
   // sum of std::vector<unsigned> m_num_warps_per_sm
   unsigned all_warps_num;
 
@@ -175,9 +179,19 @@ class PrivateSM {
 
   Scoreboard* m_scoreboard;
 
-  int last_fetch_warp_id;
+  /* key - shed_id : value - kernel_id */
+
+  // int last_fetch_warp_id;
+  /* key - kid : value - wid */
+  std::map<int, int> last_fetch_warp_id;
+  int distance_last_fetch_kid;
   int last_issue_sched_id;
-  std::vector<int> last_issue_warp_ids;
+  // std::vector<int> last_issue_warp_ids;
+  /* Key: <kid, block_id>, value: warp_id. */
+  std::map<std::pair<int, int>, int> last_issue_warp_ids;
+
+  std::vector<int> last_issue_block_index_per_sched;
+
   RegisterBankAllocator* m_reg_bank_allocator;
 
   opndcoll_rfu_t* m_operand_collector;
