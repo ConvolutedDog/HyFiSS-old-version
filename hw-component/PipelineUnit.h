@@ -43,6 +43,7 @@ class pipelined_simd_unit {
   /* virtual void cycle();*/
   //issue(warp_inst_t*&)成员函数将给定的流水线寄存器的内容移入m_dispatch_reg。
   virtual void issue(register_set &source_reg);
+  virtual void issue(register_set &source_reg, unsigned reg_id);
   //lane的意思为一个warp中有32个线程，而在流水线寄存器中可能暂存了很多条指令，这些指令的每对应的线程掩
   //码的每一位都是一个lane。即遍历流水线寄存器中的非空指令，返回所有指令的整体线程掩码（所有指令线程掩
   //码的或值）。
@@ -134,6 +135,7 @@ class sfu : public pipelined_simd_unit {
   virtual bool can_issue(const inst_fetch_buffer_entry &inst) const;
   virtual unsigned clock_multiplier() const { return 1; }
   virtual void issue(register_set &source_reg);
+  virtual void issue(register_set &source_reg, unsigned reg_id);
   bool is_issue_partitioned() { return true; }
   virtual bool stallable() const { return false; }
 };
@@ -153,6 +155,7 @@ class dp_unit : public pipelined_simd_unit {
   virtual bool can_issue(const inst_fetch_buffer_entry &inst) const;
   virtual unsigned clock_multiplier() const { return 1; }
   virtual void issue(register_set &source_reg);
+  virtual void issue(register_set &source_reg, unsigned reg_id);
   bool is_issue_partitioned() { return true; }
   virtual bool stallable() const { return false; }
 };
@@ -171,6 +174,7 @@ class sp_unit : public pipelined_simd_unit {
   virtual bool can_issue(const inst_fetch_buffer_entry &inst) const;
   virtual unsigned clock_multiplier() const { return 1; }
   virtual void issue(register_set &source_reg);
+  virtual void issue(register_set &source_reg, unsigned reg_id);
   bool is_issue_partitioned() { return true; }
   virtual bool stallable() const { return false; }
 };
@@ -189,6 +193,7 @@ class tensor_core : public pipelined_simd_unit {
   virtual bool can_issue(const inst_fetch_buffer_entry &inst) const;
   virtual unsigned clock_multiplier() const { return 1; }
   virtual void issue(register_set &source_reg);
+  virtual void issue(register_set &source_reg, unsigned reg_id);
   bool is_issue_partitioned() { return true; }
   virtual bool stallable() const { return false; }
 };
@@ -207,6 +212,7 @@ class int_unit : public pipelined_simd_unit {
   virtual bool can_issue(const inst_fetch_buffer_entry &inst) const;
   virtual unsigned clock_multiplier() const { return 1; }
   virtual void issue(register_set &source_reg);
+  virtual void issue(register_set &source_reg, unsigned reg_id);
   bool is_issue_partitioned() { return true; }
   virtual bool stallable() const { return false; }
 };
@@ -226,6 +232,7 @@ class specialized_unit : public pipelined_simd_unit {
   virtual bool can_issue(const inst_fetch_buffer_entry &inst) const;
   virtual unsigned clock_multiplier() const { return 1; }
   virtual void issue(register_set &source_reg);
+  virtual void issue(register_set &source_reg, unsigned reg_id);
   bool is_issue_partitioned() { return true; }
   virtual bool stallable() const { return false; }
 
@@ -248,7 +255,8 @@ class mem_unit : public pipelined_simd_unit {
   virtual bool can_issue(const inst_fetch_buffer_entry &inst) const;
   virtual unsigned clock_multiplier() const { return 1; }
   virtual void issue(register_set &source_reg);
-  bool is_issue_partitioned() { return false; }
+  virtual void issue(register_set &source_reg, unsigned reg_id);
+  bool is_issue_partitioned() { return true; }
   virtual bool stallable() const { return true; }
 };
 
