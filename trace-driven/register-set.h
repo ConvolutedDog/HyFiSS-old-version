@@ -130,6 +130,7 @@ class register_set {
     dest->kid = src->kid;
     dest->uid = src->uid;
     dest->latency = src->latency;
+    std::cout << "src->latency: " << src->latency << std::endl;
     dest->m_valid = true;
     std::cout << "    dest: " 
                           << dest->kid << ", " 
@@ -185,9 +186,10 @@ class register_set {
     inst_fetch_buffer_entry **ready = get_ready(sub_core_model, reg_id);
     std::cout << "    ready: " << ready << std::endl;
     std::cout << "    (*ready): kid, " << (*ready)->kid << std::endl
-              << "               pc, " << (*ready)->pc << std::endl
+              << "              pc, " << (*ready)->pc << std::endl
               << "              wid, " << (*ready)->wid << std::endl
-              << "              uid, " << (*ready)->uid << std::endl;
+              << "              uid, " << (*ready)->uid << std::endl
+              << "              latency, " << (*ready)->latency << std::endl;
     assert(ready != NULL);
     move_warp(dest, *ready);
   }
@@ -201,6 +203,35 @@ class register_set {
           // ready is oldest
         } else {
           ready = &regs[i];
+        }
+      }
+    }
+    return ready;
+  }
+  inst_fetch_buffer_entry **get_ready(std::vector<inst_fetch_buffer_entry>* except_regs) {
+    inst_fetch_buffer_entry **ready;
+    ready = NULL;
+    for (unsigned i = 0; i < regs.size(); i++) {
+      if (regs[i]->m_valid) {
+        if (ready and (*ready)->uid < regs[i]->uid) {
+          // ready is oldest
+        } else {
+          ready = &regs[i];
+        }
+
+        if (ready && except_regs != NULL) {
+          bool is_except = false;
+          for (auto except_reg : *except_regs) {
+            if (except_reg.uid == regs[i]->uid && 
+                except_reg.wid == regs[i]->wid && 
+                except_reg.kid == regs[i]->kid) {
+              is_except = true;
+              break;
+            }
+          }
+          if (is_except) {
+            ready = NULL;
+          }
         }
       }
     }
@@ -304,6 +335,10 @@ class register_set {
   unsigned get_pc(unsigned reg_id) {
     assert(regs[reg_id]->m_valid);
     return regs[reg_id]->pc;
+  }
+  unsigned get_latency(unsigned reg_id) {
+    assert(regs[reg_id]->m_valid);
+    return regs[reg_id]->latency;
   }
   void set_latency(unsigned latency, unsigned reg_id) {
     assert(regs[reg_id]->m_valid);
