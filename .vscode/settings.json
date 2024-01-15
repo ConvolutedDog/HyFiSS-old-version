@@ -73,6 +73,8 @@
         "shared_mutex": "cpp",
         "filesystem": "cpp",
         "source_location": "cpp",
-        "process_args.h": "c"
+        "process_args.h": "c",
+        "strstream": "cpp",
+        "variant": "cpp"
     }
 }
