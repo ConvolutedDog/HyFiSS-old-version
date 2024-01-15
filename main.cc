@@ -99,9 +99,21 @@ int getIthKey(std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int i) {
 }
 
 #ifdef USE_BOOST
+/* SM_traces_all_passes[kid][sm_id_corresponding_to_current_rank]: 
+ *     mem_instn0, mem_instn1, ...
+ */
 void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc, 
                                                                   char **argv, 
-                                                                  std::vector<std::map<int, std::vector<mem_instn>>>* SM_traces_all_passes, 
+                                                                  std::vector<std::map<int, 
+                                                                                       std::vector<mem_instn>
+                                                                                      >
+                                                                             >* SM_traces_all_passes,
+                                                                  std::map<std::tuple<int, 
+                                                                                      int, 
+                                                                                      unsigned long long
+                                                                                     >, 
+                                                                           std::map<unsigned, bool>
+                                                                          >* mem_instn_distance_overflow_flag,
                                                                   int _tmp_print_, 
                                                                   std::string configs_dir,
                                                                   bool dump_histogram) {
@@ -148,13 +160,19 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
         //   std::cout << std::hex << mem_ins.time_stamp << " ";
         //   std::cout << std::hex << mem_ins.addr[0] << std::endl;
         // }
-        
+        std::map<unsigned, bool> distance_overflow_flag_vector;
         std::vector<unsigned long long> have_got_line_addr; // use have_got_line_addr will cause not accurate hit rate 
         for (unsigned j = 0; j < (mem_ins.addr).size(); j++) {
           unsigned long long cache_line_addr = mem_ins.addr[j] >> int(log2(l1_cache_line_size));
           /**/ // use have_got_line_addr will cause not accurate hit rate
-          if(std::find(have_got_line_addr.begin(), have_got_line_addr.end(), cache_line_addr) != have_got_line_addr.end()) {
+          if(std::find(have_got_line_addr.begin(), 
+                       have_got_line_addr.end(), 
+                       cache_line_addr) != have_got_line_addr.end()) {
             mem_ins.distance[j] = 0;
+            mem_ins.miss[j] = false;
+            
+            
+            distance_overflow_flag_vector[mem_ins.addr[j]] = false;
             // num_all_acc++;
           } else {
           /**/ // use have_got_line_addr will cause not accurate hit rate 
@@ -162,7 +180,7 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
             /* If you only want to dump the histogram of each SM for every kernel, you can also use: 
              *     process_one_access(input, &pdt_c, tim); */
             mem_ins.distance[j] = process_one_access_and_get_distance(input, &pdt_c, tim);
-            if (curr_process_idx == 0 && kid == 0) if ((cache_line_addr & 3) == 0)
+            if (curr_process_idx == 0 && kid == 0) if ((cache_line_addr & 3) == 0);
               // std::cout << "###SM-" << curr_process_idx << " " 
               //                       << std::hex << (mem_ins.addr[j]) << " " 
               //                       << std::hex << (mem_ins.addr[j] >> 7) << " " 
@@ -171,8 +189,23 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
               //                       << (cache_line_addr & 3) << std::dec << std::endl;
             if (mem_ins.distance[j] > (int)l1_cache_blocks) {
               miss_num_all_acc++;
+              mem_ins.miss[j] = true;
+              /* Here we have got that if a mem instn will hit or miss L1 cache, and now we 
+               * should add intns to the L2 cache, and should pass hit or miss L1 cache to 
+               * the compute model. */
+              /* The reason  */
+
+              distance_overflow_flag_vector[mem_ins.addr[j]] = true;
+            } else {
+              distance_overflow_flag_vector[mem_ins.addr[j]] = false;
             }
+
             num_all_acc++;
+
+            
+            mem_instn_distance_overflow_flag->insert(std::make_pair(std::make_tuple(kid, curr_process_idx, mem_ins.pc), 
+                                                      distance_overflow_flag_vector));
+            
             
             tim++;
             have_got_line_addr.push_back(cache_line_addr); // use have_got_line_addr will cause not accurate hit rate 
@@ -395,6 +428,21 @@ STOP_AND_REPORT_TIMER_pass(-1, 1);
 
 START_TIMER(3);
 
+    /* When gpgpu_concurrent_kernel_sm is configured to false, 
+     * passnum_concurrent_issue_to_sm is just the number of kernels.
+     * And the SM_traces_all_passes's size if also the number of kernels,
+     * pass is the kernel id.
+     */
+    /* 算法：
+     *   对于所有的rank，每个rank都会遍历所有的kernel，找到所有的kernel的kernel_info_t对象，
+     *   存储在single_pass_kernels_info中，以下是对应于单个kernel:{
+     *     对于kernel-kid，遍历其所有的thread block，找到当前rank所持有的thread block(这要
+     *     通过block的sm_id判断)，并将其加入到
+     *     SM_traces_all_passes[kid][sm_id_corresponding_to_current_rank]中，
+     *     SM_traces_all_passes[kid][sm_id_corresponding_to_current_rank]: 
+     *     mem_instn0, mem_instn1, ...
+     *   }
+     */
     for (int pass = 0; pass < passnum_concurrent_issue_to_sm; pass++) {
       if (PRINT_LOG) std::cout << "Schedule pass: " << pass << std::endl;
 
@@ -436,13 +484,20 @@ START_TIMER(2);
        * the same SM. */
       std::map<int, std::vector<mem_instn>>* SM_traces = &SM_traces_all_passes[pass];
 
-      
-
-      /* pass_num is the SMs that the current rank should process */
+      /* pass_num is the SMs that the current rank should process. */
       const int pass_num = int((gpu_config[V100].num_sm + world.size() - 1)/world.size());
+      /* _pass is the index of SMs that the current rank should process. 
+       * If we have 4 ranks, and 8 SMs:
+       *          _pass-0  1
+       *   rank-0 => SM-0, 4, 
+       *   rank-1 => SM-1, 5,
+       *   rank-2 => SM-2, 6,
+       *   rank-3 => SM-3, 7.
+       */
       for (int _pass = 0; _pass < pass_num; _pass++) {
+        /* curr_process_idx_rank is the SM id that should be processed. */
         int curr_process_idx_rank = world.rank() + _pass * world.size();
-        /* curr_process_idx is the SM id that should be processed */
+        /* curr_process_idx is the SM id that should be processed. */
         int curr_process_idx = curr_process_idx_rank;
         if (curr_process_idx < gpu_config[V100].num_sm)
         for (auto k : single_pass_kernels_info) {
@@ -646,8 +701,36 @@ START_TIMER(4);
   /***                              Calculate the stack distance.                             ***/
   /***                                                                                        ***/
   /**********************************************************************************************/
+  /* SM_traces_all_passes[kid=0...kernels_num-1][0...num_sms_of_kis-1][] 
+   * Note that the second dim of SM_traces_all_passes is the SM id, and if the kernels.
+   * 
+   * We also need a map to store the distance of each memory instruction, the key is the
+   * <k_id, sm_id, pc>, and the value is the distance vector of 1~32 addresses in the 
+   * instruction. */
+  std::map<std::tuple<int, int, unsigned long long>, std::map<unsigned, bool>> mem_instn_distance_overflow_flag;
 
-  private_L1_cache_stack_distance_evaluate_boost_no_concurrent(argc, argv, &SM_traces_all_passes,  _tmp_print_, configs, dump_histogram);
+  private_L1_cache_stack_distance_evaluate_boost_no_concurrent(argc, 
+                                                               argv, 
+                                                               &SM_traces_all_passes, 
+                                                               &mem_instn_distance_overflow_flag, 
+                                                               _tmp_print_, 
+                                                               configs, 
+                                                               dump_histogram);
+
+  /* Print mem_instn_distance_overflow_flag. */
+  /*
+  std::cout << "mem_instn_distance_overflow_flag START: " << std::endl;
+  for (auto iter : mem_instn_distance_overflow_flag) {
+    std::cout << "kernel_id: " << std::dec << std::get<0>(iter.first) 
+              << " sm_id: " << std::dec << std::get<1>(iter.first) 
+              << " pc: " << std::hex << std::get<2>(iter.first) << "";
+    for (auto iter2 : iter.second) {
+      std::cout << "    address: " << std::hex << iter2.first 
+                << " miss: " << std::dec << iter2.second << std::endl;
+    }
+  }
+  std::cout << "mem_instn_distance_overflow_flag END." << std::endl;
+  */
 
 STOP_AND_REPORT_TIMER_rank(world.rank(), 4);
 
