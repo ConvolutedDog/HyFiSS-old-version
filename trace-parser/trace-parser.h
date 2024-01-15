@@ -318,6 +318,7 @@ struct mem_instn {
     mem_access_type = has_mem_instn_type();
 
     distance.resize(addr.size());
+    miss.resize(addr.size());
   }
   mem_instn(unsigned _pc, unsigned long long _addr_start1, 
             unsigned _time_stamp, int addr_groups, 
@@ -355,6 +356,7 @@ struct mem_instn {
     }
 
     distance.resize(addr.size());
+    miss.resize(addr.size());
   }
 
   unsigned pc;
@@ -366,6 +368,7 @@ struct mem_instn {
   enum mem_instn_type mem_access_type;
 
   std::vector<int> distance;
+  std::vector<bool> miss;
 
   /* Here we will judge if or not the opcode has 'RED'/'ATOM'/'LDG'/'STG'/'LDL'/'STL'.
    * 1. RED: global reduction operations, Reduction Operation on generic Memory.
