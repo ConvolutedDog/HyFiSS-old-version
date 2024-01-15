@@ -102,7 +102,7 @@ void pipelined_simd_unit::issue(register_set &source_reg) {
   if (ready_reg != NULL) {
     std::cout << "    (*ready_reg): " << (*ready_reg)->kid 
               << " " << (*ready_reg)->wid 
-              << " " << (*ready_reg)->uid << std::endl
+              << " " << (*ready_reg)->uid
               << std::endl;
   
     // simd_function_unit::issue(source_reg);
@@ -127,7 +127,7 @@ void pipelined_simd_unit::issue(register_set &source_reg) {
     std::cout << "    source after move: " << (*ready_reg)->m_valid << std::endl;
 
     //设置m_dispatch_reg的标识占用位图的状态，m_dispatch_reg是warp_inst_t类型，可获取该指令的延迟。
-    std::cout << "\n    occupied.set" << std::endl;
+    std::cout << "    occupied.set" << std::endl;
     occupied.set(m_dispatch_reg->latency);
 
     std::cout << "  ### pipelined_simd_unit::issue() end:" << std::endl
