@@ -1400,8 +1400,8 @@ void PrivateSM::run(){
             if (m_ibuffer->is_not_empty(global_all_kernels_warp_id)) {
               
               std::cout << "  Before pop,m_ibuffer:" << std::endl;
-              std::cout << "wid:" << wid;
-              m_ibuffer->print_ibuffer(wid);
+              std::cout << "wid:" << global_all_kernels_warp_id;
+              m_ibuffer->print_ibuffer(global_all_kernels_warp_id);
               // pop the instn from ibuffer
               ibuffer_entry entry = m_ibuffer->front(global_all_kernels_warp_id);
               std::cout << "  pop_front(uid,pc,wid,kid): " 
@@ -1410,7 +1410,7 @@ void PrivateSM::run(){
                                           << entry.wid << " " 
                                           << entry.kid << std::endl;
               std::cout << "  After pop,m_ibuffer:" << std::endl;
-              m_ibuffer->print_ibuffer(entry.wid);
+              m_ibuffer->print_ibuffer(global_all_kernels_warp_id);
               unsigned _fetch_instn_id = entry.uid;
               unsigned _pc = entry.pc;
               unsigned _gwid = entry.wid;
