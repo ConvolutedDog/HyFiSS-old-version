@@ -74,7 +74,9 @@ class IBuffer {
 
   void print_ibuffer(unsigned gwarp_id) {
       std::cout << "    Ibuffer (pc, wid, kid) warp - " << gwarp_id << ": ";
-      for (auto it = m_ibuffer[gwarp_id].begin(); it != m_ibuffer[gwarp_id].end(); it++) {
+      for (auto it = m_ibuffer[gwarp_id].begin(); 
+                it != m_ibuffer[gwarp_id].end(); 
+                it++) {
         std::cout << "(" << it->pc << ", " << it->wid << ", " << it->kid << "), ";
       }
       std::cout << std::endl;
