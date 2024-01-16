@@ -1,6 +1,7 @@
 
 #include "inst-trace.h"
 
+#define NUM_CYCLE_MEM_ACCESS_LATENCY 7
 
 bool is_number(const std::string &s) {
   std::string::const_iterator it = s.begin();
@@ -185,8 +186,8 @@ void _inst_trace_t::parse_opcode_latency_info() {
         break;
       case LOAD_OP: // TODO: need to be modified
       case STORE_OP: // TODO: need to be modified
-        latency = 10; // TODO: need to be modified
-        initiation_interval = 10; // TODO: need to be modified
+        latency = NUM_CYCLE_MEM_ACCESS_LATENCY; // TODO: need to be modified
+        initiation_interval = 0; // TODO: need to be modified
         func_unit = LDST_UNIT;
         break;
       default:
