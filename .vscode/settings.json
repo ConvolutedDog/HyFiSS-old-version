@@ -75,6 +75,7 @@
         "source_location": "cpp",
         "process_args.h": "c",
         "strstream": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "any": "cpp"
     }
 }
