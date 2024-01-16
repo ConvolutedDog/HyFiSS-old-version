@@ -571,6 +571,10 @@ class trace_parser {
     return &conpute_instns[kernel_id][warp_id][next_instn_id];
   }
 
+  unsigned get_one_kernel_one_warp_instn_count(int kernel_id, int warp_id) {
+    return conpute_instns[kernel_id][warp_id].size();
+  }
+
   unsigned get_one_kernel_one_warp_instn_size(int kernel_id, int warp_id) {
     return conpute_instns[kernel_id][warp_id].size();
   }
