@@ -867,6 +867,7 @@ START_TIMER(6);
     unsigned smid = curr_process_idx_rank;
     std::cout << "### Rank-" << world.rank() << ", processing SM-" << smid << std::endl;
     // if (smid < gpu_config[V100].num_sm) {
+    
     if (smid == 0) {
       std::cout << "$$$ Rank-" << world.rank() << ", processing SM-" << smid << std::endl;
       PrivateSM private_sm = PrivateSM(smid, &tracer, &hw_cfg);
