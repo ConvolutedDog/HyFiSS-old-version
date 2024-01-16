@@ -742,12 +742,24 @@ bool trace_warp_inst_t::parse_from_trace_struct(
 
   // if (trace->pred_str != "") std::cout << "pred_str: " << trace->pred_str << std::endl;
 
+  /* Low Performance
   if (trace->pred_str != "") {
     std::regex pattern("@!?P(\\d+)");
     std::smatch match;
 
     if (std::regex_search(trace->pred_str, match, pattern) && match.size() > 1) {
       pred = std::stoul(match.str(1)); 
+    }
+  }
+  */
+
+  if (!trace->pred_str.empty()) {
+    size_t pos_P = trace->pred_str.find('P');
+    if (pos_P != std::string::npos) {
+        size_t pos_space = trace->pred_str.find(' ', pos_P);
+        size_t count = (pos_space != std::string::npos) ? pos_space - pos_P - 1 : std::string::npos;
+        std::string num_str = trace->pred_str.substr(pos_P + 1, count);
+        pred = std::stoul(num_str);
     }
   }
 
