@@ -735,7 +735,7 @@ void trace_parser::parse_configs_file(bool PRINT_LOG) {
 #include <regex>
 #include <algorithm>
 
-
+/* Low Performance
 bool judge_format_mem(char* d_name, std::vector<std::pair<int, int>>* x) {
   std::string name = d_name;
   std::regex pattern("kernel_(\\d+)_block_(\\d+).mem");
@@ -744,6 +744,28 @@ bool judge_format_mem(char* d_name, std::vector<std::pair<int, int>>* x) {
   if (std::regex_match(name, match, pattern)) {
     int xx = std::stoi(match[1]);
     int yy = std::stoi(match[2]);
+
+    if (std::find((*x).begin(), (*x).end(), std::make_pair(xx, yy)) != (*x).end()) {
+      return true;
+    } else {
+      return false;
+    }
+  } else {
+    return false;
+  }
+}
+*/
+
+bool judge_format_mem(char* d_name, std::vector<std::pair<int, int>>* x) {
+  std::string name = d_name;
+
+  size_t pos_kernel = name.find("kernel_");
+  size_t pos_block = name.find("_block_");
+  size_t pos_mem = name.find(".mem");
+
+  if (pos_kernel != std::string::npos && pos_block != std::string::npos && pos_mem != std::string::npos) {
+    int xx = std::stoi(name.substr(pos_kernel + 7, pos_block - (pos_kernel + 7)));
+    int yy = std::stoi(name.substr(pos_block + 7, pos_mem - (pos_block + 7)));
 
     if (std::find((*x).begin(), (*x).end(), std::make_pair(xx, yy)) != (*x).end()) {
       return true;
@@ -1124,7 +1146,12 @@ void trace_parser::process_compute_instns_fast(std::string compute_instns_dir, b
             // ss >> std::hex >> _pc;
             // ss >> std::hex >> _mask_str;
             char mask_str[9];
+            /* Low Performance
             sscanf(line.c_str(), "%x %s", &_pc, mask_str);
+            */
+            std::istringstream iss(line);
+            iss >> std::hex >> _pc >> mask_str;
+
             _mask_str = std::string(mask_str);
             
                 if (_mask_str == "!") _mask = 0xffffffff;
