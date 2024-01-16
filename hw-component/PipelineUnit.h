@@ -11,6 +11,8 @@
 
 #define MAX_ALU_LATENCY 512
 
+#define NUM_CYCLE_MEM_ACCESS_LATENCY 7
+
 /*
 SP单元和SFU单元的时序模型主要在 shader.h 中定义的 pipelined_simd_unit 类中实现。模拟单元的具体类（
 sp_unit类和sfu类）是从这个类派生出来的，由可重载的 can_issue() 成员函数来指定单元可执行的指令类型。
@@ -245,7 +247,7 @@ class mem_unit : public pipelined_simd_unit {
   mem_unit(register_set *result_port, unsigned issue_reg_id,
            hw_config* hw_cfg, trace_parser* tracer)
            : pipelined_simd_unit(result_port, 
-                                 10,  
+                                 NUM_CYCLE_MEM_ACCESS_LATENCY,  
                                  // TODO: should be latency of L1 miss + L2 miss + DRAM access time
                                  issue_reg_id,
                                  hw_cfg, tracer) {
