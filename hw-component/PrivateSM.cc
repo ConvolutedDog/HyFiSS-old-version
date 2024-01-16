@@ -425,9 +425,9 @@ void PrivateSM::run(){
 
   std::cout << "# cycle: " << m_cycle << std::endl;
 
-  if (m_cycle >= 6261) {
-    active = false;
-  }
+  // if (m_cycle >= 6261) {
+  //   active = false;
+  // }
 
   // for (auto it_kernel_block_pair = kernel_block_pair.begin(); 
   //           it_kernel_block_pair != kernel_block_pair.end(); 
@@ -629,7 +629,8 @@ void PrivateSM::run(){
         pipe_reg->m_valid = false;
 
         /* If the instn string of (_kid, _wid, _pc) is "EXIT", should deactivate this warp. */
-        if (_trace_warp_inst.get_opcode() == OP_EXIT) {
+        if (_trace_warp_inst.get_opcode() == OP_EXIT &&
+            tracer->get_one_kernel_one_warp_instn_count(_kid, _wid) == _uid + 1) {
           /* m_warp_active_status[
            *                      0 ~ kernel_block_pair.size()
            *                     ]
@@ -662,6 +663,11 @@ void PrivateSM::run(){
            * 80 * 3 = 240.
            */
           m_warp_active_status[_index][_wid - _gwarp_id_start] = false;
+          std::cout << "kid,block_id,wid,cycle:" 
+                    << _kid << " " 
+                    << _block_id << " " 
+                    << _wid << " "
+                    << m_cycle << std::endl;
           std::cout << "  **Deactivate warp (_index_, wid): (" 
                     << _index << ", " << _wid - _gwarp_id_start << ")" 
                     << " <=> (kid, block_id, wid): (" 
@@ -2127,7 +2133,7 @@ void PrivateSM::run(){
 
       if (!all_warps_finished) break;
     }
-
+    
     if (all_warps_finished) {
       active = false;
       std::cout << "D: SM-" << m_smid << " is finished." << std::endl;
