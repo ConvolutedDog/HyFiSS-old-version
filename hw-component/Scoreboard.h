@@ -9,6 +9,7 @@
 #ifndef SCOREBOARD_H
 #define SCOREBOARD_H
 
+#define _DEBUG_LOG_ 0
 
 class Scoreboard {
  public:
