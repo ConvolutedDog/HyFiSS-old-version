@@ -44,22 +44,24 @@ void pipelined_simd_unit::cycle() {
     std::rotate(m_pipeline_reg.begin(), m_pipeline_reg.begin() + 1, m_pipeline_reg.end());
     m_pipeline_reg[m_pipeline_depth - 1]->m_valid = false;
   }
-
-  bool print_status = false;
-  for (auto &reg : m_pipeline_reg) {
-    if (reg->m_valid) {
-      print_status = true;
-      break;
-    }
-  }
-  if (print_status) {
-    std::cout << "    UNIT " << m_name << " 's m_pipeline_reg status:" << std::endl;
+  
+  if (_DEBUG_LOG_) {
+    bool print_status = false;
     for (auto &reg : m_pipeline_reg) {
-      std::cout << "    reg: valid-" << reg->m_valid 
-                << ",pc-" << reg->pc 
-                << ",kid-" << reg->kid 
-                << ",wid-" << reg->wid 
-                << ",uid-" << reg->uid << std::endl;
+      if (reg->m_valid) {
+        print_status = true;
+        break;
+      }
+    }
+    if (print_status) {
+      std::cout << "    UNIT " << m_name << " 's m_pipeline_reg status:" << std::endl;
+      for (auto &reg : m_pipeline_reg) {
+        std::cout << "    reg: valid-" << reg->m_valid 
+                  << ",pc-" << reg->pc 
+                  << ",kid-" << reg->kid 
+                  << ",wid-" << reg->wid 
+                  << ",uid-" << reg->uid << std::endl;
+      }
     }
   }
 
@@ -94,50 +96,57 @@ void pipelined_simd_unit::issue(register_set &source_reg) {
     m_hw_cfg->get_sub_core_model() && this->is_issue_partitioned();
   inst_fetch_buffer_entry **ready_reg =
     source_reg.get_ready(partition_issue, m_issue_reg_id);
-  
-  std::cout << "    partition_issue: " << partition_issue << std::endl
-            << "    m_issue_reg_id: " << m_issue_reg_id << std::endl
-            << "    ready_reg: " << ready_reg << std::endl
-            << "    NULL: " << NULL << std::endl;
+  if (_DEBUG_LOG_)
+    std::cout << "    partition_issue: " << partition_issue << std::endl
+              << "    m_issue_reg_id: " << m_issue_reg_id << std::endl
+              << "    ready_reg: " << ready_reg << std::endl
+              << "    NULL: " << NULL << std::endl;
 
   if (ready_reg != NULL) {
-    std::cout << "    (*ready_reg): " << (*ready_reg)->kid 
-              << " " << (*ready_reg)->wid 
-              << " " << (*ready_reg)->uid
-              << std::endl;
+    if (_DEBUG_LOG_)
+      std::cout << "    (*ready_reg): " << (*ready_reg)->kid 
+                << " " << (*ready_reg)->wid 
+                << " " << (*ready_reg)->uid
+                << std::endl;
   
     // simd_function_unit::issue(source_reg);
 
     //source_reg即为流水线寄存器，目的是找到一个非空的指令，将其移入m_dispatch_reg。
-    std::cout << "    source_reg.move_out_to.m_dispatch_reg" << std::endl;
+    if (_DEBUG_LOG_)
+      std::cout << "    source_reg.move_out_to.m_dispatch_reg" << std::endl;
 
-    std::cout << "    Before Move: " << "valid: " << m_dispatch_reg->m_valid << std::endl
-              << "                         kid: " << m_dispatch_reg->kid << std::endl
-              << "                         wid: " << m_dispatch_reg->wid << std::endl 
-              << "                         uid: " << m_dispatch_reg->uid << std::endl;
-    std::cout << "    source before move: " << (*ready_reg)->m_valid << std::endl;
+    if (_DEBUG_LOG_) {
+      std::cout << "    Before Move: " << "valid: " << m_dispatch_reg->m_valid << std::endl
+                << "                         kid: " << m_dispatch_reg->kid << std::endl
+                << "                         wid: " << m_dispatch_reg->wid << std::endl 
+                << "                         uid: " << m_dispatch_reg->uid << std::endl;
+      std::cout << "    source before move: " << (*ready_reg)->m_valid << std::endl;
+    }
 
     source_reg.move_out_to(partition_issue, this->get_issue_reg_id(),
                           m_dispatch_reg);
 
-    std::cout << "    After Move: " << "valid: " << m_dispatch_reg->m_valid << std::endl
-              << "                        kid: " << m_dispatch_reg->kid << std::endl
-              << "                        wid: " << m_dispatch_reg->wid << std::endl 
-              << "                        uid: " << m_dispatch_reg->uid << std::endl;
+    if (_DEBUG_LOG_) {
+      std::cout << "    After Move: " << "valid: " << m_dispatch_reg->m_valid << std::endl
+                << "                        kid: " << m_dispatch_reg->kid << std::endl
+                << "                        wid: " << m_dispatch_reg->wid << std::endl 
+                << "                        uid: " << m_dispatch_reg->uid << std::endl;
 
-    std::cout << "    source after move: " << (*ready_reg)->m_valid << std::endl;
+      std::cout << "    source after move: " << (*ready_reg)->m_valid << std::endl;
+    }
 
     //设置m_dispatch_reg的标识占用位图的状态，m_dispatch_reg是warp_inst_t类型，可获取该指令的延迟。
-    std::cout << "    occupied.set" << std::endl;
+    if (_DEBUG_LOG_) std::cout << "    occupied.set" << std::endl;
     
     occupied.set(m_dispatch_reg->latency);
 
-    std::cout << "  ### pipelined_simd_unit::issue() end:" << std::endl
-              << "    Instn[pc:" << m_dispatch_reg->pc << ","
-              << "kid:" << m_dispatch_reg->kid << ","
-              << "wid:" << m_dispatch_reg->wid << ","
-              << "uid:" << m_dispatch_reg->uid << "] has been issued to UNIT " 
-              << m_name << std::endl;
+    if (_DEBUG_LOG_)
+      std::cout << "  ### pipelined_simd_unit::issue() end:" << std::endl
+                << "    Instn[pc:" << m_dispatch_reg->pc << ","
+                << "kid:" << m_dispatch_reg->kid << ","
+                << "wid:" << m_dispatch_reg->wid << ","
+                << "uid:" << m_dispatch_reg->uid << "] has been issued to UNIT " 
+                << m_name << std::endl;
 
   }
 }
@@ -148,50 +157,57 @@ void pipelined_simd_unit::issue(register_set &source_reg, unsigned reg_id) {
   inst_fetch_buffer_entry **ready_reg =
     source_reg.get_ready(partition_issue, reg_id);
   
-  std::cout << "    partition_issue: " << partition_issue << std::endl
-            << "    reg_id: " << reg_id << std::endl
-            << "    ready_reg: " << ready_reg << std::endl
-            << "    NULL: " << NULL << std::endl;
+  if (_DEBUG_LOG_)
+    std::cout << "    partition_issue: " << partition_issue << std::endl
+              << "    reg_id: " << reg_id << std::endl
+              << "    ready_reg: " << ready_reg << std::endl
+              << "    NULL: " << NULL << std::endl;
 
   if (ready_reg != NULL) {
-    std::cout << "    (*ready_reg): " << (*ready_reg)->kid 
-              << " " << (*ready_reg)->wid 
-              << " " << (*ready_reg)->uid
-              << std::endl;
+    if (_DEBUG_LOG_)
+      std::cout << "    (*ready_reg): " << (*ready_reg)->kid 
+                << " " << (*ready_reg)->wid 
+                << " " << (*ready_reg)->uid
+                << std::endl;
   
     // simd_function_unit::issue(source_reg);
 
     //source_reg即为流水线寄存器，目的是找到一个非空的指令，将其移入m_dispatch_reg。
-    std::cout << "    source_reg.move_out_to.m_dispatch_reg" << std::endl;
+    if (_DEBUG_LOG_) {
+      std::cout << "    source_reg.move_out_to.m_dispatch_reg" << std::endl;
 
-    std::cout << "    Before Move: " << "valid: " << m_dispatch_reg->m_valid << std::endl
-              << "                         kid: " << m_dispatch_reg->kid << std::endl
-              << "                         wid: " << m_dispatch_reg->wid << std::endl 
-              << "                         uid: " << m_dispatch_reg->uid << std::endl;
-    std::cout << "    source before move: " << (*ready_reg)->m_valid << std::endl;
+      std::cout << "    Before Move: " << "valid: " << m_dispatch_reg->m_valid << std::endl
+                << "                         kid: " << m_dispatch_reg->kid << std::endl
+                << "                         wid: " << m_dispatch_reg->wid << std::endl 
+                << "                         uid: " << m_dispatch_reg->uid << std::endl;
+      std::cout << "    source before move: " << (*ready_reg)->m_valid << std::endl;
+    }
 
     source_reg.move_out_to(partition_issue, reg_id,
                            m_dispatch_reg);
 
-    std::cout << "    After Move: " << "valid: " << m_dispatch_reg->m_valid << std::endl
-              << "                        kid: " << m_dispatch_reg->kid << std::endl
-              << "                        wid: " << m_dispatch_reg->wid << std::endl 
-              << "                        uid: " << m_dispatch_reg->uid << std::endl
-              << "                    latency: " << m_dispatch_reg->latency << std::endl;
+    if (_DEBUG_LOG_) {
+      std::cout << "    After Move: " << "valid: " << m_dispatch_reg->m_valid << std::endl
+                << "                        kid: " << m_dispatch_reg->kid << std::endl
+                << "                        wid: " << m_dispatch_reg->wid << std::endl 
+                << "                        uid: " << m_dispatch_reg->uid << std::endl
+                << "                    latency: " << m_dispatch_reg->latency << std::endl;
 
-    std::cout << "    source after move: " << (*ready_reg)->m_valid << std::endl;
+      std::cout << "    source after move: " << (*ready_reg)->m_valid << std::endl;
+    }
 
     //设置m_dispatch_reg的标识占用位图的状态，m_dispatch_reg是warp_inst_t类型，可获取该指令的延迟。
-    std::cout << "    occupied.set" << std::endl;
+    if (_DEBUG_LOG_) std::cout << "    occupied.set" << std::endl;
     
     occupied.set(m_dispatch_reg->latency);
 
-    std::cout << "  ### pipelined_simd_unit::issue() end:" << std::endl
-              << "    Instn[pc:" << m_dispatch_reg->pc << ","
-              << "kid:" << m_dispatch_reg->kid << ","
-              << "wid:" << m_dispatch_reg->wid << ","
-              << "uid:" << m_dispatch_reg->uid << "] has been issued to UNIT " 
-              << m_name << std::endl;
+    if (_DEBUG_LOG_)
+      std::cout << "  ### pipelined_simd_unit::issue() end:" << std::endl
+                << "    Instn[pc:" << m_dispatch_reg->pc << ","
+                << "kid:" << m_dispatch_reg->kid << ","
+                << "wid:" << m_dispatch_reg->wid << ","
+                << "uid:" << m_dispatch_reg->uid << "] has been issued to UNIT " 
+                << m_name << std::endl;
 
   }
 }
