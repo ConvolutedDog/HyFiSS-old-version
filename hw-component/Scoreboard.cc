@@ -11,7 +11,7 @@ Scoreboard::Scoreboard(const unsigned smid, const unsigned n_warps)
 }
 
 void Scoreboard::printContents() const {
-  printf("Scoreboard contents (sid=%u): \n", m_smid);
+  printf("    Scoreboard contents (sid=%u): \n", m_smid);
   for (unsigned i = 0; i < reg_table.size(); i++) {
     if (reg_table[i].size() == 0) continue;
     printf("  wid = %2u: ", i);
@@ -53,7 +53,8 @@ void Scoreboard::reserveRegisters(const unsigned wid, std::vector<int> regnums, 
     if (regnums[r] > 0) {
       if (std::find(prev_regs.begin(), prev_regs.end(), regnums[r]) == prev_regs.end()) {
         prev_regs.push_back(regnums[r]);
-        std::cout << "  reserve register: " << regnums[r] << std::endl;
+        if (_DEBUG_LOG_)
+          std::cout << "  reserve register: " << regnums[r] << std::endl;
         reserveRegister(wid, regnums[r]);
       }
     }
