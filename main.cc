@@ -764,7 +764,8 @@ START_TIMER(5);
   tracer.read_compute_instns(PRINT_COMPUTE_LOG, &need_to_read_mem_instns_kernel_block_pair);
   
   if (world.rank() == 0) {
-    std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" << std::endl;
+    if (_DEBUG_LOG_)
+      std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" << std::endl;
 
     // compute_instn* tmp = tracer.get_one_kernel_one_warp_one_instn(42, 2, 3);
     // _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
@@ -807,7 +808,8 @@ START_TIMER(5);
     // std::cout << "warp_id: " << std::dec << tmp_trace_warp_inst->get_warp_id() << std::endl;
     // std::cout << "active_mask: " << std::dec << tmp_trace_warp_inst->get_active_mask() << std::endl;
     
-    std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" << std::endl;
+    if (_DEBUG_LOG_)
+      std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" << std::endl;
   }
 
 STOP_AND_REPORT_TIMER_rank(world.rank(), 5);
@@ -869,16 +871,21 @@ START_TIMER(6);
     // if (smid < gpu_config[V100].num_sm) {
     
     if (smid == 0) {
-      std::cout << "$$$ Rank-" << world.rank() << ", processing SM-" << smid << std::endl;
+      if (_DEBUG_LOG_)
+        std::cout << "$$$ Rank-" << world.rank() 
+                  << ", processing SM-" << smid << std::endl;
       PrivateSM private_sm = PrivateSM(smid, &tracer, &hw_cfg);
-      std::cout << "private_sm.get_cycle(): " << private_sm.get_cycle() << std::endl;
+      if (_DEBUG_LOG_)
+        std::cout << "private_sm.get_cycle(): " 
+                  << private_sm.get_cycle() << std::endl;
       // traverse blocks_per_kernel
       for (auto pair : *(private_sm.get_blocks_per_kernel())) {
         unsigned kid = pair.first;
         std::vector<unsigned> block_ids = pair.second;
-        for (unsigned block_id : block_ids) {
-          std::cout << "kid: " << kid << ", block_id: " << block_id << std::endl;
-        }
+        if (_DEBUG_LOG_)
+          for (unsigned block_id : block_ids) {
+            std::cout << "kid: " << kid << ", block_id: " << block_id << std::endl;
+          }
       }
       while (private_sm.get_active()) {
         private_sm.run();
