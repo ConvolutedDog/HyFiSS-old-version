@@ -42,7 +42,7 @@ class register_set {
     return false;
   }
   void release_register_set() {
-    std::cout << "DELETE " << m_name << std::endl;
+    // std::cout << "DELETE " << m_name << std::endl;
     for (auto ptr : regs) {
       // if (ptr != NULL) {
         delete ptr;
@@ -103,11 +103,12 @@ class register_set {
 
   void move_warp_newalloc_src(inst_fetch_buffer_entry *&dest, 
                  inst_fetch_buffer_entry *&src) {
-    std::cout << "    src: " 
-                         << src->kid << ", " 
-                         << src->pc << ", " 
-                         << src->wid << ", " 
-                         << src->uid << std::endl;
+    if (_DEBUG_LOG_)
+      std::cout << "    src: " 
+                << src->kid << ", " 
+                << src->pc << ", " 
+                << src->wid << ", " 
+                << src->uid << std::endl;
     dest->pc = src->pc;
     dest->wid = src->wid;
     dest->kid = src->kid;
@@ -115,11 +116,12 @@ class register_set {
     dest->m_valid = true;
     // src->clear();
 
-    std::cout << "    dest: " 
-                          << dest->kid << ", " 
-                          << dest->pc << ", " 
-                          << dest->wid << ", " 
-                          << dest->uid << std::endl;
+    if (_DEBUG_LOG_)
+      std::cout << "    dest: " 
+                << dest->kid << ", " 
+                << dest->pc << ", " 
+                << dest->wid << ", " 
+                << dest->uid << std::endl;
     
   }
 
@@ -130,13 +132,15 @@ class register_set {
     dest->kid = src->kid;
     dest->uid = src->uid;
     dest->latency = src->latency;
-    std::cout << "src->latency: " << src->latency << std::endl;
+    if (_DEBUG_LOG_)
+      std::cout << "      src->latency: " << src->latency << std::endl;
     dest->m_valid = true;
-    std::cout << "    dest: " 
-                          << dest->kid << ", " 
-                          << dest->pc << ", " 
-                          << dest->wid << ", " 
-                          << dest->uid << std::endl;
+    if (_DEBUG_LOG_) 
+      std::cout << "    dest: " 
+                << dest->kid << ", " 
+                << dest->pc << ", " 
+                << dest->wid << ", " 
+                << dest->uid << std::endl;
     // src->clear();
     src->m_valid = false;
   }
@@ -149,11 +153,12 @@ class register_set {
   }
   //获取一个空寄存器，并将一条指令存入。
   void move_in(bool sub_core_model, unsigned reg_id, inst_fetch_buffer_entry *&src) {
-    std::cout << "  move in: " 
-                              << src->pc << ", " 
-                              << src->wid << ", " 
-                              << src->kid << ", " 
-                              << src->uid << std::endl; 
+    if (_DEBUG_LOG_)
+      std::cout << "  move in: " 
+                << src->pc << ", " 
+                << src->wid << ", " 
+                << src->kid << ", " 
+                << src->uid << std::endl; 
     inst_fetch_buffer_entry *free;
     // std::cout << "sub_core_model: | " << sub_core_model << std::endl;
     if (!sub_core_model) {
@@ -184,12 +189,14 @@ class register_set {
       return move_out_to(dest);
     }
     inst_fetch_buffer_entry **ready = get_ready(sub_core_model, reg_id);
-    std::cout << "    ready: " << ready << std::endl;
-    std::cout << "    (*ready): kid, " << (*ready)->kid << std::endl
-              << "              pc, " << (*ready)->pc << std::endl
-              << "              wid, " << (*ready)->wid << std::endl
-              << "              uid, " << (*ready)->uid << std::endl
-              << "              latency, " << (*ready)->latency << std::endl;
+    if (_DEBUG_LOG_) {
+      std::cout << "    ready: " << ready << std::endl;
+      std::cout << "    (*ready): kid, " << (*ready)->kid << std::endl
+                << "              pc, " << (*ready)->pc << std::endl
+                << "              wid, " << (*ready)->wid << std::endl
+                << "              uid, " << (*ready)->uid << std::endl
+                << "              latency, " << (*ready)->latency << std::endl;
+    }
     assert(ready != NULL);
     move_warp(dest, *ready);
   }
@@ -253,11 +260,14 @@ class register_set {
     for (unsigned i = 0; i < regs.size(); i++) {
       std::cout << "     ";
       if (regs[i]->m_valid) {
-        std::cout << "    valid: ";
-        std::cout << "pc: " << regs[i]->pc << ", wid: " << regs[i]->wid 
-                  << ", kid: " << regs[i]->kid << ", uid: " << regs[i]->uid;
+        if (_DEBUG_LOG_) {
+          std::cout << "    valid: ";
+          std::cout << "pc: " << regs[i]->pc << ", wid: " << regs[i]->wid 
+                    << ", kid: " << regs[i]->kid << ", uid: " << regs[i]->uid;
+        }
       } else {
-        std::cout << "    novalid      ";
+        if (_DEBUG_LOG_)
+          std::cout << "    novalid      ";
       }
       std::cout << std::endl;
     }
@@ -279,8 +289,10 @@ class register_set {
 
     assert(reg_id < regs.size());
     if (regs[reg_id]->m_valid == false) {
-      std::cout << "get free: " << regs[reg_id] << std::endl;
-      std::cout << "get free: " << &regs[reg_id] << std::endl;
+      if (_DEBUG_LOG_) {
+        std::cout << "get free: " << regs[reg_id] << std::endl;
+        std::cout << "get free: " << &regs[reg_id] << std::endl;
+      }
       return &regs[reg_id];
     }
     return NULL;
@@ -289,7 +301,8 @@ class register_set {
     // in subcore model, each sched has a one specific reg to use (based on
     // sched id)
     if (!sub_core_model) return *(get_free());
-    std::cout << "  @#@#@#: " << regs[reg_id] << std::endl;
+    if (_DEBUG_LOG_)
+      std::cout << "  @#@#@#: " << regs[reg_id] << std::endl;
     assert(reg_id < regs.size());
     if (regs[reg_id]->m_valid == false) {
       // std::cout << "get free: | " << regs[reg_id] << std::endl;
