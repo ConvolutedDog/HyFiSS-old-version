@@ -328,9 +328,10 @@ class opndcoll_rfu_t {  // operand collector based register file unit
       }
     }
     void init(unsigned num_cu, unsigned num_banks) {
-      std::cout << "arbiter_t::init " 
-                << " num_cu: " << num_cu 
-                << " num_banks: " << num_banks << std::endl;
+      if (_DEBUG_LOG_)
+        std::cout << "arbiter_t::init " 
+                  << " num_cu: " << num_cu 
+                  << " num_banks: " << num_banks << std::endl;
       assert(num_cu > 0);
       assert(num_banks > 0);
       m_num_collectors = num_cu;
@@ -343,20 +344,15 @@ class opndcoll_rfu_t {  // operand collector based register file unit
       for (unsigned i = 0; i < m_num_banks; i++)
         _request[i] = new int[m_num_collectors];
       // m_queue stores the op_t s of every bank
-      std::cout << "DDD" << std::endl;
       m_queue = new std::list<op_t>[num_banks];
       // m_allocated_bank stores the allocation_t of every bank
-      std::cout << "CCC" << std::endl;
       m_allocated_bank = new allocation_t[num_banks];
-      std::cout << "EEE" << std::endl;
       for (unsigned i = 0; i < num_banks; ++i) {
         m_allocated_bank[i] = allocation_t(m_reg_bank_allocator, i);
       }
-      std::cout << "BBB" << std::endl;
       m_allocator_rr_head = new unsigned[num_cu];
       for (unsigned n = 0; n < num_cu; n++)
         m_allocator_rr_head[n] = n % num_banks;
-      std::cout << "AAA" << std::endl;
       reset_alloction();
     }
 
@@ -396,21 +392,24 @@ class opndcoll_rfu_t {  // operand collector based register file unit
       m_tracer = tracer;
       m_bank
       */
-      std::cout << "      arbiter_t::add_read_requests:" << std::endl;
+      if (_DEBUG_LOG_)
+        std::cout << "      arbiter_t::add_read_requests:" << std::endl;
       // print src
       for (unsigned i = 0; i < MAX_REG_OPERANDS * 2; i++) {
         op_t &op = (op_t &)(src[i]);
-        if (op.valid()) {
-          std::cout << "        arbiter_t::add_read_requests::op: " << std::endl;
-          std::cout << "          get_wid(): " << op.get_wid() << std::endl;
-          std::cout << "          get_reg(): " << op.get_reg() << std::endl;
-          std::cout << "          get_sid(): " << op.get_sid() << std::endl;
-          std::cout << "          get_active_count(): " << op.get_active_count() << std::endl;
-          std::cout << "          get_active_mask(): " << op.get_active_mask() << std::endl;
-          std::cout << "          get_oc_id(): " << op.get_oc_id() << std::endl;
-          std::cout << "          get_bank(): " << op.get_bank() << std::endl;
-          std::cout << "          get_operand(): " << op.get_operand() << std::endl;
-          std::cout << "          get_reg_string(): " << op.get_reg_string() << std::endl;
+        if (_DEBUG_LOG_) {
+          if (op.valid()) {
+            std::cout << "        arbiter_t::add_read_requests::op: " << std::endl;
+            std::cout << "          get_wid(): " << op.get_wid() << std::endl;
+            std::cout << "          get_reg(): " << op.get_reg() << std::endl;
+            std::cout << "          get_sid(): " << op.get_sid() << std::endl;
+            std::cout << "          get_active_count(): " << op.get_active_count() << std::endl;
+            std::cout << "          get_active_mask(): " << op.get_active_mask() << std::endl;
+            std::cout << "          get_oc_id(): " << op.get_oc_id() << std::endl;
+            std::cout << "          get_bank(): " << op.get_bank() << std::endl;
+            std::cout << "          get_operand(): " << op.get_operand() << std::endl;
+            std::cout << "          get_reg_string(): " << op.get_reg_string() << std::endl;
+          }
         }
       }
 
