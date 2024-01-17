@@ -13,6 +13,8 @@
 
 #define MHZ *1000000
 
+#define _DEBUG_LOG_ 0
+
 enum pipeline_stage_name_t {
   ID_OC_SP = 0,
   ID_OC_DP = 1,
