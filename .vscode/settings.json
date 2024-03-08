@@ -76,6 +76,8 @@
         "process_args.h": "c",
         "strstream": "cpp",
         "variant": "cpp",
-        "any": "cpp"
-    }
+        "any": "cpp",
+        "*.inc": "cpp"
+    },
+    "cmake.sourceDirectory": "/home/yangjianchao/Github/memory_model/simulator-apps/sputnik/sputnik/bias_relu"
 }
