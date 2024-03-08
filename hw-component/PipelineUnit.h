@@ -11,7 +11,7 @@
 
 #define MAX_ALU_LATENCY 512
 
-#define NUM_CYCLE_MEM_ACCESS_LATENCY 7
+#define NUM_CYCLE_MEM_ACCESS_LATENCY 5
 
 /*
 SP单元和SFU单元的时序模型主要在 shader.h 中定义的 pipelined_simd_unit 类中实现。模拟单元的具体类（
@@ -86,7 +86,7 @@ class pipelined_simd_unit {
     }
   }
 
-  void cycle();
+  std::vector<unsigned> cycle();
 
   virtual unsigned clock_multiplier() const { return 1; };
   //获取SIMD单元的名称。
@@ -112,6 +112,7 @@ class pipelined_simd_unit {
   hw_config* m_hw_cfg;
   trace_parser* m_tracer;
   //流水线寄存器至多512个槽的位图，标识每个槽是否被占用。
+ public:
   std::bitset<MAX_ALU_LATENCY> occupied;
 };
 
@@ -128,7 +129,8 @@ class sfu : public pipelined_simd_unit {
   sfu(register_set *result_port, unsigned issue_reg_id,
       hw_config* hw_cfg, trace_parser* tracer)
       : pipelined_simd_unit(result_port, 
-                            hw_cfg->get_opcode_latency_initiation_sfu(0), 
+                            // hw_cfg->get_opcode_latency_initiation_sfu(0), 
+                            MAX_ALU_LATENCY,
                             issue_reg_id,
                             hw_cfg, tracer) {
     m_name = "SFU";
@@ -148,7 +150,8 @@ class dp_unit : public pipelined_simd_unit {
   dp_unit(register_set *result_port, unsigned issue_reg_id,
           hw_config* hw_cfg, trace_parser* tracer)
           : pipelined_simd_unit(result_port, 
-                                hw_cfg->get_opcode_latency_initiation_dp(0), 
+                                // hw_cfg->get_opcode_latency_initiation_dp(0),
+                                MAX_ALU_LATENCY, 
                                 issue_reg_id,
                                 hw_cfg, tracer) {
     m_name = "DP";
@@ -167,7 +170,8 @@ class sp_unit : public pipelined_simd_unit {
   sp_unit(register_set *result_port, unsigned issue_reg_id,
           hw_config* hw_cfg, trace_parser* tracer)
           : pipelined_simd_unit(result_port, 
-                                hw_cfg->get_opcode_latency_initiation_sp(0), 
+                                // hw_cfg->get_opcode_latency_initiation_sp(0), 
+                                MAX_ALU_LATENCY,
                                 issue_reg_id,
                                 hw_cfg, tracer) {
     m_name = "SP";
@@ -186,7 +190,8 @@ class tensor_core : public pipelined_simd_unit {
   tensor_core(register_set *result_port, unsigned issue_reg_id,
               hw_config* hw_cfg, trace_parser* tracer)
               : pipelined_simd_unit(result_port, 
-                                    hw_cfg->get_opcode_latency_initiation_tensor_core(0), 
+                                    // hw_cfg->get_opcode_latency_initiation_tensor_core(0), 
+                                    MAX_ALU_LATENCY,
                                     issue_reg_id,
                                     hw_cfg, tracer) {
     m_name = "TENSOR_CORE";
@@ -205,7 +210,8 @@ class int_unit : public pipelined_simd_unit {
   int_unit(register_set *result_port, unsigned issue_reg_id,
            hw_config* hw_cfg, trace_parser* tracer)
            : pipelined_simd_unit(result_port, 
-                                 hw_cfg->get_opcode_latency_initiation_int(0), 
+                                 //  hw_cfg->get_opcode_latency_initiation_int(0), 
+                                 MAX_ALU_LATENCY,
                                  issue_reg_id,
                                  hw_cfg, tracer) {
     m_name = "INT";
@@ -224,7 +230,8 @@ class specialized_unit : public pipelined_simd_unit {
   specialized_unit(register_set *result_port, unsigned issue_reg_id,
                    hw_config* hw_cfg, trace_parser* tracer, unsigned index)
                    : pipelined_simd_unit(result_port, 
-                                         hw_cfg->get_opcode_latency_initiation_spec_unit(index, 0), 
+                                         //  hw_cfg->get_opcode_latency_initiation_spec_unit(index, 0), 
+                                         MAX_ALU_LATENCY,
                                          issue_reg_id,
                                          hw_cfg, tracer) {
     m_index = index;
@@ -247,7 +254,8 @@ class mem_unit : public pipelined_simd_unit {
   mem_unit(register_set *result_port, unsigned issue_reg_id,
            hw_config* hw_cfg, trace_parser* tracer)
            : pipelined_simd_unit(result_port, 
-                                 NUM_CYCLE_MEM_ACCESS_LATENCY,  
+                                 //  NUM_CYCLE_MEM_ACCESS_LATENCY,  
+                                 MAX_ALU_LATENCY,
                                  // TODO: should be latency of L1 miss + L2 miss + DRAM access time
                                  issue_reg_id,
                                  hw_cfg, tracer) {
