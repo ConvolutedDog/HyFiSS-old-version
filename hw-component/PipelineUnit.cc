@@ -27,24 +27,136 @@ pipelined_simd_unit::~pipelined_simd_unit() {
 }
 
 bool pipelined_simd_unit::can_issue(unsigned latency) const {
+  // std::cout << "      can_issue: " << !m_dispatch_reg->m_valid << " " 
+  //           << !occupied.test(latency) << std::endl;
+  // std::cout << "      occupied.to_string(): ";
+  // for (int i = 0; i < 32; ++i) {
+  //   std::cout << occupied[i];
+  // }
+  // std::cout << '\n';
   return !m_dispatch_reg->m_valid && !occupied.test(latency);
 }
 
-void pipelined_simd_unit::cycle() {
-  if (m_pipeline_reg[0]->m_valid) {
-    m_result_port->move_in(m_pipeline_reg[0]);
-    assert(active_insts_in_pipeline > 0);
-    active_insts_in_pipeline--;
+std::vector<unsigned> pipelined_simd_unit::cycle() {
+
+  std::vector<unsigned> need_to_return_wids;
+
+  bool active_during_this_cycle = false;
+  // print m_pipeline_reg
+  // for (int s = m_pipeline_depth - 1; s >= 0; s--) {
+  //   if (m_pipeline_reg[s]->m_valid) {
+  //     std::cout << "      " << m_name.c_str() << "[" << s << "] ";
+  //     std::cout << "m_pipeline_reg[" << s << "]: (pc,wid,kid,uid) "
+  //               << m_pipeline_reg[s]->pc << " " << m_pipeline_reg[s]->wid
+  //               << " " << m_pipeline_reg[s]->kid << " "
+  //               << m_pipeline_reg[s]->uid << std::endl;
+  //   }
+  // }
+
+  // if (m_pipeline_reg[0]->m_valid) {
+  bool should_shift_pipeline = false;
+  // m_result_port->print();
+  if (m_pipeline_reg[0]->m_valid && (m_result_port->get_free() != NULL)) {
+    if (_CALIBRATION_LOG_) {
+      std::cout << "    Execute: ("
+                << m_pipeline_reg[0]->kid << ", "
+                << m_pipeline_reg[0]->wid << ", "
+                << m_pipeline_reg[0]->uid << ", "
+                << m_pipeline_reg[0]->pc << ")" << std::endl;
+    }
+
+    // std::cout << "@" << (m_result_port->get_free() != NULL) << std::endl;
+    if (m_result_port->get_free() != NULL) {
+      active_during_this_cycle = true;
+      need_to_return_wids.push_back(m_pipeline_reg[0]->wid);
+
+      m_result_port->move_in(m_pipeline_reg[0]);
+      assert(active_insts_in_pipeline > 0);
+      active_insts_in_pipeline--;
+      should_shift_pipeline = true;
+    }
+    // m_result_port->move_in(m_pipeline_reg[0]);
+    // assert(active_insts_in_pipeline > 0);
+    // active_insts_in_pipeline--;
   }
 
-  if (active_insts_in_pipeline) {
+/*
+  // if (active_insts_in_pipeline) {
+  if (should_shift_pipeline && active_insts_in_pipeline) {
+    // print m_pipeline_reg
+    std::cout << "    bef " << m_name << "-pipe: ";
+    for (int s = 0; s <= 32 - 1; s++) {
+      if (m_pipeline_reg[s]->m_valid) {
+        std::cout << "1";
+      }
+      else {
+        std::cout << "0";
+      }
+    }
+    std::cout << std::endl;
     // for (unsigned stage = 0; stage < m_pipeline_depth - 1; stage++) {
     //   m_pipeline_reg[stage]->move_in(m_pipeline_reg[stage + 1]);
     // }
     std::rotate(m_pipeline_reg.begin(), m_pipeline_reg.begin() + 1, m_pipeline_reg.end());
     m_pipeline_reg[m_pipeline_depth - 1]->m_valid = false;
+
+    // print m_pipeline_reg
+    std::cout << "    aft " << m_name << "-pipe: ";
+    for (int s = 0; s <= 32 - 1; s++) {
+      if (m_pipeline_reg[s]->m_valid) {
+        std::cout << "1";
+      }
+      else {
+        std::cout << "0";
+      }
+    }
+    std::cout << std::endl;
   }
-  
+*/
+
+
+
+
+/*
+  if (active_insts_in_pipeline) {
+    if (!m_pipeline_reg[0]->m_valid) {
+      for (unsigned stage = 0; stage < m_pipeline_depth - 1; stage++) {
+        // m_pipeline_reg[stage]->move_in(m_pipeline_reg[stage + 1]);
+        m_pipeline_reg[stage]->m_valid = m_pipeline_reg[stage + 1]->m_valid;
+        m_pipeline_reg[stage]->pc = m_pipeline_reg[stage + 1]->pc;
+        m_pipeline_reg[stage]->wid = m_pipeline_reg[stage + 1]->wid;
+        m_pipeline_reg[stage]->kid = m_pipeline_reg[stage + 1]->kid;
+        m_pipeline_reg[stage]->uid = m_pipeline_reg[stage + 1]->uid;
+        m_pipeline_reg[stage]->latency = m_pipeline_reg[stage + 1]->latency;
+        m_pipeline_reg[stage]->initial_interval = m_pipeline_reg[stage + 1]->initial_interval;
+        m_pipeline_reg[stage + 1]->m_valid = false;
+      }
+    }
+  }
+*/
+  if (active_insts_in_pipeline) {
+    active_during_this_cycle = true;
+    for (unsigned stage = 0; stage < m_pipeline_depth - 1; stage++) {
+      if (!m_pipeline_reg[stage]->m_valid) {
+        need_to_return_wids.push_back(m_pipeline_reg[stage + 1]->wid);
+        m_pipeline_reg[stage]->m_valid = m_pipeline_reg[stage + 1]->m_valid;
+        m_pipeline_reg[stage]->pc = m_pipeline_reg[stage + 1]->pc;
+        m_pipeline_reg[stage]->wid = m_pipeline_reg[stage + 1]->wid;
+        m_pipeline_reg[stage]->kid = m_pipeline_reg[stage + 1]->kid;
+        m_pipeline_reg[stage]->uid = m_pipeline_reg[stage + 1]->uid;
+        m_pipeline_reg[stage]->latency = m_pipeline_reg[stage + 1]->latency;
+        m_pipeline_reg[stage]->initial_interval = m_pipeline_reg[stage + 1]->initial_interval;
+        m_pipeline_reg[stage + 1]->m_valid = false;
+      }
+    }
+  }
+
+
+
+
+
+
+
   if (_DEBUG_LOG_) {
     bool print_status = false;
     for (auto &reg : m_pipeline_reg) {
@@ -65,7 +177,11 @@ void pipelined_simd_unit::cycle() {
     }
   }
 
+/*
   if (m_dispatch_reg->m_valid) {
+    std::cout << "    m_dispatch_reg latency: " << m_dispatch_reg->latency 
+              << " initial_interval: " << m_dispatch_reg->initial_interval 
+              << " dec_counter: " << m_dispatch_reg->initial_interval_dec_counter << std::endl;
     if (m_dispatch_reg->latency == 0) {
       // m_pipeline_reg[0]->move_in(m_dispatch_reg);
       int start_stage =
@@ -87,8 +203,48 @@ void pipelined_simd_unit::cycle() {
       m_dispatch_reg->latency--;
     }
   }
+*/
+
+  // std::cout << "    m_dispatch_reg->m_valid: " 
+  //           << m_name << ": " << m_dispatch_reg->m_valid << std::endl;
+  if (m_dispatch_reg->m_valid) {
+    // std::cout << "    m_dispatch_reg latency: " << m_dispatch_reg->latency 
+    //           << " initial_interval: " << m_dispatch_reg->initial_interval 
+    //           << " dec_counter: " << m_dispatch_reg->initial_interval_dec_counter << std::endl;
+    if (m_dispatch_reg->initial_interval_dec_counter == 1) {
+      int start_stage = m_dispatch_reg->latency - m_dispatch_reg->initial_interval /*+ 1*/;
+      
+      // std::cout << "    start_stage: " << start_stage 
+      //           << " m_pipeline_depth: " << m_pipeline_depth 
+      //           << " ini_intval counter: " 
+      //           << m_dispatch_reg->initial_interval_dec_counter
+      //           << " latency: " << m_dispatch_reg->latency
+      //           << " initial_interval: " << m_dispatch_reg->initial_interval
+      //           << std::endl;
+      assert(start_stage >= 0 && start_stage < m_pipeline_depth);
+      // m_pipeline_reg[start_stage]->move_in(m_dispatch_reg);
+      if (m_pipeline_reg[start_stage]->m_valid == false) {
+        active_during_this_cycle = true;
+        need_to_return_wids.push_back(m_dispatch_reg->wid);
+
+        m_dispatch_reg->m_valid = false;
+        active_insts_in_pipeline++;
+        m_pipeline_reg[start_stage]->m_valid = true;
+        m_pipeline_reg[start_stage]->pc = m_dispatch_reg->pc;
+        m_pipeline_reg[start_stage]->wid = m_dispatch_reg->wid;
+        m_pipeline_reg[start_stage]->kid = m_dispatch_reg->kid;
+        m_pipeline_reg[start_stage]->uid = m_dispatch_reg->uid;
+        m_pipeline_reg[start_stage]->latency = m_dispatch_reg->latency;
+        m_pipeline_reg[start_stage]->initial_interval = m_dispatch_reg->initial_interval;
+      }
+    } else {
+      m_dispatch_reg->initial_interval_dec_counter--;
+    }
+  }
 
   occupied >>= 1;
+
+  return need_to_return_wids;
 }
 
 void pipelined_simd_unit::issue(register_set &source_reg) {
