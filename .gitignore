@@ -4,3 +4,16 @@ memory_model.x
 memory_trace.txt
 tmp.txt
 perf.data*
+merge_report.py
+perf.report
+simulator-apps/
+tmp.bak.txt
+tmp.txt1
+tmp1.bak.txt
+tmp1.txt
+tmp1.txt.bak
+tmp2.txt
+tmp3.txt
+tmp_tune.bak.txt
+tmp_tune.txt
+tune.py
