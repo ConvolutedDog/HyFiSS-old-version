@@ -112,9 +112,11 @@ void opndcoll_rfu_t::dispatch_ready_cu() {
     collector_unit_t *cu = du.find_ready();
     if (cu) {
       cu->dispatch();
+      ///*//*/ if (_DEBUG_LOG_)
+        // std::cout << "    cu is not NULL " << cu << std::endl;
     } else {
-      if (_DEBUG_LOG_)
-        std::cout << "    cu is NULL " << cu << std::endl;
+      ///*//*/ if (_DEBUG_LOG_)
+        // std::cout << "    cu is NULL " << cu << std::endl;
     }
   }
 }
@@ -126,7 +128,7 @@ void opndcoll_rfu_t::allocate_cu(unsigned port_num) {
   for (unsigned i = 0; i < inp.m_in.size(); i++) {
     // std::cout << "    i: " << i << " inp.m_in.size(): " << inp.m_in.size() << std::endl;
     if ((*inp.m_in[i]).has_ready()) {
-      if (_DEBUG_LOG_)
+      /*//*/ if (_DEBUG_LOG_)
         std::cout << "      has_ready_pipeline_reg_idx: " << i << std::endl;
       // find a free cu
       for (unsigned j = 0; j < inp.m_cu_sets.size(); j++) {
@@ -156,14 +158,17 @@ void opndcoll_rfu_t::allocate_cu(unsigned port_num) {
         }
         for (unsigned k = cuLowerBound; k < cuUpperBound; k++) {
           if (cu_set[k].is_free()) {
-            if (_DEBUG_LOG_)
+            /*//*/ if (_DEBUG_LOG_)
               std::cout << "      cu_set[" << k << "] is free" << std::endl;
             collector_unit_t *cu = &cu_set[k];
             allocated = cu->allocate(inp.m_in[i], inp.m_out[i]);
-            if (_DEBUG_LOG_)
+            /*//*/ if (_DEBUG_LOG_)
               std::cout << "      allocated: " << allocated << std::endl;
             m_arbiter.add_read_requests(cu);
             break;
+          } else {
+            /*//*/ if (_DEBUG_LOG_)
+              std::cout << "      cu_set[" << k << "] is not free" << std::endl;
           }
         }
         if (allocated) break;  // cu has been allocated, no need to search more.
@@ -188,8 +193,9 @@ void opndcoll_rfu_t::allocate_reads() {
     unsigned bank =
         register_bank_opcoll(reg, wid, m_num_banks, m_bank_warp_shift, sub_core_model,
                       m_num_banks_per_sched, rr.get_sid());
-    if (_DEBUG_LOG_)
-      std::cout << "    read_ops: reg: " << reg 
+    /*//*/ if (_DEBUG_LOG_)
+      std::cout << "    opndcoll_rfu_t::allocate_reads(): " << std::endl
+                << "      read_ops: reg: " << reg 
                 << " wid: " << wid 
                 << " bank: " << bank << std::endl;
     m_arbiter.allocate_for_read(bank, rr);
@@ -201,12 +207,12 @@ void opndcoll_rfu_t::allocate_reads() {
     unsigned cu = op.get_oc_id();
     unsigned operand = op.get_operand();
     m_cu[cu]->collect_operand(operand);
-    if (_DEBUG_LOG_) {
+    /*//*/ if (_DEBUG_LOG_) {
       std::cout << "    m_cu[cu]->get_num_operands(): " 
                 << m_cu[cu]->get_num_operands() << std::endl;
       std::cout << "    m_cu[" << cu << "]->m_not_ready: " 
                 << m_cu[cu]->get_not_ready() << std::endl;
-    }
+    /*//*/ }
   }
 }
 
@@ -216,6 +222,18 @@ bool opndcoll_rfu_t::collector_unit_t::ready() const {
   // if (m_output_register != NULL)
   //   std::cout << "    (*m_output_register).has_free(m_sub_core_model, m_reg_id): " 
   //             << (*m_output_register).has_free(m_sub_core_model, m_reg_id) << std::endl;
+  // std::cout << "        m_output_register != NULL: " 
+  //           << (m_output_register != NULL) << std::endl
+  //           << "        !m_free: " << (!m_free) << std::endl
+  //           << "        m_not_ready.none(): " << m_not_ready.none() 
+  //           << std::endl;
+  // if (m_output_register != NULL)
+  //   std::cout << "        (*m_output_register).has_free(x): " 
+  //             << (*m_output_register).get_name() << " "
+  //             << (*m_output_register).has_free(m_sub_core_model, m_reg_id) << std::endl;
+  // else
+  //   std::cout << "        m_output_register is NULL" << std::endl;
+  
   if (m_output_register != NULL)
     return (!m_free) && m_not_ready.none() &&
            (*m_output_register).has_free(m_sub_core_model, m_reg_id);
@@ -338,8 +356,17 @@ void opndcoll_rfu_t::collector_unit_t::dispatch() {
     std::cout << "      m_warp->uid: " << m_warp->uid << std::endl;
     std::cout << "      m_warp->m_valid: " << m_warp->m_valid << std::endl;
   }
-
+  // std::cout << "    before readop"; m_output_register->print();
+  if (_CALIBRATION_LOG_) {
+    std::cout << "    Read Operands: ("
+              << m_warp->kid << ", "
+              << m_warp->wid << ", "
+              << m_warp->uid << ", "
+              << m_warp->pc << ")" << std::endl;
+  }
+  
   m_output_register->move_in(m_sub_core_model, m_reg_id, m_warp);
+  // std::cout << "    after readop "; m_output_register->print();
   m_warp->m_valid = false;
 
   if (_DEBUG_LOG_) {
@@ -444,7 +471,7 @@ std::list<opndcoll_rfu_t::op_t> opndcoll_rfu_t::arbiter_t::allocate_reads() {
   }
 
   // print result
-  if (_DEBUG_LOG_) {
+  /*//*/ if (_DEBUG_LOG_) {
     if (result.size() > 0)
       std::cout << "    allocate_reads result: " << std::endl;
     for (auto x : result) {
@@ -458,7 +485,7 @@ std::list<opndcoll_rfu_t::op_t> opndcoll_rfu_t::arbiter_t::allocate_reads() {
       std::cout << "      get_operand(): " << x.get_operand() << std::endl;
       std::cout << "      get_reg_string(): " << x.get_reg_string() << std::endl;
     }
-  }
+  /*//*/ }
 
   return result;
 }
