@@ -392,12 +392,12 @@ class opndcoll_rfu_t {  // operand collector based register file unit
       m_tracer = tracer;
       m_bank
       */
-      if (_DEBUG_LOG_)
+      /*//*/ if (_DEBUG_LOG_)
         std::cout << "      arbiter_t::add_read_requests:" << std::endl;
       // print src
       for (unsigned i = 0; i < MAX_REG_OPERANDS * 2; i++) {
         op_t &op = (op_t &)(src[i]);
-        if (_DEBUG_LOG_) {
+        /*//*/ if (_DEBUG_LOG_) {
           if (op.valid()) {
             std::cout << "        arbiter_t::add_read_requests::op: " << std::endl;
             std::cout << "          get_wid(): " << op.get_wid() << std::endl;
@@ -410,7 +410,7 @@ class opndcoll_rfu_t {  // operand collector based register file unit
             std::cout << "          get_operand(): " << op.get_operand() << std::endl;
             std::cout << "          get_reg_string(): " << op.get_reg_string() << std::endl;
           }
-        }
+        /*//*/ }
       }
 
       for (unsigned i = 0; i < MAX_REG_OPERANDS * 2; i++) {
@@ -464,7 +464,9 @@ class opndcoll_rfu_t {  // operand collector based register file unit
       assert(not m_cu_sets.empty());
     }
     // private:
+    // typedef std::vector<register_set *> port_vector_t;
     port_vector_t m_in, m_out;
+    // typedef std::vector<unsigned int> uint_vector_t;
     uint_vector_t m_cu_sets;
   };
 
@@ -635,6 +637,7 @@ class opndcoll_rfu_t {  // operand collector based register file unit
                               cusPerSched - (m_last_cu % cusPerSched) : 1;
       for (unsigned n = 0; n < m_num_collectors; n++) {
         unsigned c = (m_last_cu + n + rr_increment) % m_num_collectors;
+        // std::cout << "      dispatch_unit_t::find_ready: c: " << c << std::endl;
         if ((*m_collector_units)[c].ready()) {
           m_last_cu = c;
           return &((*m_collector_units)[c]);
