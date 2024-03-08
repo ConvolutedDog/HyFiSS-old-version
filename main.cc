@@ -39,6 +39,16 @@
 
 #include <chrono>
 
+#include <cmath>
+
+float ceil(float x, float s) {
+  return s * std::ceil(x / s);
+}
+
+float floor(float x, float s) {
+  return s * std::floor(x / s);
+}
+
 trace_kernel_info_t *create_kernel_info(kernel_trace_t* kernel_trace_info,
 							                          trace_parser *parser){
   dim3 gridDim(kernel_trace_info->grid_dim_x, kernel_trace_info->grid_dim_y, kernel_trace_info->grid_dim_z);
@@ -116,26 +126,46 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
                                                                           >* mem_instn_distance_overflow_flag,
                                                                   int _tmp_print_, 
                                                                   std::string configs_dir,
-                                                                  bool dump_histogram) {
+                                                                  bool dump_histogram,
+                                                                  stat_collector* stat_coll,
+                                                                  unsigned KERNEL_EVALUATION) {
   boost::mpi::environment env(argc, argv);
   boost::mpi::communicator world;
 
   /* gpu_config[V100].num_sm is the number of the SMs that have been used during the execution. */
   const int pass_num = int((gpu_config[V100].num_sm + world.size() - 1)/world.size());
 
-  unsigned l1_cache_line_size = 32; // BUG: need configure
+  // unsigned l1_cache_line_size = 32; // BUG: need configure
+  // unsigned l1_cache_size = 96 * 1024; // BUG: need configure
+  // unsigned l1_cache_associativity = 64; // BUG: need configure
+  // unsigned l1_cache_blocks = l1_cache_size / l1_cache_line_size; // BUG: need configure
+  // unsigned l2_cache_line_size = 64; // BUG: need configure
+  // unsigned l2_cache_size = 96 * 1024; // BUG: need configure
+  // unsigned l2_cache_associativity = 24; // BUG: need configure
+  // unsigned l2_cache_blocks = l2_cache_size / l2_cache_line_size; // BUG: need configure
+  
+  unsigned l1_cache_line_size = 128; // BUG: need configure
   unsigned l1_cache_size = 32 * 1024; // BUG: need configure
   unsigned l1_cache_associativity = 64; // BUG: need configure
   unsigned l1_cache_blocks = l1_cache_size / l1_cache_line_size; // BUG: need configure
+  unsigned l2_cache_line_size = 128; // BUG: need configure
+  unsigned l2_cache_size = 96 * 1024 * 64; // BUG: need configure
+  unsigned l2_cache_associativity = 24; // BUG: need configure
+  unsigned l2_cache_blocks = l2_cache_size / l2_cache_line_size; // BUG: need configure
 
   std::cout << std::endl;
 
+  float L1_hit_rate = 0.0;
+
+  /* pass_num is the number of SMs that this current process should calculate. */
   for (int pass = 0; pass < pass_num; pass++) {
     int curr_process_idx_rank = world.rank() + pass * world.size();
     int curr_process_idx;
     if (curr_process_idx_rank < gpu_config[V100].num_sm) {
       curr_process_idx = curr_process_idx_rank;
     } else continue;
+
+    /* curr_process_idx = curr_process_idx_rank, is the sm_id that the current loop should calculate. */
 
     /* HKEY input should be char* of addr */
     HKEY input;
@@ -144,7 +174,11 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
     program_data_t* pdt;
     FILE* file;
     std::string parda_histogram_filepath;
+
+    /* SM_traces_all_passes[kid=0...kernels_num-1][0...num_sms_of_kis-1][] */
     for (unsigned kid = 0; kid < (*SM_traces_all_passes).size() ; kid++) {
+      if ((unsigned)KERNEL_EVALUATION != kid) continue;
+
       unsigned miss_num_all_acc = 0;
       unsigned num_all_acc = 0;
 
@@ -153,7 +187,53 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
       /* Here we ONLY USE the curr_process_idx-th items of SM_traces_all_passes, so for every rank, 
        * we only load the curr_process_idx-th items for all kernels into SM_traces_all_passes, which 
        * significantly accelerate the simulation speed. */
+
+      std::vector<std::vector<unsigned long long>> L1_miss_instns; // that need to read/write from/to L2
+
+      unsigned LDG_requests = 0;
+      unsigned LDG_transactions = 0;
+      unsigned STG_requests = 0;
+      unsigned STG_transactions = 0;
+
+      unsigned Global_atomic_requests = 0;
+      unsigned Global_reduction_requests = 0;
+      unsigned Global_atomic_and_reduction_transactions = 0;
+
+      unsigned L2_read_transactions = 0;
+      unsigned L2_write_transactions = 0;
+      unsigned L2_total_transactions = 0;
+      
+
       for (auto mem_ins : (*SM_traces_all_passes)[kid][curr_process_idx]) { 
+        /*
+          SM_traces_all_passes:  kid=0  curr_process_idx=0  mem_instn0, 
+                                                            mem_instn1, <---- mem_ins
+                                                            ...
+                                        curr_process_idx=1  mem_instn0, 
+                                                            mem_instn1, 
+                                                            ...
+                                        curr_process_idx=2  mem_instn0, 
+                                                            mem_instn1, 
+                                                            ...
+                                        ...
+                                        curr_process_idx=79 mem_instn0, 
+                                                            mem_instn1, 
+                                                            ...
+                                 kid=1  curr_process_idx=0  mem_instn0, 
+                                                            mem_instn1, 
+                                                            ...
+                                        curr_process_idx=1  mem_instn0, 
+                                                            mem_instn1, 
+                                                            ...
+                                        curr_process_idx=2  mem_instn0, 
+                                                            mem_instn1, 
+                                                            ...
+                                        ...
+                                        curr_process_idx=79 mem_instn0, 
+                                                            mem_instn1, 
+                                                            ...
+        
+        */
         // if (world.rank() == 0) {
         //   std::cout << "rank-" << std::dec << world.rank() << ", " << "SM-" << curr_process_idx << " " << "kid-" << kid << " ";
         //   std::cout << std::setw(18) << std::right << std::hex << mem_ins.pc << " ";
@@ -162,6 +242,14 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
         // }
         std::map<unsigned, bool> distance_overflow_flag_vector;
         std::vector<unsigned long long> have_got_line_addr; // use have_got_line_addr will cause not accurate hit rate 
+
+        // std::cout << mem_ins.has_mem_instn_type() << " " << mem_ins.opcode << std::endl;
+        
+        
+        L1_miss_instns.push_back(std::vector<unsigned long long>());
+        
+        if (mem_ins.has_mem_instn_type() == LDG || mem_ins.has_mem_instn_type() == STG)
+
         for (unsigned j = 0; j < (mem_ins.addr).size(); j++) {
           unsigned long long cache_line_addr = mem_ins.addr[j] >> int(log2(l1_cache_line_size));
           /**/ // use have_got_line_addr will cause not accurate hit rate
@@ -188,15 +276,29 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
               //                       << input << " " 
               //                       << (cache_line_addr & 3) << std::dec << std::endl;
             if (mem_ins.distance[j] > (int)l1_cache_blocks) {
+              // std::cout << mem_ins.distance[j] << " " ;
               miss_num_all_acc++;
               mem_ins.miss[j] = true;
+              L1_miss_instns.back().push_back(mem_ins.addr[j]);
+              // L1_miss_instns.push_back(mem_ins.addr[j]);
               /* Here we have got that if a mem instn will hit or miss L1 cache, and now we 
                * should add intns to the L2 cache, and should pass hit or miss L1 cache to 
                * the compute model. */
               /* The reason  */
 
               distance_overflow_flag_vector[mem_ins.addr[j]] = true;
+
+              // L2 read trans
+              if (mem_ins.has_mem_instn_type() == LDG) {
+                L2_read_transactions += 1;
+                L2_total_transactions += 1;
+              }
+              if (mem_ins.has_mem_instn_type() == STG) {
+                L2_write_transactions += 1;
+                L2_total_transactions += 1;
+              }
             } else {
+              L1_miss_instns.back().push_back(mem_ins.addr[j]);
               distance_overflow_flag_vector[mem_ins.addr[j]] = false;
             }
 
@@ -213,7 +315,43 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
           }
           /**/ // use have_got_line_addr will cause not accurate hit rate 
         }
+
+        if (mem_ins.has_mem_instn_type() == LDG) {
+          LDG_requests++;
+          LDG_transactions += have_got_line_addr.size();
+        }
+        if (mem_ins.has_mem_instn_type() == STG) {
+          STG_requests++;
+          STG_transactions += have_got_line_addr.size();
+        }
+        if (mem_ins.has_mem_instn_type() == ATOM) {
+          Global_atomic_requests++;
+          Global_atomic_and_reduction_transactions += have_got_line_addr.size();
+        }
+        if (mem_ins.has_mem_instn_type() == RED) {
+          Global_reduction_requests++;
+          Global_atomic_and_reduction_transactions += have_got_line_addr.size();
+        }
       }
+
+      
+      stat_coll->set_L2_read_transactions(L2_read_transactions, curr_process_idx);
+      stat_coll->set_L2_write_transactions(L2_write_transactions, curr_process_idx);
+      stat_coll->set_L2_total_transactions(L2_total_transactions, curr_process_idx);
+
+
+      stat_coll->set_GEMM_read_requests(LDG_requests, curr_process_idx);
+      stat_coll->set_GEMM_write_requests(STG_requests, curr_process_idx);
+      stat_coll->set_GEMM_total_requests(LDG_requests + STG_requests, curr_process_idx);
+      stat_coll->set_GEMM_read_transactions(LDG_transactions, curr_process_idx);
+      stat_coll->set_GEMM_write_transactions(STG_transactions, curr_process_idx);
+      stat_coll->set_GEMM_total_transactions(LDG_transactions + STG_transactions, curr_process_idx);
+      stat_coll->set_Number_of_read_transactions_per_read_requests((float)((float)LDG_transactions / (float)LDG_requests), curr_process_idx);
+      stat_coll->set_Number_of_write_transactions_per_write_requests((float)((float)STG_transactions / (float)STG_requests), curr_process_idx);
+
+      stat_coll->set_Total_number_of_global_atomic_requests(Global_atomic_requests, curr_process_idx);
+      stat_coll->set_Total_number_of_global_reduction_requests(Global_reduction_requests, curr_process_idx);
+      stat_coll->set_Global_memory_atomic_and_reduction_transactions(Global_atomic_and_reduction_transactions, curr_process_idx);
 
       // if (num_all_acc > 0) if (kid==0)
       // std::cout << "SM-" << curr_process_idx << " kid-" << kid
@@ -230,16 +368,175 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
           parda_histogram_filepath = configs_dir + "/" + "../kernel_" + std::to_string(kid) + "_SM_" + std::to_string(curr_process_idx) + ".histogram";
           
         file = fopen(parda_histogram_filepath.c_str(), "w");
-          
-        if (file != NULL) {
-          parda_fprintf_histogram(pdt->histogram, file);
-          fclose(file);
-        }
-      }
         
+        if (file != NULL) {
+          L1_hit_rate = parda_fprintf_histogram_r(pdt->histogram, file, false);
+          fclose(file);
+        } else {
+          L1_hit_rate = parda_fprintf_histogram_r(pdt->histogram, NULL, false);
+        }
+      } else {
+        L1_hit_rate = parda_fprintf_histogram_r(pdt->histogram, NULL, false);
+      }
+      
+      // std::cout << "L1_hit_rate: " << L1_hit_rate << std::endl;
+      // std::cout << "@@@: " << curr_process_idx << " " << (float)(((float)num_all_acc-(float)miss_num_all_acc)/(float)num_all_acc) << std::endl;
+      stat_coll->set_Unified_L1_cache_hit_rate(L1_hit_rate, curr_process_idx);
+      stat_coll->set_Unified_L1_cache_requests(num_all_acc, curr_process_idx);
+      // std::cout << "rank: " << world.rank() << " sm_id: " << curr_process_idx 
+      //           << " num_all_acc: " << num_all_acc << " miss_num_all_acc: " 
+      //           << miss_num_all_acc << " L1_hit_rate: " << L1_hit_rate << std::endl;
+      
       parda_free(pdt);
+
+
+      /*  LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL  */
+      // tim = 0;
+      // pdt_c = parda_init();
+
+      // unsigned l2_miss_num_all_acc = 0;
+      // unsigned l2_num_all_acc = 0;
+
+      // for (auto mem_ins : (*SM_traces_all_passes)[kid][curr_process_idx]) {
+      //   std::vector<unsigned long long> have_got_line_addr;
+      //   std::vector<unsigned long long> L1_have_got_line_addr;
+      //   for (unsigned j = 0; j < (mem_ins.addr).size(); j++) {
+      //     unsigned long long cache_line_addr = mem_ins.addr[j] >> int(log2(l2_cache_line_size));
+      //     if(std::find(have_got_line_addr.begin(), 
+      //                  have_got_line_addr.end(), 
+      //                  cache_line_addr) != have_got_line_addr.end()) {
+      //       ;
+      //     } else {
+      //       sprintf(input, "0x%llx", cache_line_addr);
+      //       mem_ins.distance[j] = process_one_access_and_get_distance(input, &pdt_c, tim);
+      //       if (mem_ins.distance[j] > (int)l2_cache_blocks) {
+      //         l2_miss_num_all_acc++;
+      //       }
+      //       l2_num_all_acc++;
+      //       tim++;
+      //       // have_got_line_addr.push_back(cache_line_addr);
+      //     }
+      //   }
+      // }
+      
+      // std::cout << "L2_hit_rate: " << l2_num_all_acc << " " << l2_miss_num_all_acc << " ";
+      // std::cout << "@@@: " << curr_process_idx 
+      //           << " " << (float)(((float)l2_num_all_acc-(float)l2_miss_num_all_acc)/(float)l2_num_all_acc) 
+      //           << std::endl;
+      /*  LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL  */
     }
   }
+
+
+  // HERE DO L2 CACHE HIT RATE EVALUATION
+  if (world.rank() == 0) {
+    unsigned DRAM_total_transactions = 0;
+
+    bool index_instn_go_on = true;
+    for (unsigned kid = 0; kid < (*SM_traces_all_passes).size() ; kid++) {
+      if ((unsigned)KERNEL_EVALUATION != kid) continue;
+      unsigned max_instn_size = 0;
+      for (unsigned sm_id = 0; sm_id < gpu_config[V100].num_sm; sm_id++) {
+        if ((*SM_traces_all_passes)[kid][sm_id].size() > max_instn_size) {
+          max_instn_size = (*SM_traces_all_passes)[kid][sm_id].size();
+        }
+      }
+
+      HKEY input;
+      long tim;
+      program_data_t pdt_c;
+
+      tim = 0;
+      pdt_c = parda_init();
+
+      unsigned l2_miss_num_all_acc = 0;
+      unsigned l2_num_all_acc = 0;
+
+      for (unsigned instn_index = 0; instn_index < max_instn_size; instn_index++) {
+        for (unsigned sm_id = 0; sm_id < gpu_config[V100].num_sm; sm_id++) {
+          // std::cout << "sm_id: " << sm_id << " " << (*SM_traces_all_passes)[kid][sm_id].size() << std::endl;
+          
+          if (instn_index < (*SM_traces_all_passes)[kid][sm_id].size()) {
+            auto mem_ins = (*SM_traces_all_passes)[kid][sm_id][instn_index];
+
+            if (!((*SM_traces_all_passes)[kid][sm_id][instn_index].has_mem_instn_type() == LDG || 
+                (*SM_traces_all_passes)[kid][sm_id][instn_index].has_mem_instn_type() == STG)) continue;
+
+            std::vector<unsigned long long> have_got_line_addr;
+            std::vector<unsigned long long> L1_have_got_line_addr;
+
+            for (unsigned j = 0; j < (mem_ins.addr).size(); j++) {
+              
+              unsigned long long L1_cache_line_addr = mem_ins.addr[j] >> int(log2(l1_cache_line_size));
+              unsigned long long cache_line_addr = mem_ins.addr[j] >> int(log2(l2_cache_line_size));
+
+              // std::cout << std::hex << mem_ins.addr[j] << " ";
+              
+              // if(std::find(have_got_line_addr.begin(), 
+              //              have_got_line_addr.end(), 
+              //              cache_line_addr) != have_got_line_addr.end()) {
+              //   ;
+              // } else {
+              //   sprintf(input, "0x%llx", cache_line_addr);
+              //   mem_ins.distance_L2[j] = process_one_access_and_get_distance(input, &pdt_c, tim);
+              //   if (mem_ins.distance_L2[j] > (int)l2_cache_blocks) {
+              //     l2_miss_num_all_acc++;
+              //   }
+              //   l2_num_all_acc++;
+              //   tim++;
+              //   have_got_line_addr.push_back(cache_line_addr);
+              // }
+
+              if(std::find(L1_have_got_line_addr.begin(), 
+                           L1_have_got_line_addr.end(), 
+                           L1_cache_line_addr) != L1_have_got_line_addr.end()) {
+                ;
+              } else {
+                if(std::find(have_got_line_addr.begin(), 
+                             have_got_line_addr.end(), 
+                             cache_line_addr) != have_got_line_addr.end()) {
+                  l2_num_all_acc++;
+                } else {
+                  sprintf(input, "0x%llx", cache_line_addr);
+                  mem_ins.distance_L2[j] = process_one_access_and_get_distance(input, &pdt_c, tim);
+                  if (mem_ins.distance_L2[j] > (int)l2_cache_blocks) {
+                    l2_miss_num_all_acc++;
+                    if (mem_ins.has_mem_instn_type() == LDG) {
+                      DRAM_total_transactions++;
+                    }
+                  }
+                  l2_num_all_acc++;
+                  tim++;
+                  have_got_line_addr.push_back(cache_line_addr);
+                }
+                L1_have_got_line_addr.push_back(L1_cache_line_addr);
+              }
+            }
+          }
+        }
+      }
+
+      
+
+      std::cout << "L2_hit_rate: " << l2_num_all_acc << " " << l2_miss_num_all_acc << " " 
+                << (float)(((float)l2_num_all_acc-(float)l2_miss_num_all_acc)/(float)l2_num_all_acc) << std::endl;
+
+      float L2_hit_rate = (float)(((float)l2_num_all_acc-(float)l2_miss_num_all_acc)/(float)l2_num_all_acc);
+
+      
+      program_data_t* pdt = &pdt_c;
+      pdt->histogram[B_INF] += narray_get_len(pdt->ga);
+      L2_hit_rate = parda_fprintf_histogram_r(pdt->histogram, NULL, false);
+
+      stat_coll->set_L2_cache_hit_rate(L2_hit_rate);
+      stat_coll->set_L2_cache_requests(l2_num_all_acc);
+
+      stat_coll->set_DRAM_total_transactions(DRAM_total_transactions);
+      
+      parda_free(&pdt);
+    }
+  }
+
 }
 #else
 void private_L1_cache_stack_distance_evaluate_no_boost_no_concurrent(int argc, 
@@ -354,6 +651,8 @@ START_TIMER(0);
 
   bool PRINT_COMPUTE_LOG = false;
 
+  unsigned KERNEL_EVALUATION = 0;
+
   std::string hw_config_file = "./DEV-Def/QV100.config";
 
   app.add_option("--configs", configs, "The configs path, which is generated from our NVBit tool, "
@@ -365,6 +664,7 @@ START_TIMER(0);
                                                      "rate");
   app.add_option("--clog", PRINT_COMPUTE_LOG, "Print the computation traces processing log or not");
   app.add_option("--config_file", hw_config_file, "The config file, e.g., \"../DEV-Def/QV100.config\"");
+  app.add_option("--kernel_id", KERNEL_EVALUATION, "The kernel id that you want to simulate");
 
   int _tmp_print_;
 
@@ -394,6 +694,8 @@ START_TIMER(1);
     need_to_read_mem_instns_sms.push_back(curr_process_idx);
   }
 
+  stat_collector stat_coll(gpu_config[V100].num_sm, KERNEL_EVALUATION);
+
   // if (world.rank() == 29) for (auto x : need_to_read_mem_instns_sms) std::cout << "@@@ " << x << std::endl;
 
   std::vector<std::pair<int, int>> need_to_read_mem_instns_kernel_block_pair;
@@ -408,6 +710,100 @@ START_TIMER(1);
   tracer.read_mem_instns(PRINT_LOG, &need_to_read_mem_instns_kernel_block_pair);
 
   auto issuecfg = tracer.get_issuecfg();
+
+  // std::cout << "@@@ 000" << std::endl;
+
+  app_config* appcfg = tracer.get_appcfg();
+  assert(appcfg->get_kernel_block_size((int)KERNEL_EVALUATION) <= stat_coll.get_max_block_size());
+  assert(appcfg->get_kernel_num_registers((int)KERNEL_EVALUATION) <= stat_coll.get_max_registers_per_thread());
+  assert(appcfg->get_kernel_shared_mem_bytes((int)KERNEL_EVALUATION) <= stat_coll.get_shared_mem_size());
+
+  stat_coll.set_total_num_workloads(appcfg->get_kernel_grid_dim_x((int)KERNEL_EVALUATION) * 
+                                    appcfg->get_kernel_grid_dim_y((int)KERNEL_EVALUATION) * 
+                                    appcfg->get_kernel_grid_dim_z((int)KERNEL_EVALUATION));
+  // std::cout << "@@@ 111" << std::endl;
+  stat_coll.set_active_SMs(std::min(stat_coll.get_m_num_sm(), stat_coll.get_active_SMs()));
+  
+  // std::cout << appcfg->get_kernel_block_size((int)KERNEL_EVALUATION) << std::endl;
+  // std::cout << stat_coll.get_warp_size() << std::endl;
+
+  stat_coll.set_allocated_active_warps_per_block(
+    (unsigned)(ceil(appcfg->get_kernel_block_size((int)KERNEL_EVALUATION) / stat_coll.get_warp_size(), 1)) );
+
+  if (stat_coll.get_allocated_active_warps_per_block() == 0)
+    stat_coll.set_allocated_active_warps_per_block(1);
+
+  // std::cout << "@@@ 222" << std::endl;
+
+  // std::cout << stat_coll.get_max_active_blocks_per_SM() << std::endl;
+  // std::cout << stat_coll.get_max_active_threads_per_SM() << std::endl;
+  // std::cout << stat_coll.get_warp_size() << std::endl;
+  // std::cout << stat_coll.get_allocated_active_warps_per_block() << std::endl;
+
+  stat_coll.set_Thread_block_limit_warps( std::min( stat_coll.get_max_active_blocks_per_SM(), 
+                                                    (unsigned)floor(stat_coll.get_max_active_threads_per_SM()/
+                                                     stat_coll.get_warp_size()/stat_coll.get_allocated_active_warps_per_block(),
+                                                     1) ) );
+  // std::cout << "@@@ 333" << std::endl;
+  if (appcfg->get_kernel_num_registers((int)KERNEL_EVALUATION) == 0) {
+    stat_coll.set_Thread_block_limit_registers(stat_coll.get_max_active_blocks_per_SM());
+  } else {
+    // std::cout << "get_kernel_num_registers: " << appcfg->get_kernel_num_registers((int)KERNEL_EVALUATION) << std::endl;
+    // std::cout << "stat_coll.get_warp_size(): " << stat_coll.get_warp_size() << std::endl;
+    // std::cout << "stat_coll.get_register_allocation_size(): " << stat_coll.get_register_allocation_size() << std::endl;
+    unsigned allocated_regs_per_warp = (unsigned)( ceil(appcfg->get_kernel_num_registers((int)KERNEL_EVALUATION) * 
+                                                    stat_coll.get_warp_size(), 
+                                                    stat_coll.get_register_allocation_size()) );
+    // std::cout << "allocated_regs_per_warp: " << allocated_regs_per_warp << std::endl;
+
+    // std::cout << "stat_coll.get_max_registers_per_block(): " << stat_coll.get_max_registers_per_block() << std::endl;
+    // std::cout << "hw_cfg.get_num_sched_per_sm(): " << hw_cfg.get_num_sched_per_sm() << std::endl;
+
+    unsigned allocated_regs_per_SM = (unsigned)( floor(stat_coll.get_max_registers_per_block() / allocated_regs_per_warp, 
+                                                 hw_cfg.get_num_sched_per_sm()) );
+    // std::cout << "allocated_regs_per_SM: " << allocated_regs_per_SM << std::endl;
+
+    // std::cout << "stat_coll.get_allocated_active_warps_per_block(): " << stat_coll.get_allocated_active_warps_per_block() << std::endl;
+    // std::cout << "stat_coll.get_max_registers_per_SM(): " << stat_coll.get_max_registers_per_SM() << std::endl;
+    // std::cout << "stat_coll.get_max_registers_per_block(): " << stat_coll.get_max_registers_per_block() << std::endl;
+    stat_coll.set_Thread_block_limit_registers( floor(allocated_regs_per_SM / stat_coll.get_allocated_active_warps_per_block(), 1) * 
+                                                floor(stat_coll.get_max_registers_per_SM() / stat_coll.get_max_registers_per_block(), 1) );
+  }
+  
+  // std::cout << "@@@ 333" << std::endl;
+  
+  if (appcfg->get_kernel_shared_mem_bytes((int)KERNEL_EVALUATION) == 0) {
+    // std::cout << "stat_coll.get_max_active_blocks_per_SM(): " << stat_coll.get_max_active_blocks_per_SM() << std::endl;
+    stat_coll.set_Thread_block_limit_shared_memory(stat_coll.get_max_active_blocks_per_SM());
+  } else {
+    // std::cout << appcfg->get_kernel_shared_mem_bytes((int)KERNEL_EVALUATION) << " " << stat_coll.get_smem_allocation_size() << std::endl;
+    float smem_per_block = ceil(appcfg->get_kernel_shared_mem_bytes((int)KERNEL_EVALUATION), stat_coll.get_smem_allocation_size());
+    // std::cout << smem_per_block << std::endl;
+
+    stat_coll.set_Thread_block_limit_shared_memory(floor(stat_coll.get_shared_mem_size()/smem_per_block, 1));
+    // std::cout << stat_coll.get_shared_mem_size() << " " << stat_coll.get_Thread_block_limit_shared_memory() << std::endl;
+  }
+
+  // std::cout << "#@#@# " << stat_coll.get_Thread_block_limit_warps() << " " 
+  //           << stat_coll.get_Thread_block_limit_registers() << " " << stat_coll.get_Thread_block_limit_shared_memory() << std::endl;
+  
+  stat_coll.set_allocated_active_blocks_per_SM( std::min(std::min(stat_coll.get_Thread_block_limit_warps(),
+                                                                  stat_coll.get_Thread_block_limit_registers()),
+                                                         stat_coll.get_Thread_block_limit_shared_memory()) );
+  unsigned th_active_blocks = stat_coll.get_allocated_active_blocks_per_SM();
+  stat_coll.set_Theoretical_max_active_warps_per_SM(th_active_blocks * stat_coll.get_allocated_active_warps_per_block());
+  // std::cout << "#Theoretical_max_active_warps_per_SM: " << stat_coll.get_Theoretical_max_active_warps_per_SM() << std::endl;
+  // std::cout << "#max_active_threads_per_SM: " << stat_coll.get_max_active_threads_per_SM() << std::endl;
+  // std::cout << (float)stat_coll.get_Theoretical_max_active_warps_per_SM() / 
+  //                                                     (float)(stat_coll.get_max_active_threads_per_SM() / 
+  //                                                      stat_coll.get_warp_size()) * 100. << std::endl;
+  stat_coll.set_Theoretical_occupancy((unsigned)(ceil((float)stat_coll.get_Theoretical_max_active_warps_per_SM() / 
+                                                      (float)(stat_coll.get_max_active_threads_per_SM() / 
+                                                       stat_coll.get_warp_size()) * 100., 1)));
+  
+  
+
+
 
 STOP_AND_REPORT_TIMER_pass(-1, 1);
     
@@ -425,6 +821,8 @@ STOP_AND_REPORT_TIMER_pass(-1, 1);
   std::vector<std::map<int, std::vector<mem_instn>>> SM_traces_all_passes;
   
   SM_traces_all_passes.resize(passnum_concurrent_issue_to_sm);
+
+  // std::cout << "@@@ 777" << std::endl;
 
 START_TIMER(3);
 
@@ -444,9 +842,12 @@ START_TIMER(3);
      *   }
      */
     for (int pass = 0; pass < passnum_concurrent_issue_to_sm; pass++) {
+      if (pass != (int)KERNEL_EVALUATION) continue;
+
+      // pass is kernel_id
       if (PRINT_LOG) std::cout << "Schedule pass: " << pass << std::endl;
 
-START_TIMER(2);
+// START_TIMER(2);
 
       std::vector<trace_kernel_info_t*> single_pass_kernels_info;
       
@@ -468,13 +869,20 @@ START_TIMER(2);
       int start_kernel_id = pass * (gpgpu_concurrent_kernel_sm ? gpu_config[V100].max_concurrent_kernels_num : 1);
       int end_kernel_id = (pass + 1) * (gpgpu_concurrent_kernel_sm ? gpu_config[V100].max_concurrent_kernels_num : 1) - 1;
       
+      // when gpgpu_concurrent_kernel_sm = 0, start_kernel_id = start_kernel_id = pass = kernel_id
+
       /* Here we traversal all the kernels that should be executed during this pass, to create their kernel-info 
        * object. And then the kernels that belong to the same SM will to be used to evaluate L1D cache. */
+
+      // when gpgpu_concurrent_kernel_sm = 0, kid = start_kernel_id = end_kernel_id = pass
       for (int kid = start_kernel_id; kid <= std::min(end_kernel_id, tracer.get_appcfg()->get_kernels_num() - 1); kid++) {
         kernel_trace_t * kernel_trace_info = tracer.parse_kernel_info(kid, PRINT_LOG);
         trace_kernel_info_t *kernel_info = create_kernel_info(kernel_trace_info, &tracer);
         single_pass_kernels_info.push_back(kernel_info);
       }
+
+      // single_pass_kernels_info has only one item, and it is the kernel_info_t object of the 
+      // start_kernel_id = start_kernel_id = pass = kernel_id -th kernel.
 
       if (PRINT_LOG) std::cout << "    Kernel nums waiting for processing: " << single_pass_kernels_info.size() << std::endl;
 
@@ -490,17 +898,21 @@ START_TIMER(2);
        * If we have 4 ranks, and 8 SMs:
        *          _pass-0  1
        *   rank-0 => SM-0, 4, 
-       *   rank-1 => SM-1, 5,
+       *   rank-1 => SM-1, 5, <-- curr_process_idx
        *   rank-2 => SM-2, 6,
        *   rank-3 => SM-3, 7.
        */
-      for (int _pass = 0; _pass < pass_num; _pass++) {
+
+      // pass_num is the total number of SMs that are calculated by the current rank.
+      // _pass is the index of SMs that are calculated by the current rank.
+      for (int _pass = 0; _pass < /*pass_num*/1; _pass++) {
         /* curr_process_idx_rank is the SM id that should be processed. */
         int curr_process_idx_rank = world.rank() + _pass * world.size();
         /* curr_process_idx is the SM id that should be processed. */
         int curr_process_idx = curr_process_idx_rank;
         if (curr_process_idx < gpu_config[V100].num_sm)
         for (auto k : single_pass_kernels_info) {
+          // k is only single_pass_kernels_info[0]
 
           if (PRINT_LOG) std::cout << "      kernel_id[" << k->get_trace_info()->kernel_id 
                                   << "] | kernel_name[" << k->get_trace_info()->kernel_name << "]" << std::endl;
@@ -533,7 +945,7 @@ START_TIMER(2);
             /* Calculate the allocated SM index of current thread block i. */
             
             int sm_id = issuecfg->get_sm_id_of_one_block_fast(unsigned(kernel_id + 1), unsigned(i));
-            if (sm_id == curr_process_idx) {
+            // if (sm_id == curr_process_idx) { // yangjianchao16 20240306
               /* The threadblock_traces[i] stores the memory traces that belong to k->get_trace_info()->kernel_id 
                * and thread block i. */
               threadblock_traces[i] = k->get_one_kernel_one_threadblock_traces(k->get_trace_info()->kernel_id - 1, i);
@@ -541,7 +953,7 @@ START_TIMER(2);
               // SM_traces[sm_id].insert(SM_traces[sm_id].end(), threadblock_traces[i].begin(), threadblock_traces[i].end()); // old
               (*SM_traces)[sm_id].insert((*SM_traces)[sm_id].end(), threadblock_traces[i].begin(), threadblock_traces[i].end());
               // std::cout << "sm_id-" << sm_id << " " << threadblock_traces[i].size() << std::endl;
-            }
+            // } // yangjianchao16 20240306
           }
           /* Next we will interleave the threadblock_traces[...] to the whole traces belong to kernel_id. */
         }
@@ -593,7 +1005,7 @@ START_TIMER(2);
       // single_pass_kernels_info.reserve(gpgpu_concurrent_kernel_sm ? std::min(tracer.get_appcfg()->get_kernels_num(), 
       //                                                                        gpu_config[V100].max_concurrent_kernels_num) : 1);
 
-STOP_AND_REPORT_TIMER_pass(pass, 2);
+// STOP_AND_REPORT_TIMER_pass(pass, 2);
 
     }
 
@@ -709,13 +1121,39 @@ START_TIMER(4);
    * instruction. */
   std::map<std::tuple<int, int, unsigned long long>, std::map<unsigned, bool>> mem_instn_distance_overflow_flag;
 
+  // std::cout << "@@@ 888" << std::endl;
+
+  auto start_memory_timer = std::chrono::system_clock::now();
   private_L1_cache_stack_distance_evaluate_boost_no_concurrent(argc, 
                                                                argv, 
                                                                &SM_traces_all_passes, 
                                                                &mem_instn_distance_overflow_flag, 
                                                                _tmp_print_, 
                                                                configs, 
-                                                               dump_histogram);
+                                                               dump_histogram,
+                                                               &stat_coll,
+                                                               KERNEL_EVALUATION);
+  auto end_memory_timer = std::chrono::system_clock::now();
+  auto duration_memory_timer = 
+    std::chrono::duration_cast<std::chrono::microseconds>(end_memory_timer - start_memory_timer);
+  auto cost_memory_timer = (double)(double(duration_memory_timer.count()) * 
+    (double)(std::chrono::microseconds::period::num) / (double)(std::chrono::microseconds::period::den));
+  stat_coll.set_Simulation_time_memory_model(cost_memory_timer, world.rank());
+
+  // std::cout << "@@@ 999" << std::endl;
+
+  stat_coll.print_Unified_L1_cache_hit_rate();
+
+  
+  // abort();
+  
+
+  // the 0-th rank should merge results from multiple ranks
+  if (world.rank() == 0) {
+    
+
+
+  }
 
   /* Print mem_instn_distance_overflow_flag. */
   /*
@@ -863,17 +1301,19 @@ START_TIMER(6);
   39     Writeback: bank-\d+ of reg-\d+ is not idle
   **********************************************************************************************/
 
+  auto start_compute_timer = std::chrono::system_clock::now();
+  
+
   for (int _pass = 0; _pass < pass_num; _pass++) {
     int curr_process_idx_rank = world.rank() + _pass * world.size();
     /* curr_process_idx is the SM id that should be processed */
     unsigned smid = curr_process_idx_rank;
-    std::cout << "### Rank-" << world.rank() << ", processing SM-" << smid << std::endl;
+    // std::cout << "### Rank-" << world.rank() << ", processing SM-" << smid << std::endl;
     // if (smid < gpu_config[V100].num_sm) {
     
     if (smid == 0) {
-      if (_DEBUG_LOG_)
-        std::cout << "$$$ Rank-" << world.rank() 
-                  << ", processing SM-" << smid << std::endl;
+      std::cout << "### Rank-" << world.rank() 
+                << ", processing SM-" << smid << std::endl;
       PrivateSM private_sm = PrivateSM(smid, &tracer, &hw_cfg);
       if (_DEBUG_LOG_)
         std::cout << "private_sm.get_cycle(): " 
@@ -887,12 +1327,54 @@ START_TIMER(6);
             std::cout << "kid: " << kid << ", block_id: " << block_id << std::endl;
           }
       }
+      std::cout << " ...run START... " << std::endl;
       while (private_sm.get_active()) {
-        private_sm.run();
+        private_sm.run(KERNEL_EVALUATION);
       }
+      
+      
+      std::cout << "private_sm.get_active_cycles(): " << private_sm.get_active_cycles() << std::endl;
+      //active_warps_id_size_sum
+      std::cout << "private_sm.get_active_warps_id_size_sum(): " << private_sm.get_active_warps_id_size_sum() << std::endl;
+
+      /*
+      unsigned get_active_warps() { return m_active_warps; }
+      unsigned get_max_warps_init() { return max_warps_init; }
+      */
+      float achieved_occupancy = (float)private_sm.get_active_warps_id_size_sum() / 
+                                 (float)private_sm.get_active_cycles() / 
+                                 (float)private_sm.get_max_warps_init();
+      stat_coll.set_Achieved_occupancy(achieved_occupancy, smid);
+      // std::cout << "achieved_occupancy: " << achieved_occupancy << std::endl;
+      float achieved_active_warps_per_SM = achieved_occupancy * (float)stat_coll.get_Theoretical_max_active_warps_per_SM();
+      // std::cout << "achieved_active_warps_per_SM: " << achieved_active_warps_per_SM << std::endl;
+      stat_coll.set_Achieved_active_warps_per_SM(achieved_active_warps_per_SM, smid);
+
+
+      std::cout << " ...run EXIT... " << std::endl;
+      stat_coll.set_GPU_active_cycles(private_sm.get_cycle(), smid);
+      stat_coll.set_SM_active_cycles(private_sm.get_cycle(), smid);
+      stat_coll.set_Warp_instructions_executed(private_sm.get_num_warp_instns_executed(), smid);
+      stat_coll.set_Instructions_executed_per_clock_cycle_IPC(
+        (float)private_sm.get_num_warp_instns_executed() / (float)private_sm.get_cycle(), smid);
+      stat_coll.set_Total_instructions_executed_per_seconds( // MIPS
+        (float)( (float)private_sm.get_num_warp_instns_executed() / 1e6 ) / 
+        (float)( (float)private_sm.get_cycle() / (float)hw_cfg.get_core_clock_mhz() ), smid);
+      stat_coll.set_Kernel_execution_time( // ns
+        (float)((float)private_sm.get_cycle() / (float)hw_cfg.get_core_clock_mhz() * 1e9), smid);
     }
   }
-  
+
+  auto end_compute_timer = std::chrono::system_clock::now();
+  auto duration_compute_timer = 
+    std::chrono::duration_cast<std::chrono::microseconds>(end_compute_timer - start_compute_timer);
+  auto cost_compute_timer = (double)(double(duration_compute_timer.count()) * 
+    (double)(std::chrono::microseconds::period::num) / (double)(std::chrono::microseconds::period::den));
+  // std::cout << "Cost " << "-" << cost_compute_timer << " seconds." << std::endl;
+  stat_coll.set_Simulation_time_compute_model(cost_compute_timer, world.rank());
+
+
+  stat_coll.dump_output(configs, world.rank());
 
 STOP_AND_REPORT_TIMER_rank(world.rank(), 6);
 
@@ -902,3 +1384,11 @@ STOP_AND_REPORT_TIMER_pass(-1, 0);
 
   return 0;
 }
+
+
+/*
+make clean && make -j && mpirun -np 1 ./memory_model.x --configs ./traces/hotspot/configs/ --sort 0 --log 0 --dump_histogram 0 --clog 0 --config_file DEV-Def/QV100.config --tmp 0 --kernel_id 0 > tmp.txt
+
+vs: tmp_tune.bak.txt/tmp_tune.txt  hotspot
+    tmp.txt
+*/
