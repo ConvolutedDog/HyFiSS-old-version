@@ -105,6 +105,7 @@ void parda_print(const program_data_t* pdt);
 void print_iterator(gpointer key, gpointer value, gpointer ekt);
 void parda_print_histogram(const unsigned* histogram);
 void parda_fprintf_histogram(const unsigned* histogram, FILE* file);
+float parda_fprintf_histogram_r(const unsigned* histogram, FILE* file, bool print);
 
 int parda_findopt(char *option, char **value, int *argc, char ***argv);
 void parda_process(char* input, T tim, program_data_t* pdt);
