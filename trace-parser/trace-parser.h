@@ -290,6 +290,8 @@ enum mem_instn_type {
   ATOM,
   LDG,
   STG,
+  LDS,
+  STS,
   LDL,
   STL,
   num_mem_instn_types,
@@ -318,6 +320,7 @@ struct mem_instn {
     mem_access_type = has_mem_instn_type();
 
     distance.resize(addr.size());
+    distance_L2.resize(addr.size());
     miss.resize(addr.size());
   }
   mem_instn(unsigned _pc, unsigned long long _addr_start1, 
@@ -356,6 +359,7 @@ struct mem_instn {
     }
 
     distance.resize(addr.size());
+    distance_L2.resize(addr.size());
     miss.resize(addr.size());
   }
 
@@ -368,6 +372,7 @@ struct mem_instn {
   enum mem_instn_type mem_access_type;
 
   std::vector<int> distance;
+  std::vector<int> distance_L2;
   std::vector<bool> miss;
 
   /* Here we will judge if or not the opcode has 'RED'/'ATOM'/'LDG'/'STG'/'LDL'/'STL'.
@@ -382,6 +387,8 @@ struct mem_instn {
     else if (opcode.find("ATOM") != std::string::npos) return ATOM;
     else if (opcode.find("LDG") != std::string::npos) return LDG;
     else if (opcode.find("STG") != std::string::npos) return STG;
+    else if (opcode.find("LDS") != std::string::npos) return LDS;
+    else if (opcode.find("STS") != std::string::npos) return STS;
     else if (opcode.find("LDL") != std::string::npos) return LDL;
     else if (opcode.find("STL") != std::string::npos) return STL;
     else return UNKOWN_TYPE;
@@ -569,6 +576,10 @@ class trace_parser {
 
   compute_instn* get_one_kernel_one_warp_one_instn(int kernel_id, int warp_id, int next_instn_id) {
     return &conpute_instns[kernel_id][warp_id][next_instn_id];
+  }
+
+  unsigned get_one_kernel_one_warp_one_instn_max_size(int kernel_id, int warp_id) {
+    return conpute_instns[kernel_id][warp_id].size();
   }
 
   unsigned get_one_kernel_one_warp_instn_count(int kernel_id, int warp_id) {
