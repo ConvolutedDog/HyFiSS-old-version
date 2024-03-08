@@ -110,3 +110,40 @@ void parda_fprintf_histogram(const unsigned* histogram, FILE* file) {
   fprintf(file, "#INF  \t%9u\t%0.8f\t%9llu\t%0.8lf\n", histogram[B_INF], histogram[B_INF]/(double)sum, cum, cum/(double)sum);
   // fprintf(file, "#INF  \t%9u\n", histogram[B_INF]);
 }
+
+float parda_fprintf_histogram_r(const unsigned* histogram, FILE* file, bool print=true) {
+  int last_bucket;
+  int i;
+  unsigned long long sum = 0;  // For normalizing
+  unsigned long long cum = 0;  // Cumulative output
+
+  // Find the last non-zero bucket
+  last_bucket = nbuckets-1;
+  while (histogram[last_bucket] == 0)
+    last_bucket--;
+
+  for (i = 0; i <= last_bucket; i++)
+    sum += histogram[i];
+  sum += histogram[B_OVFL];
+  sum += histogram[B_INF];
+
+  if (print) fprintf(file, "# Dist\t     Refs\t   Refs(%%)\t  Cum_Ref\tCum_Ref(%%)\n");
+
+  for (i = 0; i <= last_bucket; i++) {
+    cum += histogram[i];
+    if (histogram[i] && print)
+        fprintf(file, "%6d\t%9u\t%0.8lf\t%9llu\t%0.8lf\n", i, histogram[i],
+                histogram[i] / (double)sum, cum, cum / (double)sum);
+  }
+
+  cum += histogram[B_OVFL];
+  if (print) fprintf(file, "#OVFL \t%9u\t%0.8f\t%9llu\t%0.8lf\n", histogram[B_OVFL], histogram[B_OVFL]/(double)sum, cum, cum/(double)sum);
+
+  float hit_rate = cum/(double)sum;
+
+  cum += histogram[B_INF];
+  if (print) fprintf(file, "#INF  \t%9u\t%0.8f\t%9llu\t%0.8lf\n", histogram[B_INF], histogram[B_INF]/(double)sum, cum, cum/(double)sum);
+  // if (print) fprintf(file, "#INF  \t%9u\n", histogram[B_INF]);
+
+  return hit_rate;
+}
