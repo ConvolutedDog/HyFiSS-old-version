@@ -2,6 +2,250 @@
 
 #include "PrivateSM.h"
 
+stat_collector::stat_collector(unsigned num_sm, unsigned kernel_id) {
+  this->kernel_id = kernel_id;
+
+  m_num_sm = num_sm;
+  max_block_size = 1024; // TODO: SM70
+  warp_size = 32; // TODO: SM70
+  smem_allocation_size = 256; // TODO: SM70
+  max_registers_per_SM = 65536; // TODO: SM70
+  max_registers_per_block = 65536; // TODO: SM70
+  max_registers_per_thread = 255; // TODO: SM70
+  register_allocation_size = 256; // TODO: SM70
+  max_active_blocks_per_SM = 32; // TODO: SM70
+  max_active_threads_per_SM = 2048; // TODO: SM70
+  shared_mem_size = 96*1024; // TODO: V100
+
+  active_SMs = 0;
+
+  Thread_block_limit_SM = 32;
+  Thread_block_limit_registers = 0;
+  Thread_block_limit_shared_memory = 0;
+  Thread_block_limit_warps = 0;
+  Theoretical_max_active_warps_per_SM = 0;
+  Theoretical_occupancy = 0.;
+
+  Achieved_active_warps_per_SM.resize(m_num_sm, 0.);
+  Achieved_occupancy.resize(m_num_sm, 0.);
+  Unified_L1_cache_hit_rate.resize(m_num_sm, 0.);
+  Unified_L1_cache_requests.resize(m_num_sm, 0);
+  Unified_L1_cache_hit_rate_for_read_transactions.resize(m_num_sm, 0.);
+  L2_cache_hit_rate = 0.;
+  L2_cache_requests = 0;
+  GMEM_read_requests.resize(m_num_sm, 0);
+  GMEM_write_requests.resize(m_num_sm, 0);
+  GMEM_total_requests.resize(m_num_sm, 0);
+  GMEM_read_transactions.resize(m_num_sm, 0);
+  GMEM_write_transactions.resize(m_num_sm, 0);
+  GMEM_total_transactions.resize(m_num_sm, 0);
+  Number_of_read_transactions_per_read_requests.resize(m_num_sm, 0);
+  Number_of_write_transactions_per_write_requests.resize(m_num_sm, 0);
+  L2_read_transactions.resize(m_num_sm, 0);
+  L2_write_transactions.resize(m_num_sm, 0);
+  L2_total_transactions.resize(m_num_sm, 0);
+  DRAM_total_transactions = 0;
+  Total_number_of_global_atomic_requests.resize(m_num_sm, 0);
+  Total_number_of_global_reduction_requests.resize(m_num_sm, 0);
+  Global_memory_atomic_and_reduction_transactions.resize(m_num_sm, 0);
+  GPU_active_cycles.resize(m_num_sm, 0);
+  SM_active_cycles.resize(m_num_sm, 0);
+  Warp_instructions_executed.resize(m_num_sm, 0);
+  Instructions_executed_per_clock_cycle_IPC.resize(m_num_sm, 0.);
+  Total_instructions_executed_per_seconds.resize(m_num_sm, 0.);
+  Kernel_execution_time.resize(m_num_sm, 0);
+  Simulation_time_memory_model.resize(m_num_sm, 0);
+  Simulation_time_compute_model.resize(m_num_sm, 0);
+}
+
+void stat_collector::dump_output(const std::string& path, unsigned rank) {
+  // std::string full_path = path + std::string("/rank-") + std::to_string(rank) + std::string(".temp.txt");
+  std::string full_path = path + std::string("/kernel-") + std::to_string(get_kernel_id()) + 
+                          std::string("-rank-") + std::to_string(rank) + std::string(".temp.txt");
+  std::ofstream file(full_path);
+  if (file.is_open()) {
+    file << "From rank: " << rank << std::endl;
+      
+    file << "Thread_block_limit_SM = " << Thread_block_limit_SM << std::endl;
+    file << "Thread_block_limit_registers = " << Thread_block_limit_registers << std::endl;
+    file << "Thread_block_limit_shared_memory = " << Thread_block_limit_shared_memory << std::endl;
+    file << "Thread_block_limit_warps = " << Thread_block_limit_warps << std::endl;
+    file << "Theoretical_max_active_warps_per_SM = " << Theoretical_max_active_warps_per_SM << std::endl;
+    file << "Theoretical_occupancy = " << Theoretical_occupancy << std::endl;
+
+    file << std::endl;
+
+    
+    file << "Unified_L1_cache_hit_rate[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Unified_L1_cache_hit_rate[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Unified_L1_cache_requests[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Unified_L1_cache_requests[sm_id] << " ";;
+    }
+    file << std::endl;
+      
+    // unsigned all_misses = 0;
+    // unsigned all_requests = 0;
+    // for (unsigned i = 0; i < Unified_L1_cache_requests.size(); i++) {
+    //   all_misses += Unified_L1_cache_requests[i] * (1. - Unified_L1_cache_hit_rate[i]);
+    //   all_requests += Unified_L1_cache_requests[i];
+    // }
+    // file << "Unified_L1_cache_hit_rate: " << (float)(((float)all_requests - (float)all_misses)/(float)all_requests) << std::endl;
+    // file << "Unified_L1_cache_hit_rate_for_read_transactions[rank] = " << Unified_L1_cache_hit_rate_for_read_transactions[rank] << std::endl;
+
+    file << std::endl;
+
+    file << "L2_cache_hit_rate = " << L2_cache_hit_rate << std::endl;
+    file << "L2_cache_requests = " << L2_cache_requests << std::endl;
+
+    file << std::endl;
+
+    file << "GMEM_read_requests[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << GMEM_read_requests[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "GMEM_write_requests[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << GMEM_write_requests[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "GMEM_total_requests[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << GMEM_total_requests[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "GMEM_read_transactions[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << GMEM_read_transactions[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "GMEM_write_transactions[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << GMEM_write_transactions[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "GMEM_total_transactions[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << GMEM_total_transactions[sm_id] << " ";;
+    }
+    file << std::endl;
+
+    file << std::endl;
+
+    file << "Number_of_read_transactions_per_read_requests[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Number_of_read_transactions_per_read_requests[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Number_of_write_transactions_per_write_requests[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Number_of_write_transactions_per_write_requests[sm_id] << " ";;
+    }
+    file << std::endl;
+
+    file << std::endl;
+
+
+    file << "L2_read_transactions[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << L2_read_transactions[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "L2_write_transactions[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << L2_write_transactions[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "L2_total_transactions[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << L2_total_transactions[sm_id] << " ";;
+    }
+
+    file << std::endl;
+    file << std::endl;
+    file << "DRAM_total_transactions = " << DRAM_total_transactions;
+    file << std::endl;
+    file << std::endl;
+    file << "Total_number_of_global_atomic_requests[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Total_number_of_global_atomic_requests[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Total_number_of_global_reduction_requests[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Total_number_of_global_reduction_requests[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Global_memory_atomic_and_reduction_transactions[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Global_memory_atomic_and_reduction_transactions[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << std::endl;
+    file << "Achieved_active_warps_per_SM[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Achieved_active_warps_per_SM[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Achieved_occupancy[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Achieved_occupancy[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << std::endl;
+    file << "GPU_active_cycles[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << GPU_active_cycles[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "SM_active_cycles[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << SM_active_cycles[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << std::endl;
+    file << "Warp_instructions_executed[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Warp_instructions_executed[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Instructions_executed_per_clock_cycle_IPC[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Instructions_executed_per_clock_cycle_IPC[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Total_instructions_executed_per_seconds[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Total_instructions_executed_per_seconds[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << std::endl;
+    file << "Kernel_execution_time[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Kernel_execution_time[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << std::endl;
+
+    file << "Simulation_time_memory_model[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Simulation_time_memory_model[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Simulation_time_compute_model[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Simulation_time_compute_model[sm_id] << " ";;
+    }
+    file << std::endl;
+
+    file.close();
+  }
+}
+
 
 bool operator<(const curr_instn_id_per_warp_entry& lhs, const curr_instn_id_per_warp_entry& rhs) {
   if (lhs.kid != rhs.kid) {
@@ -20,6 +264,13 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
   m_smid = smid;
   m_cycle = 0;
   active = true;
+  m_active_warps = 0;
+  max_warps_init = 0;
+
+  num_warp_instns_executed = 0;
+
+  active_cycles = 0;
+  active_warps_id_size_sum = 0;
 
   m_hw_cfg = hw_cfg;
 
@@ -65,6 +316,7 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
     unsigned block_id = it->second;
 
     m_num_blocks_per_kernel[kid] += 1;
+    // std::cout << "kid: " << kid << " m_num_blocks_per_kernel[kid]: " << m_num_blocks_per_kernel[kid] << std::endl;
 
     unsigned _warps_per_block = appcfg->get_num_warp_per_block(kid);
     for (unsigned _i = 0; _i < _warps_per_block; _i++) {
@@ -100,7 +352,7 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
   m_scoreboard = new Scoreboard(m_smid, all_warps_num);
 
   m_inst_fetch_buffer = new inst_fetch_buffer_entry();
-
+  m_inst_fetch_buffer_copy = new inst_fetch_buffer_entry();               // yangjianchao16 add 20240131
   
   // std::cout << "D: all_warps_num: " << all_warps_num << std::endl;
 
@@ -330,6 +582,7 @@ bool PrivateSM::check_active(){
 PrivateSM::~PrivateSM() {
   delete m_ibuffer;
   delete m_inst_fetch_buffer;
+  delete m_inst_fetch_buffer_copy;               // yangjianchao16 add 20240131
   delete m_scoreboard;
   delete m_reg_bank_allocator;
   delete m_operand_collector;
@@ -434,10 +687,22 @@ void PrivateSM::issue_warp(register_set &pipe_reg_set,
 
 }
 
-void PrivateSM::run(){
-  m_cycle++;
+void insert_into_active_warps_id(std::vector<unsigned>* active_warps_id, unsigned wid) {
+  // find if wid is in active_warps_id, if yes pass, if no insert into
+  // how to use: insert_into_active_warps_id(&active_warps_id, wid);
+  if (std::find(active_warps_id->begin(), active_warps_id->end(), wid) == active_warps_id->end()) {
+    active_warps_id->push_back(wid);
+  }
+} 
 
-  std::cout << "# cycle: " << m_cycle << std::endl;
+void PrivateSM::run(unsigned KERNEL_EVALUATION){
+  m_cycle++;
+  
+  bool active_during_this_cycle = false;
+
+  std::vector<unsigned> active_warps_id;
+
+  // std::cout << "# cycle: " << m_cycle << std::endl;
 
   // if (m_cycle >= 6261) {
   //   active = false;
@@ -487,11 +752,12 @@ void PrivateSM::run(){
     // std::cout << "$ SM-" << m_smid << " Kernel-" << kid << " Block-" << block_id 
     //           << ", gwarp_id_start: " << gwarp_id_start << ", gwarp_id_end: " 
     //           << gwarp_id_end << std::endl;
+
     
     for (auto it_kernel_block_pair = kernel_block_pair.begin(); 
-              (it_kernel_block_pair != kernel_block_pair.end()) &&
-              (it_kernel_block_pair->first - 1 == KERNEL_EVALUATION); // TODO: here only first kernel is considered
+              it_kernel_block_pair != kernel_block_pair.end(); // TODO: here only first kernel is considered
               it_kernel_block_pair++) {
+      if (it_kernel_block_pair->first - 1 != KERNEL_EVALUATION) continue;
       /* -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
        * Here, kernel_block_pair is (1,80), (1,160), (1,0), (2,0), (3,0), (4,0)
        * for it_kernel_block_pair : kernel_block_pair:
@@ -519,6 +785,8 @@ void PrivateSM::run(){
          * kernel - kid. */
         if (m_cycle == 1 && m_warp_active_status[_index_][_wid_] == false) {
           m_warp_active_status[_index_][_wid_] = true;
+          m_active_warps++;
+          max_warps_init++;
           if (_DEBUG_LOG_)
             std::cout << "  **First time to activate warp (_index_, wid): (" 
                       << _index_ << ", " << _wid_ << ")" 
@@ -529,6 +797,7 @@ void PrivateSM::run(){
         }
       }
     }
+    
 
     /**********************************************************************************************/
     /***                                                                                        ***/
@@ -608,6 +877,8 @@ void PrivateSM::run(){
                       << sched_id << std::endl;
           // Now we set the bank_id of the dst reg id to be on_write (for dst reg id, it is on_wite).
           if (m_reg_bank_allocator->getBankState(bank_id) == FREE) {
+            // active_during_this_cycle = true;
+
             m_reg_bank_allocator->setBankState(bank_id, ON_WRITING);
             
             _trace_warp_inst.set_arch_reg_dst(i, -1);
@@ -616,6 +887,8 @@ void PrivateSM::run(){
                         << ", WRITING)   dst_reg_id : " 
                         << _trace_warp_inst.get_arch_reg_dst(i) 
                         << std::endl;
+
+            insert_into_active_warps_id(&active_warps_id, _wid); // here _wid id global
           } else
             if (_DEBUG_LOG_)
               std::cout << "    cannot setBankState "
@@ -635,6 +908,17 @@ void PrivateSM::run(){
       // remove the instn from writeback_stage_instns
       if (all_write_back) {
         // std::cout << "    all_write_back" << std::endl;
+        if (_CALIBRATION_LOG_) {
+          std::cout << "    Write back: ("
+                    << _kid << ", "
+                    << _wid << ", "
+                    << _uid << ", "
+                    << _pc << ")" << std::endl;
+        }
+        // inc instns executed
+        num_warp_instns_executed++;
+
+
         if (_DEBUG_LOG_) {
           std::cout << "  **Write back instn "
                        "(pc, gwid, kid, "
@@ -670,8 +954,9 @@ void PrivateSM::run(){
           /* We now need to calculate the index of kernel - block pair (_kid, _block_id). */
           unsigned _index = 0;
           for (auto _it_kernel_block_pair = kernel_block_pair.begin(); 
-                    _it_kernel_block_pair != kernel_block_pair.end(); 
+                    _it_kernel_block_pair != kernel_block_pair.end();
                     _it_kernel_block_pair++) {
+            if (_it_kernel_block_pair->first - 1 != KERNEL_EVALUATION) continue;
             if (_it_kernel_block_pair->first - 1 == _kid && 
                 _it_kernel_block_pair->second == _block_id) {
               _index = std::distance(kernel_block_pair.begin(), _it_kernel_block_pair);
@@ -689,6 +974,8 @@ void PrivateSM::run(){
            * 80 * 3 = 240.
            */
           m_warp_active_status[_index][_wid - _gwarp_id_start] = false;
+          m_active_warps--;
+          insert_into_active_warps_id(&active_warps_id, _wid);
           if (_DEBUG_LOG_)
             std::cout << "  **ENDCYCLLE: kid,block_id,wid,cycle:" 
                       << _kid << " " 
@@ -713,6 +1000,7 @@ void PrivateSM::run(){
                     << _wid << ", " 
                     << _kid << ", " 
                     << _uid << ")" << std::endl;
+        insert_into_active_warps_id(&active_warps_id, _wid);
         // exit(0); /// NEED TO DELETE
         
       }
@@ -745,8 +1033,9 @@ void PrivateSM::run(){
        * the same _kid. */
       unsigned _kid_block_id_count = 0;
       for (auto _it_kernel_block_pair = kernel_block_pair.begin(); 
-                _it_kernel_block_pair != kernel_block_pair.end(); 
+                _it_kernel_block_pair != kernel_block_pair.end();
                 _it_kernel_block_pair++) {
+        if (_it_kernel_block_pair->first - 1 != KERNEL_EVALUATION) continue;
         if (_it_kernel_block_pair->first - 1 == _kid) {
           if (_it_kernel_block_pair->second < _block_id) {
             _kid_block_id_count++;
@@ -763,6 +1052,8 @@ void PrivateSM::run(){
                         m_num_warps_per_sm.begin() + _kid, 0);
 
       if (all_write_back) {
+        
+
         if (_DEBUG_LOG_)
           m_scoreboard->printContents();
 
@@ -786,6 +1077,7 @@ void PrivateSM::run(){
           // void Scoreboard::releaseRegisters(const unsigned wid, std::vector<int> regnums)
           // m_scoreboard->releaseRegisters(_wid, regnum);
           m_scoreboard->releaseRegisters(global_all_kernels_warp_id, regnum);
+          insert_into_active_warps_id(&active_warps_id, global_all_kernels_warp_id);
         }
 
         if (_DEBUG_LOG_)
@@ -794,6 +1086,7 @@ void PrivateSM::run(){
       
       preg = m_pipeline_reg[EX_WB].get_ready(&except_regs);
       pipe_reg = (preg == NULL) ? NULL : *preg;
+      active_during_this_cycle = true;
     }
     
 
@@ -809,7 +1102,16 @@ void PrivateSM::run(){
     }
 
     for (unsigned n = 0; n < m_fu.size(); n++) {
-      for (auto _ = 0; _ < m_fu[n]->clock_multiplier(); _++) m_fu[n]->cycle();
+      for (auto _ = 0; _ < m_fu[n]->clock_multiplier(); _++) {
+        // if (m_fu[n]->cycle()) {
+        //   active_during_this_cycle = true;
+        // }
+        std::vector<unsigned> returned_wids = m_fu[n]->cycle();
+        for (auto wid : returned_wids) {
+          insert_into_active_warps_id(&active_warps_id, wid);
+          active_during_this_cycle = true;
+        }
+      }
     }
 
     std::vector<opndcoll_rfu_t::input_port_t>* m_in_ports_ptr = m_operand_collector->get_m_in_ports();
@@ -834,7 +1136,7 @@ void PrivateSM::run(){
       for (unsigned i = 0; i < inp.m_out.size(); i++) {
         if ((*inp.m_out[i]).has_ready()) {
           // print the ready instn
-          if (_DEBUG_LOG_)
+          /*//*/ if (_DEBUG_LOG_)
             std::cout << "  Ready instn in inp.m_out[" << i << "]: " << std::endl;
           // (*inp.m_out[i]).print();
           std::vector<unsigned> ready_reg_ids = (*inp.m_out[i]).get_ready_reg_ids();
@@ -845,7 +1147,7 @@ void PrivateSM::run(){
             unsigned _wid = (*inp.m_out[i]).get_wid(reg_id);
             unsigned _uid = (*inp.m_out[i]).get_uid(reg_id);
             unsigned _latency = (*inp.m_out[i]).get_latency(reg_id);
-            if (_DEBUG_LOG_)
+            /*//*/ if (_DEBUG_LOG_)
               std::cout << "    Ready instn "
                            "(pc, gwid, kid, fetch_instn_id, latency): (" << _pc << ", " 
                                                                          << _wid << ", " 
@@ -858,8 +1160,8 @@ void PrivateSM::run(){
               tracer->get_one_kernel_one_warp_one_instn(_kid, _wid, _uid);
             _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
 
-            if (_DEBUG_LOG_)
-              std::cout << "tmp_inst_trace->get_func_unit(): " 
+            /*//*/ if (_DEBUG_LOG_)
+              std::cout << "    tmp_inst_trace->get_func_unit(): " 
                         << tmp_inst_trace->get_func_unit() << std::endl;
             
             unsigned offset_fu = 0;
@@ -869,7 +1171,7 @@ void PrivateSM::run(){
             switch (tmp_inst_trace->get_func_unit()) {
               // In PrivateSM.cc, m_fu[SP_UNIT-1] => SP_UNIT_PIPELINE.
               case SP_UNIT:
-                if (_DEBUG_LOG_) {
+                if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                   std::cout << "    SP unit latency: " 
                             << tmp_inst_trace->get_latency() 
                             << std::endl;
@@ -880,6 +1182,9 @@ void PrivateSM::run(){
                 (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
                 if (_DEBUG_LOG_) std::cout << "@#@#@#@#@#@#1 " << reg_id << std::endl;
                 (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+                // std::cout << "  SP initial interval: " 
+                //           << tmp_inst_trace->get_initiation_interval() 
+                //           << std::endl;
 
                 offset_fu = 0;
                 for (unsigned _ = 0; _ < m_hw_cfg->get_num_sp_units(); _++) {
@@ -891,26 +1196,30 @@ void PrivateSM::run(){
                       std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl
                                 << "resbus: " << resbus << std::endl;
                     }
+                    insert_into_active_warps_id(&active_warps_id, _wid);
+                    active_during_this_cycle = true;
                     if (schedule_wb_now &&
                         (resbus != -1)) {
                       m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      break;
                     } else if (!schedule_wb_now) {
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
                     }
@@ -923,7 +1232,7 @@ void PrivateSM::run(){
                 }
                 break;
               case DP_UNIT:
-                if (_DEBUG_LOG_) {
+                if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                   std::cout << "    DP unit latency: " 
                             << tmp_inst_trace->get_latency() 
                             << std::endl;
@@ -933,6 +1242,9 @@ void PrivateSM::run(){
                 }
                 (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
                 (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+                // std::cout << "  DP initial interval: " 
+                //           << tmp_inst_trace->get_initiation_interval() 
+                //           << std::endl;
 
                 offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units() 
                             + m_hw_cfg->get_num_int_units();
@@ -942,26 +1254,30 @@ void PrivateSM::run(){
                     resbus = test_result_bus(tmp_inst_trace->get_latency());
                     if (_DEBUG_LOG_) 
                       std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    insert_into_active_warps_id(&active_warps_id, _wid);
+                    active_during_this_cycle = true;
                     if (schedule_wb_now &&
                         (resbus != -1)) {
                       m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      break;
                     } else if (!schedule_wb_now) {
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
                     }
@@ -974,7 +1290,7 @@ void PrivateSM::run(){
                 }
                 break;
               case SFU_UNIT:
-                if (_DEBUG_LOG_) {
+                if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                   std::cout << "    SFU unit latency: " 
                             << tmp_inst_trace->get_latency() 
                             << std::endl;
@@ -984,6 +1300,9 @@ void PrivateSM::run(){
                 }
                 (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
                 (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+                // std::cout << "  SFU initial interval: " 
+                //           << tmp_inst_trace->get_initiation_interval() 
+                //           << std::endl;
 
                 offset_fu = m_hw_cfg->get_num_sp_units();
                 for (unsigned _ = 0; _ < m_hw_cfg->get_num_sfu_units(); _++) {
@@ -992,26 +1311,30 @@ void PrivateSM::run(){
                     resbus = test_result_bus(tmp_inst_trace->get_latency());
                     if (_DEBUG_LOG_) 
                       std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    insert_into_active_warps_id(&active_warps_id, _wid);
+                    active_during_this_cycle = true;
                     if (schedule_wb_now &&
                         (resbus != -1)) {
                       m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      break;
                     } else if (!schedule_wb_now) {
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
                     }
@@ -1024,7 +1347,7 @@ void PrivateSM::run(){
                 }
                 break;
               case TENSOR_CORE_UNIT:
-                if (_DEBUG_LOG_) {
+                if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                   std::cout << "    TENSOR_CORE unit latency: " 
                             << tmp_inst_trace->get_latency() 
                             << std::endl;
@@ -1034,6 +1357,9 @@ void PrivateSM::run(){
                 }
                 (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
                 (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+                // std::cout << "  TC initial interval: " 
+                //           << tmp_inst_trace->get_initiation_interval() 
+                //           << std::endl;
 
                 offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units() 
                             + m_hw_cfg->get_num_int_units() + m_hw_cfg->get_num_dp_units();
@@ -1043,26 +1369,30 @@ void PrivateSM::run(){
                     resbus = test_result_bus(tmp_inst_trace->get_latency());
                     if (_DEBUG_LOG_) 
                       std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    insert_into_active_warps_id(&active_warps_id, _wid);
+                    active_during_this_cycle = true;
                     if (schedule_wb_now &&
                         (resbus != -1)) {
                       m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      break;
                     } else if (!schedule_wb_now) {
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
                     }
@@ -1075,7 +1405,7 @@ void PrivateSM::run(){
                 }
                 break;
               case INT_UNIT:
-                if (_DEBUG_LOG_) {
+                if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                   std::cout << "    INT unit latency: " 
                             << tmp_inst_trace->get_latency() 
                             << std::endl;
@@ -1085,47 +1415,76 @@ void PrivateSM::run(){
                 }
                 (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
                 (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+                // std::cout << "  INT initial interval: " 
+                //           << tmp_inst_trace->get_initiation_interval() 
+                //           << std::endl;
 
                 offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units();
                 for (unsigned _ = 0; _ < m_hw_cfg->get_num_int_units(); _++) {
                   if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
                     schedule_wb_now = !m_fu[offset_fu + _]->stallable();
                     resbus = test_result_bus(tmp_inst_trace->get_latency());
-                    if (_DEBUG_LOG_) 
+                    if (_DEBUG_LOG_) {
                       std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    }
+                    // std::cout << "    schedule_wb_now: " << schedule_wb_now 
+                    //             << " resbus: " << resbus
+                    //             << std::endl;
+                    insert_into_active_warps_id(&active_warps_id, _wid);
+                    active_during_this_cycle = true;
                     if (schedule_wb_now &&
                         (resbus != -1)) {
                       m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
-                        std::cout << "    executing instn: " 
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
+                        std::cout << "    executing instn (schedule_wb_now): " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      // (*inp.m_out[i]).print();
+                      // std::cout << "      after issue occupied.to_string(): ";
+                      // for (int iii = 0; iii < 32; ++iii) {
+                      //   std::cout << m_fu[offset_fu + _]->occupied[iii];
+                      // }
+                      break;
                     } else if (!schedule_wb_now) {
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
-                        std::cout << "    executing instn: " 
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
+                        std::cout << "    executing instn (!schedule_wb_now): " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      // std::cout << "      after issue occupied.to_string(): ";
+                      // for (int iii = 0; iii < 32; ++iii) {
+                      //   std::cout << m_fu[offset_fu + _]->occupied[iii];
+                      // }
+                      break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
                     }
+                    
 
                     // std::cout << "@@@@@@" 
                     //           << (*inp.m_out[i]).get_size() << std::endl;
                     // std::cout << "######" 
                     //           << m_hw_cfg->get_num_int_units() << std::endl;
+                  } else {
+                    if (_EXECUTE_DEBUG_LOG_) {
+                      schedule_wb_now = !m_fu[offset_fu + _]->stallable();
+                      resbus = test_result_bus(tmp_inst_trace->get_latency());
+                      std::cout << "    -schedule_wb_now: " << schedule_wb_now 
+                                << " resbus: " << resbus
+                                << std::endl;
+                    }
                   }
                 }
                 break;
               case LDST_UNIT:
-                if (_DEBUG_LOG_) {
+                if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                   std::cout << "    LDST unit latency: " 
                             << tmp_inst_trace->get_latency() 
                             << std::endl;
@@ -1140,6 +1499,9 @@ void PrivateSM::run(){
                 // TODO: get latency from memory_model from reuse distance.
                 (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
                 (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+                // std::cout << "  LDST initial interval: " 
+                //           << tmp_inst_trace->get_initiation_interval() 
+                //           << std::endl;
 
                 offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units() 
                             + m_hw_cfg->get_num_int_units() + m_hw_cfg->get_num_dp_units()
@@ -1150,11 +1512,13 @@ void PrivateSM::run(){
                     resbus = test_result_bus(tmp_inst_trace->get_latency());
                     if (_DEBUG_LOG_) 
                       std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    insert_into_active_warps_id(&active_warps_id, _wid);
+                    active_during_this_cycle = true;
                     if (schedule_wb_now &&
                         (resbus != -1)) {
                       m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
@@ -1162,15 +1526,17 @@ void PrivateSM::run(){
                                   << ", uid-" << _uid 
                                   << ", latecy-" << _latency << std::endl;
                       }
+                      break;
                     } else if (!schedule_wb_now) {
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
                     }
@@ -1184,7 +1550,7 @@ void PrivateSM::run(){
 
                 break;
               case SPEC_UNIT_1:
-                if (_DEBUG_LOG_) {
+                if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                   std::cout << "    SPEC_UNIT_1 unit latency: " 
                             << tmp_inst_trace->get_latency() 
                             << std::endl;
@@ -1194,6 +1560,9 @@ void PrivateSM::run(){
                 }
                 (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
                 (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+                // std::cout << "  SPEC1 initial interval: " 
+                //           << tmp_inst_trace->get_initiation_interval() 
+                //           << std::endl;
 
                 offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units() 
                             + m_hw_cfg->get_num_int_units() + m_hw_cfg->get_num_dp_units()
@@ -1205,26 +1574,30 @@ void PrivateSM::run(){
                     resbus = test_result_bus(tmp_inst_trace->get_latency());
                     if (_DEBUG_LOG_) 
                       std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    insert_into_active_warps_id(&active_warps_id, _wid);
+                    active_during_this_cycle = true;
                     if (schedule_wb_now &&
                         (resbus != -1)) {
                       m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      break;
                     } else if (!schedule_wb_now) {
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
                     }
@@ -1237,7 +1610,7 @@ void PrivateSM::run(){
                 }
                 break;
               case SPEC_UNIT_2:
-                if (_DEBUG_LOG_) {
+                if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                   std::cout << "    SPEC_UNIT_2 unit latency: " 
                             << tmp_inst_trace->get_latency() 
                             << std::endl;
@@ -1247,6 +1620,9 @@ void PrivateSM::run(){
                 }
                 (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
                 (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+                // std::cout << "  SPEC2 initial interval: " 
+                //           << tmp_inst_trace->get_initiation_interval() 
+                //           << std::endl;
 
                 offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units() 
                             + m_hw_cfg->get_num_int_units() + m_hw_cfg->get_num_dp_units()
@@ -1258,26 +1634,30 @@ void PrivateSM::run(){
                     resbus = test_result_bus(tmp_inst_trace->get_latency());
                     if (_DEBUG_LOG_) 
                       std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    insert_into_active_warps_id(&active_warps_id, _wid);
+                    active_during_this_cycle = true;
                     if (schedule_wb_now &&
                         (resbus != -1)) {
                       m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      break;
                     } else if (!schedule_wb_now) {
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
                     }
@@ -1290,7 +1670,7 @@ void PrivateSM::run(){
                 }
                 break;
               case SPEC_UNIT_3:
-                if (_DEBUG_LOG_) {
+                if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                   std::cout << "    SPEC_UNIT_3 unit latency: " 
                             << tmp_inst_trace->get_latency() 
                             << std::endl;
@@ -1300,6 +1680,9 @@ void PrivateSM::run(){
                 }
                 (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
                 (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+                // std::cout << "  SPEC3 initial interval: " 
+                //           << tmp_inst_trace->get_initiation_interval() 
+                //           << std::endl;
 
                 offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units() 
                             + m_hw_cfg->get_num_int_units() + m_hw_cfg->get_num_dp_units()
@@ -1311,26 +1694,30 @@ void PrivateSM::run(){
                     resbus = test_result_bus(tmp_inst_trace->get_latency());
                     if (_DEBUG_LOG_) 
                       std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
+                    insert_into_active_warps_id(&active_warps_id, _wid);
+                    active_during_this_cycle = true;
                     if (schedule_wb_now &&
                         (resbus != -1)) {
                       m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      break;
                     } else if (!schedule_wb_now) {
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
-                      if (_DEBUG_LOG_) {
+                      if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
                                   << "pc-" << _pc 
                                   << ", wid-" << _wid 
                                   << ", kid-" << _kid 
                                   << ", uid-" << _uid << std::endl;
                       }
+                      break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
                     }
@@ -1451,7 +1838,10 @@ void PrivateSM::run(){
            * be the index the wid is in the current SM. So we should first calculate the index
            * wid is. */
           unsigned _idx_wid_in_SM = wid - _gwarp_id_start;
-          for (auto _ = kernel_block_pair.begin(); _ != kernel_block_pair.end(); _++) {
+          for (auto _ = kernel_block_pair.begin(); 
+                    _ != kernel_block_pair.end(); 
+                    _++) {
+            if (_->first - 1 != KERNEL_EVALUATION) continue;
             if ((_->first - 1 < _kid) || (_->first - 1 == _kid && _->second < _block_id)) 
               _idx_wid_in_SM += appcfg->get_num_warp_per_block(_->first - 1);
           }
@@ -1493,8 +1883,9 @@ void PrivateSM::run(){
           * the same _kid. */
           unsigned _kid_block_id_count = 0;
           for (auto _it_kernel_block_pair = kernel_block_pair.begin(); 
-                    _it_kernel_block_pair != kernel_block_pair.end(); 
+                    _it_kernel_block_pair != kernel_block_pair.end();
                     _it_kernel_block_pair++) {
+            if (_it_kernel_block_pair->first - 1 != KERNEL_EVALUATION) continue;
             if (_it_kernel_block_pair->first - 1 == _kid) {
               if (_it_kernel_block_pair->second < _block_id) {
                 _kid_block_id_count++;
@@ -1591,11 +1982,11 @@ void PrivateSM::run(){
 
               if (_DEBUG_LOG_) {
                 std::cout << "  @ pred: " 
-                          << tmp_trace_warp_inst->get_pred() << " " << std::endl;
+                          << tmp_trace_warp_inst->get_pred() << " ";;
                 std::cout << "  @ ar1: " 
-                          << tmp_trace_warp_inst->get_ar1() << " " << std::endl;
+                          << tmp_trace_warp_inst->get_ar1() << " ";;
                 std::cout << "  @ ar2: " 
-                          << tmp_trace_warp_inst->get_ar2() << " " << std::endl;
+                          << tmp_trace_warp_inst->get_ar2() << " ";;
                 std::cout << "  @ srcs: ";
                 for (unsigned i = 0; i < tmp_inst_trace->reg_srcs_num; i++) {
                   std::cout << tmp_inst_trace->reg_src[i] << " ";
@@ -1924,10 +2315,23 @@ void PrivateSM::run(){
                 // m_spec_cores_out[2]->print();
                 std::cout << "==================================================" << std::endl;
               }
+
+              if (warp_inst_issued) {
+                
+                if (_CALIBRATION_LOG_) {
+                  std::cout << "    ISSUE: ("
+                            << _kid << ", "
+                            << _gwid << ", "
+                            << _fetch_instn_id << ", "
+                            << _pc << ")" << std::endl;
+                }
+              }
               
             }
 
             if (warp_inst_issued) {
+              active_during_this_cycle = true;
+              insert_into_active_warps_id(&active_warps_id, global_all_kernels_warp_id);
               m_ibuffer->pop_front(global_all_kernels_warp_id);
               // check_is_scoreboard_collision = 
               //   m_scoreboard->checkCollision(global_all_kernels_warp_id, 
@@ -1960,9 +2364,10 @@ void PrivateSM::run(){
       last_issue_block_index_per_sched[sched_id] = 
         (last_issue_block_index_per_sched[sched_id] + 1) % kernel_block_pair.size();
     }
-
+    
     last_issue_sched_id = (last_issue_sched_id + 1) % num_scheds;
 
+    
     /**********************************************************************************************/
     /***                                                                                        ***/
     /***                           Fetch and Decode instns to Fbuffer.                          ***/
@@ -1990,7 +2395,7 @@ void PrivateSM::run(){
         unsigned _gwarp_id_start = _warps_per_block * _block_id;
         unsigned _gwarp_id_end = _gwarp_id_start + _warps_per_block - 1;
     */
-
+    
     for (unsigned _ = 0; _ < get_inst_fetch_throughput(); _++) {
       /* DECODE */
       
@@ -2009,6 +2414,15 @@ void PrivateSM::run(){
         auto _wid = m_inst_fetch_buffer->wid;
         auto _kid = m_inst_fetch_buffer->kid;
         auto _uid = m_inst_fetch_buffer->uid;
+
+        unsigned __pc, __wid, __kid, __uid;                         // yangjianchao16 add 20240131
+
+        if (m_inst_fetch_buffer_copy->m_valid) {
+          __pc = m_inst_fetch_buffer_copy->pc;                 // yangjianchao16 add 20240131
+          __wid = m_inst_fetch_buffer_copy->wid;               // yangjianchao16 add 20240131
+          __kid = m_inst_fetch_buffer_copy->kid;               // yangjianchao16 add 20240131
+          __uid = m_inst_fetch_buffer_copy->uid;               // yangjianchao16 add 20240131
+        }
 
         /* m_num_warps_per_sm's first dim is the total num of kernels that are executed on
          * the GPU, and its second dim is the number of warps that blongs to the current SM.
@@ -2033,25 +2447,27 @@ void PrivateSM::run(){
          *   ......
          *   14 slot => warp 5 from kernel 1
          */
-
+        
         /* Get warps_per_block of instn <_pc, _wid, _kid, _uid>. */
         unsigned _warps_per_block = appcfg->get_num_warp_per_block(_kid);
         /* Calculate the block id. */
+        
         unsigned _block_id = (unsigned)(_wid / _warps_per_block);
-
+        
         /* Count the entries in the kernel_block_pair that are smaller than _block_id with
          * the same _kid. */
         unsigned _kid_block_id_count = 0;
         for (auto _it_kernel_block_pair = kernel_block_pair.begin(); 
-                  _it_kernel_block_pair != kernel_block_pair.end(); 
+                  _it_kernel_block_pair != kernel_block_pair.end();
                   _it_kernel_block_pair++) {
+          if (_it_kernel_block_pair->first - 1 != KERNEL_EVALUATION) continue;
           if (_it_kernel_block_pair->first - 1 == _kid) {
             if (_it_kernel_block_pair->second < _block_id) {
               _kid_block_id_count++;
             }
           }
         }
-
+        
         /* With the above assumption, for _wid from (2,80), global_all_kernels_warp_id:
          * slot 12/13/14 in the IBuffer will be filled.  */
         auto global_all_kernels_warp_id = 
@@ -2063,12 +2479,38 @@ void PrivateSM::run(){
         if (m_ibuffer->has_free_slot(global_all_kernels_warp_id)) {
           auto _entry = ibuffer_entry(_pc, _wid, _kid, _uid);
           m_ibuffer->push_back(global_all_kernels_warp_id, _entry);
-          
           m_inst_fetch_buffer->m_valid = false;
+          active_during_this_cycle = true;
+          insert_into_active_warps_id(&active_warps_id, global_all_kernels_warp_id);
+          if (_CALIBRATION_LOG_) {
+            std::cout << "    DECODE: ("
+                      << _entry.kid << ", "
+                      << _entry.wid << ", "
+                      << _entry.uid << ", "
+                      << _entry.pc << ")" << std::endl;
+            
+          }
+
+          if (m_inst_fetch_buffer_copy->m_valid) {
+            ibuffer_entry __entry = ibuffer_entry(__pc, __wid, __kid, __uid);       // yangjianchao16 add 20240131
+            m_ibuffer->push_back(global_all_kernels_warp_id, __entry);     // yangjianchao16 add 20240131
+            m_inst_fetch_buffer_copy->m_valid = false;                     // yangjianchao16 add 20240131
+            if (_CALIBRATION_LOG_) {
+              std::cout << "    DECODE: ("
+                        << __entry.kid << ", "
+                        << __entry.wid << ", "
+                        << __entry.uid << ", "
+                        << __entry.pc << ")" << std::endl;
+            }
+          }
+
           if (_DEBUG_LOG_) {
             std::cout << "  **DECODE: ";
             m_ibuffer->print_ibuffer(global_all_kernels_warp_id);
           }
+          
+          
+          
         } else {
           if (_DEBUG_LOG_)
             std::cout << "  **No DECODE cause m_ibuffer->"
@@ -2081,7 +2523,7 @@ void PrivateSM::run(){
       }
       
       // std::cout << "D: _gwarp_id_start, _gwarp_id_end: " << _gwarp_id_start << " " << _gwarp_id_end << std::endl;
-
+      
       /* Continue the loop in advance based on the state. */
       if (m_inst_fetch_buffer->m_valid) {
         if (_DEBUG_LOG_)
@@ -2090,11 +2532,21 @@ void PrivateSM::run(){
         continue;
       }
 
+      // for (auto it_kernel_block_pair = kernel_block_pair.begin(); 
+      //           it_kernel_block_pair != kernel_block_pair.end();
+      //           it_kernel_block_pair++) {
+      //   std::cout << "@ it_kernel_block_pair: " << it_kernel_block_pair->first 
+      //             << " " << it_kernel_block_pair->second << std::endl;
+      //   std::cout << "@ KERNEL_EVALUATION: " << KERNEL_EVALUATION << std::endl;
+      // }
+      
       for (auto it_kernel_block_pair = kernel_block_pair.begin(); 
-                (it_kernel_block_pair != kernel_block_pair.end()) &&
-                // (it_kernel_block_pair->second == 80) && // NEED TO DELETE
-                (it_kernel_block_pair->first - 1 == KERNEL_EVALUATION); // TODO: here only first kernel is considered
+                it_kernel_block_pair != kernel_block_pair.end();
                 it_kernel_block_pair++) {
+        if (it_kernel_block_pair->first - 1 != KERNEL_EVALUATION) continue;
+
+        // std::cout << " it_kernel_block_pair: " << it_kernel_block_pair->first << " " 
+        //           << it_kernel_block_pair->second << std::endl;
         /* Calculate the distance of it_kernel_block_pair to kernel_block_pair.begin(). */
         unsigned _index = std::distance(kernel_block_pair.begin(), it_kernel_block_pair);
         if (_index != distance_last_fetch_kid) continue;
@@ -2112,13 +2564,13 @@ void PrivateSM::run(){
          *   _gwarp_id_start  = 240, 480,   0,   0,   0,   0
          *   _gwarp_id_end    = 242, 482,   1,   1,   1,   1
          */
-
+        
         unsigned _kid = it_kernel_block_pair->first - 1;
         unsigned _block_id = it_kernel_block_pair->second;
         unsigned _warps_per_block = appcfg->get_num_warp_per_block(_kid);
         unsigned _gwarp_id_start = _warps_per_block * _block_id;
         unsigned _gwarp_id_end = _gwarp_id_start + _warps_per_block - 1;
-
+        
         /* FETCH */
         /* Here, gwid is the global warp id in the whole kernel, for example,
          *   -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
@@ -2188,7 +2640,7 @@ void PrivateSM::run(){
               m_inst_fetch_buffer->kid = _kid;
               m_inst_fetch_buffer->uid = fetch_instn_id;
               m_inst_fetch_buffer->m_valid = true;
-              
+
               if (_DEBUG_LOG_)
                 std::cout << "  **Fetch instn "
                              "(pc,gwid,kid,fetch_instn_id): " << "(" 
@@ -2199,12 +2651,64 @@ void PrivateSM::run(){
                                                               << _kid << ", " 
                                                               << fetch_instn_id << ")" 
                                                               << std::endl;
+
+              active_during_this_cycle = true;
+              insert_into_active_warps_id(&active_warps_id, wid);
+
+              if (_CALIBRATION_LOG_) {
+                std::cout << "    FETCH: ("
+                          << _kid << ", "
+                          << wid << ", "
+                          << fetch_instn_id << ", "
+                          << tmp_inst_trace->m_pc << ")" << std::endl;
+              }
               fetch_instn = true;
-              curr_instn_id_per_warp[_entry]++;
+              // curr_instn_id_per_warp[_entry]++;               // yangjianchao16 del 20240131
+              curr_instn_id_per_warp[_entry] += 2;               // yangjianchao16 add 20240131
               if (_DEBUG_LOG_)
                 std::cout << " @+1 kid:" << _entry.kid 
                           << " block_id:" << _entry.block_id 
                           << " wid:" << _entry.warp_id << std::endl;
+
+              /* COPY FETCH START */              // yangjianchao16 add 20240131
+              if (fetch_instn_id + 1 < tracer->get_one_kernel_one_warp_one_instn_max_size(_kid, wid)) {
+                tmp = tracer->get_one_kernel_one_warp_one_instn(_kid, wid, fetch_instn_id + 1);
+                tmp_inst_trace = tmp->inst_trace;
+                if (!tmp_inst_trace->m_valid) break;
+                m_inst_fetch_buffer_copy->pc = tmp_inst_trace->m_pc;
+                m_inst_fetch_buffer_copy->wid = wid;
+                m_inst_fetch_buffer_copy->kid = _kid;
+                m_inst_fetch_buffer_copy->uid = fetch_instn_id + 1;
+                m_inst_fetch_buffer_copy->m_valid = true;
+              } else {
+                m_inst_fetch_buffer_copy->pc = tmp_inst_trace->m_pc;
+                m_inst_fetch_buffer_copy->wid = wid;
+                m_inst_fetch_buffer_copy->kid = _kid;
+                m_inst_fetch_buffer_copy->uid = fetch_instn_id;
+                m_inst_fetch_buffer_copy->m_valid = false;
+              }
+              
+              if (_DEBUG_LOG_)
+                std::cout << "  **Fetch instn "
+                             "(pc,gwid,kid,fetch_instn_id): " << "(" 
+                                                              << std::hex 
+                                                              << tmp_inst_trace->m_pc << ", " 
+                                                              << std::dec
+                                                              << wid << ", " 
+                                                              << _kid << ", " 
+                                                              << fetch_instn_id + 1 << ")" 
+                                                              << std::endl;
+
+              if (_CALIBRATION_LOG_) {
+                std::cout << "    FETCH: ("
+                          << _kid << ", "
+                          << wid << ", "
+                          << fetch_instn_id + 1 << ", "
+                          << tmp_inst_trace->m_pc << ")" << std::endl;
+              }
+              /* COPY FETCH END */                // yangjianchao16 add 20240131
+
+              
             // }
           }
           
@@ -2219,8 +2723,11 @@ void PrivateSM::run(){
         // last_fetch_warp_id = (last_fetch_warp_id + 1) % _warps_per_block;
         last_fetch_warp_id[_kid] = (last_fetch_warp_id[_kid] + 1) % _warps_per_block;
       }
-
-      distance_last_fetch_kid = (distance_last_fetch_kid + 1) % m_num_blocks_per_kernel[KERNEL_EVALUATION];
+      // std::cout << ";10 ";
+      // std::cout << KERNEL_EVALUATION << " " << m_num_blocks_per_kernel[KERNEL_EVALUATION] << " ";
+      // distance_last_fetch_kid = (distance_last_fetch_kid + 1) % m_num_blocks_per_kernel[KERNEL_EVALUATION];
+      distance_last_fetch_kid = (distance_last_fetch_kid + 1) % kernel_block_pair.size();
+      // std::cout << ";11 ";
     }
     
     /**********************************************************************************************/
@@ -2238,9 +2745,10 @@ void PrivateSM::run(){
 
     bool all_warps_finished = true;
 
-    for (auto it_kernel_block_pair = kernel_block_pair.begin(); 
-              (it_kernel_block_pair != kernel_block_pair.end());
+    for (auto it_kernel_block_pair = kernel_block_pair.begin();
+              it_kernel_block_pair != kernel_block_pair.end();
               it_kernel_block_pair++) {
+      if (it_kernel_block_pair->first - 1 != KERNEL_EVALUATION) continue;
       
       /* -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
        * Here, kernel_block_pair is (1,80), (1,160), (1,0), (2,0), (3,0), (4,0)
@@ -2303,9 +2811,17 @@ void PrivateSM::run(){
     }
     
     if (all_warps_finished) {
+      // std::cout << " all_warps_finished : " << all_warps_finished << std::endl;
       active = false;
       if (_DEBUG_LOG_)
         std::cout << "D: SM-" << m_smid << " is finished." << std::endl;
     }
+
+    if (active_during_this_cycle) {
+      active_cycles++;
+    }
+
+    active_warps_id_size_sum += m_active_warps;
+
   // } /* end of it_kernel_block_pair */
 }
