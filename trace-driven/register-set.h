@@ -132,6 +132,10 @@ class register_set {
     dest->kid = src->kid;
     dest->uid = src->uid;
     dest->latency = src->latency;
+    dest->initial_interval = src->initial_interval;
+    // std::cout << "dest->initial_interval: " << dest->initial_interval << std::endl;
+    // std::cout << "src->initial_interval_dec_counter: " << src->initial_interval_dec_counter << std::endl;
+    dest->initial_interval_dec_counter = src->initial_interval_dec_counter;
     if (_DEBUG_LOG_)
       std::cout << "      src->latency: " << src->latency << std::endl;
     dest->m_valid = true;
@@ -147,7 +151,7 @@ class register_set {
 
   //获取一个非空寄存器，并将一条指令存入。
   void move_in(inst_fetch_buffer_entry *&src) {
-    inst_fetch_buffer_entry **free = get_free();
+    inst_fetch_buffer_entry **free = get_free(); // == error
     inst_fetch_buffer_entry* tmp = *free;
     move_warp(tmp, src);
   }
@@ -260,13 +264,13 @@ class register_set {
     for (unsigned i = 0; i < regs.size(); i++) {
       std::cout << "     ";
       if (regs[i]->m_valid) {
-        if (_DEBUG_LOG_) {
+        // if (_DEBUG_LOG_) {
           std::cout << "    valid: ";
           std::cout << "pc: " << regs[i]->pc << ", wid: " << regs[i]->wid 
                     << ", kid: " << regs[i]->kid << ", uid: " << regs[i]->uid;
-        }
+        // }
       } else {
-        if (_DEBUG_LOG_)
+        // if (_DEBUG_LOG_)
           std::cout << "    novalid      ";
       }
       std::cout << std::endl;
@@ -360,6 +364,8 @@ class register_set {
   void set_initial_interval(unsigned initial_interval, unsigned reg_id) {
     assert(regs[reg_id]->m_valid);
     regs[reg_id]->initial_interval = initial_interval;
+    regs[reg_id]->initial_interval_dec_counter = initial_interval;
+    // std::cout << "regs[reg_id]->initial_interval: " << regs[reg_id]->initial_interval << std::endl;
   }
 
  private:
