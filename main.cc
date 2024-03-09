@@ -1387,7 +1387,7 @@ STOP_AND_REPORT_TIMER_pass(-1, 0);
 
 
 /*
-make clean && make -j && mpirun -np 1 ./memory_model.x --configs ./traces/hotspot/configs/ --sort 0 --log 0 --dump_histogram 0 --clog 0 --config_file DEV-Def/QV100.config --tmp 0 --kernel_id 0 > tmp.txt
+make clean && make -j && mpirun -np 1 ./gpu-simulator.x --configs ./traces/hotspot/configs/ --sort 0 --log 0 --dump_histogram 0 --clog 0 --config_file DEV-Def/QV100.config --tmp 0 --kernel_id 0 > tmp.txt
 
 vs: tmp_tune.bak.txt/tmp_tune.txt  hotspot
     tmp.txt
