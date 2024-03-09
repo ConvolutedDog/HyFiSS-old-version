@@ -43,7 +43,7 @@ endif
 OBJ_PATH = obj
 
 
-TARGET = memory_model.x
+TARGET = gpu-simulator.x
 
 
 exist_OBJ_PATH = $(shell if [ -d $(OBJ_PATH) ]; then echo "exist"; else echo "noexist"; fi)
@@ -154,7 +154,7 @@ $(OBJ_PATH)/narray.o: parda/narray.c
 	$(CXX) $(CXXFLAGS) $(OPTFLAGS) -o $@ -c $^
 
 run:
-	$(MPIRUN) -np 2 ./memory_model.x --configs ./traces/vectoradd/configs/ --sort 1 --log 0 > tmp.txt
+	$(MPIRUN) -np 2 ./gpu-simulator.x --configs ./traces/vectoradd/configs/ --sort 1 --log 0 > tmp.txt
 
 .PHTONY: clean
 
