@@ -87,6 +87,9 @@ class stat_collector {
   void set_Unified_L1_cache_hit_rate(float value, unsigned smid) {
     Unified_L1_cache_hit_rate[smid] = value;
   }
+  float get_Unified_L1_cache_hit_rate(unsigned smid) {
+    return Unified_L1_cache_hit_rate[smid];
+  }
   void set_L2_cache_hit_rate(float value) {
     L2_cache_hit_rate = value;
   }
@@ -305,6 +308,8 @@ class stat_collector {
   std::vector<float> Number_of_read_transactions_per_read_requests;
   std::vector<float> Number_of_write_transactions_per_write_requests;
 
+  
+
   std::vector<unsigned> L2_read_transactions;
   std::vector<unsigned> L2_write_transactions;
   std::vector<unsigned> L2_total_transactions;
@@ -347,7 +352,7 @@ class PrivateSM {
  public:
   PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cfg);
   ~PrivateSM();
-  void run(unsigned KERNEL_EVALUATION);
+  void run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY);
 
   bool get_active() { return active; }
   unsigned long long get_cycle() { return m_cycle; }
