@@ -695,7 +695,7 @@ void insert_into_active_warps_id(std::vector<unsigned>* active_warps_id, unsigne
   }
 } 
 
-void PrivateSM::run(unsigned KERNEL_EVALUATION){
+void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
   m_cycle++;
   
   bool active_during_this_cycle = false;
@@ -1497,7 +1497,8 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION){
                             << std::endl;
                 }
                 // TODO: get latency from memory_model from reuse distance.
-                (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id);
+                // (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id); // yangjianchao16 0310
+                (*inp.m_out[i]).set_latency(MEM_ACCESS_LATENCY, reg_id);
                 (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
                 // std::cout << "  LDST initial interval: " 
                 //           << tmp_inst_trace->get_initiation_interval() 
@@ -1507,16 +1508,19 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION){
                             + m_hw_cfg->get_num_int_units() + m_hw_cfg->get_num_dp_units()
                             + m_hw_cfg->get_num_tensor_core_units();
                 for (unsigned _ = 0; _ < 1; _++) {
-                  if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
+                  // if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
+                  if (m_fu[offset_fu + _]->can_issue(MEM_ACCESS_LATENCY)) { // yangjianchao16 0310
                     schedule_wb_now = !m_fu[offset_fu + _]->stallable();
-                    resbus = test_result_bus(tmp_inst_trace->get_latency());
+                    // resbus = test_result_bus(tmp_inst_trace->get_latency()); // yangjianchao16 0310
+                    resbus = test_result_bus(MEM_ACCESS_LATENCY);
                     if (_DEBUG_LOG_) 
                       std::cout << "schedule_wb_now: " << schedule_wb_now << std::endl;
                     insert_into_active_warps_id(&active_warps_id, _wid);
                     active_during_this_cycle = true;
                     if (schedule_wb_now &&
                         (resbus != -1)) {
-                      m_result_bus[resbus]->set(tmp_inst_trace->get_latency());
+                      // m_result_bus[resbus]->set(tmp_inst_trace->get_latency()); // yangjianchao16 0310
+                      m_result_bus[resbus]->set(MEM_ACCESS_LATENCY);
                       m_fu[offset_fu + _]->issue((*inp.m_out[i]), reg_id);
                       if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                         std::cout << "    executing instn: " 
