@@ -1,3 +1,6 @@
 [submodule "tracing_tool"]
 	path = tracing_tool
 	url = https://github.com/masa-laboratory/tracing_tool.git
+[submodule "apps"]
+	path = apps
+	url = https://gitee.com/masa-laboratory/simulator-apps.git
