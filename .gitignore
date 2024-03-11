@@ -1,6 +1,7 @@
 obj/*
 traces
 memory_model.x
+gpu-simulator.x
 memory_trace.txt
 tmp.txt
 perf.data*
