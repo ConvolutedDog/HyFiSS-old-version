@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "debug memory_model.x",
+            "name": "debug gpu-simulator.x",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/memory_model.x",
+            "program": "${workspaceFolder}/gpu-simulator.x",
             "args": ["--configs", "./traces/vectoradd-2/configs/", "--sort", "0", "--log", "0", ">", "tmp.txt"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
