@@ -128,7 +128,8 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
                                                                   std::string configs_dir,
                                                                   bool dump_histogram,
                                                                   stat_collector* stat_coll,
-                                                                  unsigned KERNEL_EVALUATION) {
+                                                                  unsigned KERNEL_EVALUATION,
+                                                                  std::vector<unsigned>* MEM_ACCESS_LATENCY) {
   boost::mpi::environment env(argc, argv);
   boost::mpi::communicator world;
 
@@ -427,6 +428,8 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
     }
   }
 
+  float L2_hit_rate = 0.0;
+  // std::cout << "Process " << world.rank() << " got L2_hit_rate = " << L2_hit_rate << std::endl;
 
   // HERE DO L2 CACHE HIT RATE EVALUATION
   if (world.rank() == 0) {
@@ -521,7 +524,7 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
       std::cout << "L2_hit_rate: " << l2_num_all_acc << " " << l2_miss_num_all_acc << " " 
                 << (float)(((float)l2_num_all_acc-(float)l2_miss_num_all_acc)/(float)l2_num_all_acc) << std::endl;
 
-      float L2_hit_rate = (float)(((float)l2_num_all_acc-(float)l2_miss_num_all_acc)/(float)l2_num_all_acc);
+      L2_hit_rate = (float)(((float)l2_num_all_acc-(float)l2_miss_num_all_acc)/(float)l2_num_all_acc);
 
       
       program_data_t* pdt = &pdt_c;
@@ -533,9 +536,50 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
 
       stat_coll->set_DRAM_total_transactions(DRAM_total_transactions);
       
-      parda_free(&pdt);
+      parda_free(pdt);
     }
   }
+
+  boost::mpi::broadcast(world, L2_hit_rate, 0);
+
+  world.barrier();
+
+  // Memory Units Latencies TODO: for Volta
+  unsigned dram_mem_access = 302;
+  unsigned l1_cache_access = 33;
+  unsigned l2_cache_access = 213;
+
+  unsigned l1_cache_access_latency = l1_cache_access;
+  unsigned l2_cache_access_latency = l2_cache_access;
+  unsigned l2_cache_from_l1_access_latency = l2_cache_access_latency - l1_cache_access_latency;
+  unsigned dram_mem_access_latency = dram_mem_access;
+  unsigned l2_cache_from_dram_access_latency = 
+    dram_mem_access_latency - l2_cache_access_latency - l1_cache_access_latency;
+
+  // unsigned l1_cycles_no_contention = stat_coll->get_GEMM_total_transactions(0) * l1_cache_access_latency;
+  
+  
+
+  for (int pass = 0; pass < pass_num; pass++) {
+    int curr_process_idx_rank = world.rank() + pass * world.size();
+    int curr_process_idx;
+    if (curr_process_idx_rank < gpu_config[V100].num_sm) {
+      curr_process_idx = curr_process_idx_rank;
+    } else continue;
+
+    float _L1_hit_rate = stat_coll->get_Unified_L1_cache_hit_rate(curr_process_idx);
+
+    (*MEM_ACCESS_LATENCY)[curr_process_idx] = _L1_hit_rate * l1_cache_access_latency + 
+                                           (1 - _L1_hit_rate) * (
+                                             L2_hit_rate * l2_cache_from_l1_access_latency + 
+                                             (1 - L2_hit_rate) * l2_cache_from_dram_access_latency);
+
+    std::cout << "MEM_ACCESS_LATENCY[" << curr_process_idx << "]: " << (*MEM_ACCESS_LATENCY)[curr_process_idx] << std::endl; 
+
+  }
+
+
+  // std::cout << "Process " << world.rank() << " got L2_hit_rate = " << L2_hit_rate << std::endl;
 
 }
 #else
@@ -1123,6 +1167,9 @@ START_TIMER(4);
 
   // std::cout << "@@@ 888" << std::endl;
 
+  std::vector<unsigned> MEM_ACCESS_LATENCY;
+  MEM_ACCESS_LATENCY.resize(80);
+
   auto start_memory_timer = std::chrono::system_clock::now();
   private_L1_cache_stack_distance_evaluate_boost_no_concurrent(argc, 
                                                                argv, 
@@ -1132,7 +1179,8 @@ START_TIMER(4);
                                                                configs, 
                                                                dump_histogram,
                                                                &stat_coll,
-                                                               KERNEL_EVALUATION);
+                                                               KERNEL_EVALUATION,
+                                                               &MEM_ACCESS_LATENCY);
   auto end_memory_timer = std::chrono::system_clock::now();
   auto duration_memory_timer = 
     std::chrono::duration_cast<std::chrono::microseconds>(end_memory_timer - start_memory_timer);
@@ -1328,8 +1376,10 @@ START_TIMER(6);
           }
       }
       std::cout << " ...run START... " << std::endl;
+
+      std::cout << "@@@@ " << MEM_ACCESS_LATENCY[smid] << std::endl;
       while (private_sm.get_active()) {
-        private_sm.run(KERNEL_EVALUATION);
+        private_sm.run(KERNEL_EVALUATION, MEM_ACCESS_LATENCY[smid]);
       }
       
       
