@@ -187,6 +187,7 @@ void _inst_trace_t::parse_opcode_latency_info() {
       case LOAD_OP: // TODO: need to be modified
       case STORE_OP: // TODO: need to be modified
         latency = NUM_CYCLE_MEM_ACCESS_LATENCY; // TODO: need to be modified
+        // TODO: should be latency of L1_hit_rate * L1_access_time +  + L2 miss + DRAM access time
         initiation_interval = 2; // TODO: need to be modified
         func_unit = LDST_UNIT;
         break;
