@@ -18,3 +18,6 @@ tmp3.txt
 tmp_tune.bak.txt
 tmp_tune.txt
 tune.py
+process_sass_dir
+process_sass_dir.o
+sass-split.log
