@@ -27,6 +27,23 @@ sass_dir = os.path.abspath(sass_dir)
 files = os.listdir(sass_dir)
 sass_files = [os.path.join(sass_dir, file) for file in files if file.endswith(".sass")]
 
+f_open = {}
+
+# for sass_file in sass_files:
+#     content = open(sass_file, "r").read().split(" ")
+#     kernel_id = int(sass_file.split("/")[-1].split("_")[1].split(".sass")[0])
+#     have_created_gwarp_ids = []
+#     for i in range(int(len(content)/3)):
+#         gwarp_id = int(content[i*3+2], 16)
+#         if gwarp_id in have_created_gwarp_ids:
+#             pass
+#         else:
+#             have_created_gwarp_ids.append(gwarp_id)
+#             if not os.path.exists(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass")):
+#                 f_open[(kernel_id, gwarp_id)] = open(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass"), "w")
+#         with open(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass"), "a") as f:
+#             f.write(content[i*3]+" "+content[i*3+1]+"\n")
+
 for sass_file in sass_files:
     content = open(sass_file, "r").read().split(" ")
     kernel_id = int(sass_file.split("/")[-1].split("_")[1].split(".sass")[0])
@@ -38,8 +55,12 @@ for sass_file in sass_files:
             pass
         else:
             have_created_gwarp_ids.append(gwarp_id)
-            if not os.path.exists(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass")):
-                open(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass"), "w").close()
-        with open(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass"), "a") as f:
-            f.write(content[i*3]+" "+content[i*3+1]+"\n")
-    
+            # if not os.path.exists(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass")):
+            if 1:
+                # open(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass"), "w").close()
+                f_open[(kernel_id, gwarp_id)] = open(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass"), "w")
+        #with open(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass"), "a") as f:
+        #    f.write(content[i*3]+" "+content[i*3+1]+"\n")
+        f_open[(kernel_id, gwarp_id)].write(content[i*3]+" "+content[i*3+1]+"\n")
+for item in f_open:
+    item.close()
