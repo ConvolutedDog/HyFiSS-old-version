@@ -5,7 +5,6 @@ gpu-simulator.x
 memory_trace.txt
 tmp.txt
 perf.data*
-merge_report.py
 perf.report
 simulator-apps/
 tmp.bak.txt
