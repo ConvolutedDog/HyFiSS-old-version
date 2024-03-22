@@ -22,6 +22,18 @@ void Scoreboard::printContents() const {
   }
 }
 
+void Scoreboard::printContents(unsigned i) const {
+  // printf("    Scoreboard contents (sid=%u): \n", m_smid);
+  // for (unsigned i = 0; i < reg_table.size(); i++) {
+    // if (reg_table[i].size() == 0) continue;
+    printf("  wid = %2u: ", i);
+    std::set<int>::const_iterator it;
+    for (it = reg_table[i].begin(); it != reg_table[i].end(); it++)
+      printf("R%d ", *it);
+    printf("\n");
+  // }
+}
+
 void Scoreboard::reserveRegister(const unsigned wid, const int regnum) {
   if (!(reg_table[wid].find(regnum) == reg_table[wid].end())) {
     printf(
