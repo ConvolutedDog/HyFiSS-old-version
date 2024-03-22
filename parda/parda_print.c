@@ -139,6 +139,8 @@ float parda_fprintf_histogram_r(const unsigned* histogram, FILE* file, bool prin
   cum += histogram[B_OVFL];
   if (print) fprintf(file, "#OVFL \t%9u\t%0.8f\t%9llu\t%0.8lf\n", histogram[B_OVFL], histogram[B_OVFL]/(double)sum, cum, cum/(double)sum);
 
+
+  // printf("%llu %llu\n", cum, sum);
   float hit_rate = cum/(double)sum;
 
   cum += histogram[B_INF];
