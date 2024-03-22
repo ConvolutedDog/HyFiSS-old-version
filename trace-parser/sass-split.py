@@ -25,9 +25,9 @@ sass_dir = os.path.abspath(sass_dir)
 
 # read the sass files in sass_dir
 files = os.listdir(sass_dir)
-sass_files = [os.path.join(sass_dir, file) for file in files if file.endswith(".sass")]
+sass_files = [os.path.join(sass_dir, file) for file in files if (file.endswith(".sass") and not file.endswith(".split.sass"))]
 
-f_open = {}
+
 
 # for sass_file in sass_files:
 #     content = open(sass_file, "r").read().split(" ")
@@ -40,27 +40,55 @@ f_open = {}
 #         else:
 #             have_created_gwarp_ids.append(gwarp_id)
 #             if not os.path.exists(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass")):
-#                 f_open[(kernel_id, gwarp_id)] = open(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass"), "w")
+#                 open(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass"), "w").close()
 #         with open(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass"), "a") as f:
 #             f.write(content[i*3]+" "+content[i*3+1]+"\n")
 
+# f_open = {}
+# for sass_file in sass_files:
+#     content = open(sass_file, "r").read().split(" ")
+#     kernel_id = int(sass_file.split("/")[-1].split("_")[1].split(".sass")[0])
+    
+#     have_created_gwarp_ids = []
+#     for i in range(int(len(content)/3)):
+#         gwarp_id = int(content[i*3+2], 16)
+#         # if gwarp_id in have_created_gwarp_ids:
+#         if (kernel_id, gwarp_id) in f_open:
+#             pass
+#         else:
+#             have_created_gwarp_ids.append(gwarp_id)
+#             # if not os.path.exists(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass")):
+#             if 1:
+#                 print(kernel_id, " ", gwarp_id)
+#                 # open(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass"), "w").close()
+#                 f_open[(kernel_id, gwarp_id)] = open(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass"), "w")
+#         #with open(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass"), "a") as f:
+#         #    f.write(content[i*3]+" "+content[i*3+1]+"\n")
+#         f_open[(kernel_id, gwarp_id)].write(content[i*3]+" "+content[i*3+1]+"\n")
+# for item in f_open:
+#     item.close()
+
+
+f_open = {}
+warp_content = {}
+
 for sass_file in sass_files:
+    print("Processing ", sass_file)
     content = open(sass_file, "r").read().split(" ")
     kernel_id = int(sass_file.split("/")[-1].split("_")[1].split(".sass")[0])
-    
-    have_created_gwarp_ids = []
+
     for i in range(int(len(content)/3)):
-        gwarp_id = int(content[i*3+2], 16)
-        if gwarp_id in have_created_gwarp_ids:
-            pass
-        else:
-            have_created_gwarp_ids.append(gwarp_id)
-            # if not os.path.exists(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass")):
-            if 1:
-                # open(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass"), "w").close()
-                f_open[(kernel_id, gwarp_id)] = open(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass"), "w")
-        #with open(os.path.join(sass_dir, "kernel_"+str(kernel_id)+"_gwarp_id_"+str(gwarp_id)+".split.sass"), "a") as f:
-        #    f.write(content[i*3]+" "+content[i*3+1]+"\n")
-        f_open[(kernel_id, gwarp_id)].write(content[i*3]+" "+content[i*3+1]+"\n")
-for item in f_open:
-    item.close()
+        gwarp_id = int(content[i*3 + 2], 16)
+        entry = (kernel_id, gwarp_id)
+        
+        # 使用字典累积内容，而非直接写文件
+        if entry not in warp_content:
+            warp_content[entry] = []
+        warp_content[entry].append(content[i*3] + " " + content[i*3 + 1])
+
+print("XXXXXXXXXXXXXXXXXXX")
+
+for (kernel_id, gwarp_id), lines in warp_content.items():
+    file_path = os.path.join(sass_dir, "kernel_" + str(kernel_id) + "_gwarp_id_" + str(gwarp_id) + ".split.sass")
+    with open(file_path, "w") as file:
+        file.write("\n".join(lines))
