@@ -14,7 +14,7 @@ import argparse
 
 # ========================================================
 
-SMs_num = 80
+SMs_num = 80 # SM70
 DEBUG = 0
 
 # ========================================================
@@ -65,6 +65,48 @@ Kernel_execution_time = [None for _ in range(SMs_num)]
 Simulation_time_memory_model = [None for _ in range(SMs_num)]
 Simulation_time_compute_model = [None for _ in range(SMs_num)]
 
+Compute_Structural_Stall = [None for _ in range(SMs_num)]
+Compute_Data_Stall = [None for _ in range(SMs_num)]
+Memory_Structural_Stall = [None for _ in range(SMs_num)]
+Memory_Data_Stall = [None for _ in range(SMs_num)]
+Synchronization_Stall = [None for _ in range(SMs_num)]
+Control_Stall = [None for _ in range(SMs_num)]
+Idle_Stall = [None for _ in range(SMs_num)]
+No_Stall = [None for _ in range(SMs_num)]
+Other_Stall = [None for _ in range(SMs_num)]
+
+num_Issue_Compute_Structural_out_has_no_free_slot = [None for _ in range(SMs_num)]
+num_Issue_Memory_Structural_out_has_no_free_slot = [None for _ in range(SMs_num)]
+num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute = [None for _ in range(SMs_num)]
+num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory = [None for _ in range(SMs_num)]
+num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency = [None for _ in range(SMs_num)]
+num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency = [None for _ in range(SMs_num)]
+num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty = [None for _ in range(SMs_num)]
+num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty = [None for _ in range(SMs_num)]
+num_Writeback_Compute_Structural_bank_of_reg_is_not_idle = [None for _ in range(SMs_num)]
+num_Writeback_Memory_Structural_bank_of_reg_is_not_idle = [None for _ in range(SMs_num)]
+num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated = [None for _ in range(SMs_num)]
+num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated = [None for _ in range(SMs_num)]
+num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu = [None for _ in range(SMs_num)]
+num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu = [None for _ in range(SMs_num)]
+num_Execute_Memory_Structural_icnt_injection_buffer_is_full = [None for _ in range(SMs_num)]
+num_Issue_Compute_Data_scoreboard = [None for _ in range(SMs_num)]
+num_Issue_Memory_Data_scoreboard = [None for _ in range(SMs_num)]
+num_Execute_Memory_Data_L1 = [None for _ in range(SMs_num)]
+num_Execute_Memory_Data_L2 = [None for _ in range(SMs_num)]
+num_Execute_Memory_Data_Main_Memory = [None for _ in range(SMs_num)]
+
+SP_UNIT_execute_clks_sum = [None for _ in range(SMs_num)]
+SFU_UNIT_execute_clks_sum = [None for _ in range(SMs_num)]
+INT_UNIT_execute_clks_sum = [None for _ in range(SMs_num)]
+DP_UNIT_execute_clks_sum = [None for _ in range(SMs_num)]
+TENSOR_CORE_UNIT_execute_clks_sum = [None for _ in range(SMs_num)]
+LDST_UNIT_execute_clks_sum = [None for _ in range(SMs_num)]
+SPEC_UNIT_1_execute_clks_sum = [None for _ in range(SMs_num)]
+SPEC_UNIT_2_execute_clks_sum = [None for _ in range(SMs_num)]
+SPEC_UNIT_3_execute_clks_sum = [None for _ in range(SMs_num)]
+Other_UNIT_execute_clks_sum = [None for _ in range(SMs_num)]
+
 # ========================================================
 parser = argparse.ArgumentParser(description='Merge rank reports.')
 
@@ -72,6 +114,8 @@ parser.add_argument('--dir', type=str, required=True,
                     help='The directory of rank reports')
 parser.add_argument('--kernel_id', type=int, required=True,
                     help='The kernel_id of reports')
+parser.add_argument('--np', type=int, required=True,
+                    help='The number of processes')
 args = parser.parse_args()
 # ========================================================
 
@@ -80,8 +124,9 @@ args = parser.parse_args()
 kernel_id = args.kernel_id
 reports_dir = args.dir
 reports_dir = os.path.abspath(reports_dir)
+np = args.np
 
-print(reports_dir)
+# print(reports_dir)
 
 file_name_template = reports_dir + "/" + r"kernel-" + str(kernel_id) + "-rank-*.temp.txt"
 
@@ -93,12 +138,17 @@ files = glob.glob(file_name_template)
 rank_nums = [int(re.search('-rank-(\d+).temp.txt', file).group(1)) for file in files]
 all_ranks_num = max(rank_nums) + 1
 
+all_ranks_num = int(np)
+
 print("Processes number: ", all_ranks_num)
 # ========================================================
 
 # Process each file.
 for file in files:
-    print("Processing ", reports_dir + "/" + file.split("/")[-1], "...")
+    if int(re.search('-rank-(\d+).temp.txt', file).group(1)) >= all_ranks_num:
+        continue
+    
+    # print("Processing ", reports_dir + "/" + file.split("/")[-1], "...")
     with open(file, 'r') as f:
         content = f.read()
     # print(content)
@@ -398,12 +448,12 @@ for file in files:
     
     # ========================================================
     
-    pattern = r"Number_of_read_transactions_per_read_requests\[\]: ((?:\d+ )+(?:\d+))"
+    pattern = r"Number_of_read_transactions_per_read_requests\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
     match = re.search(pattern, content)
 
     if match:
         numbers_str = match.group(1).strip()
-        numbers = [int(n) for n in numbers_str.split()]
+        numbers = [float(n) for n in numbers_str.split()]
         # print(numbers)
     else:
         print("No match found for Number_of_read_transactions_per_read_requests[]")
@@ -423,12 +473,12 @@ for file in files:
     
     # ========================================================
     
-    pattern = r"Number_of_write_transactions_per_write_requests\[\]: ((?:\d+ )+(?:\d+))"
+    pattern = r"Number_of_write_transactions_per_write_requests\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
     match = re.search(pattern, content)
 
     if match:
         numbers_str = match.group(1).strip()
-        numbers = [int(n) for n in numbers_str.split()]
+        numbers = [float(n) for n in numbers_str.split()]
         # print(numbers)
     else:
         print("No match found for Number_of_write_transactions_per_write_requests[]")
@@ -847,8 +897,947 @@ for file in files:
     if DEBUG:
         print("Simulation_time_compute_model: ", Simulation_time_compute_model)
 
-    # ========================================================
-    
+    try:
+        # ========================================================
+        pattern = r"Compute_Structural_Stall\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for Compute_Structural_Stall[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if Compute_Structural_Stall[curr_process_idx] is not None:
+                    print(f"Error: Compute_Structural_Stall[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    Compute_Structural_Stall[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("Compute_Structural_Stall: ", Compute_Structural_Stall)
+        # ========================================================
+        pattern = r"Compute_Data_Stall\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for Compute_Data_Stall[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if Compute_Data_Stall[curr_process_idx] is not None:
+                    print(f"Error: Compute_Data_Stall[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    Compute_Data_Stall[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("Compute_Data_Stall: ", Compute_Data_Stall)
+        # ========================================================
+        pattern = r"Memory_Structural_Stall\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for Memory_Structural_Stall[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if Memory_Structural_Stall[curr_process_idx] is not None:
+                    print(f"Error: Memory_Structural_Stall[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    Memory_Structural_Stall[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("Memory_Structural_Stall: ", Memory_Structural_Stall)
+        # ========================================================
+        pattern = r"Memory_Data_Stall\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for Memory_Data_Stall[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if Memory_Data_Stall[curr_process_idx] is not None:
+                    print(f"Error: Memory_Data_Stall[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    Memory_Data_Stall[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("Memory_Data_Stall: ", Memory_Data_Stall)
+        # ========================================================
+        pattern = r"Synchronization_Stall\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for Synchronization_Stall[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if Synchronization_Stall[curr_process_idx] is not None:
+                    print(f"Error: Synchronization_Stall[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    Synchronization_Stall[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("Synchronization_Stall: ", Synchronization_Stall)
+        # ========================================================
+        pattern = r"Control_Stall\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for Control_Stall[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if Control_Stall[curr_process_idx] is not None:
+                    print(f"Error: Control_Stall[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    Control_Stall[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("Control_Stall: ", Control_Stall)
+        # ========================================================
+        pattern = r"Idle_Stall\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for Idle_Stall[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if Idle_Stall[curr_process_idx] is not None:
+                    print(f"Error: Idle_Stall[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    Idle_Stall[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("Idle_Stall: ", Idle_Stall)
+        # ========================================================
+        pattern = r"No_Stall\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for No_Stall[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if No_Stall[curr_process_idx] is not None:
+                    print(f"Error: No_Stall[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    No_Stall[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("No_Stall: ", No_Stall)
+        # ========================================================
+        pattern = r"Other_Stall\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for Other_Stall[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if Other_Stall[curr_process_idx] is not None:
+                    print(f"Error: Other_Stall[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    Other_Stall[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("Other_Stall: ", Other_Stall)
+        # ========================================================
+        pattern = r"num_Issue_Compute_Structural_out_has_no_free_slot\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_Issue_Compute_Structural_out_has_no_free_slot[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_Issue_Compute_Structural_out_has_no_free_slot[curr_process_idx] is not None:
+                    print(f"Error: num_Issue_Compute_Structural_out_has_no_free_slot[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_Issue_Compute_Structural_out_has_no_free_slot[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_Issue_Compute_Structural_out_has_no_free_slot: ", num_Issue_Compute_Structural_out_has_no_free_slot)
+        # ========================================================
+        pattern = r"num_Issue_Memory_Structural_out_has_no_free_slot\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_Issue_Memory_Structural_out_has_no_free_slot[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_Issue_Memory_Structural_out_has_no_free_slot[curr_process_idx] is not None:
+                    print(f"Error: num_Issue_Memory_Structural_out_has_no_free_slot[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_Issue_Memory_Structural_out_has_no_free_slot[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_Issue_Memory_Structural_out_has_no_free_slot: ", num_Issue_Memory_Structural_out_has_no_free_slot)
+        # ========================================================
+        pattern = r"num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute[curr_process_idx] is not None:
+                    print(f"Error: num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute: ", num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute)
+        # ========================================================
+        pattern = r"num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory[curr_process_idx] is not None:
+                    print(f"Error: num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory: ", num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory)
+        # ========================================================
+        pattern = r"num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency[curr_process_idx] is not None:
+                    print(f"Error: num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency: ", num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency)
+        # ========================================================
+        pattern = r"num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency[curr_process_idx] is not None:
+                    print(f"Error: num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency: ", num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency)
+        # ========================================================
+        pattern = r"num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty[curr_process_idx] is not None:
+                    print(f"Error: num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty: ", num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty)
+        # ========================================================
+        pattern = r"num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty[curr_process_idx] is not None:
+                    print(f"Error: num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty: ", num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty)
+        # ========================================================
+        pattern = r"num_Writeback_Compute_Structural_bank_of_reg_is_not_idle\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_Writeback_Compute_Structural_bank_of_reg_is_not_idle[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_Writeback_Compute_Structural_bank_of_reg_is_not_idle[curr_process_idx] is not None:
+                    print(f"Error: num_Writeback_Compute_Structural_bank_of_reg_is_not_idle[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_Writeback_Compute_Structural_bank_of_reg_is_not_idle[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_Writeback_Compute_Structural_bank_of_reg_is_not_idle: ", num_Writeback_Compute_Structural_bank_of_reg_is_not_idle)
+        # ========================================================
+        pattern = r"num_Writeback_Memory_Structural_bank_of_reg_is_not_idle\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_Writeback_Memory_Structural_bank_of_reg_is_not_idle[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_Writeback_Memory_Structural_bank_of_reg_is_not_idle[curr_process_idx] is not None:
+                    print(f"Error: num_Writeback_Memory_Structural_bank_of_reg_is_not_idle[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_Writeback_Memory_Structural_bank_of_reg_is_not_idle[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_Writeback_Memory_Structural_bank_of_reg_is_not_idle: ", num_Writeback_Memory_Structural_bank_of_reg_is_not_idle)
+        # ========================================================
+        pattern = r"num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated[curr_process_idx] is not None:
+                    print(f"Error: num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated: ", num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated)
+        # ========================================================
+        pattern = r"num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated[curr_process_idx] is not None:
+                    print(f"Error: num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated: ", num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated)
+        # ========================================================
+        pattern = r"num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu[curr_process_idx] is not None:
+                    print(f"Error: num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu: ", num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu)
+        # ========================================================
+        pattern = r"num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu[curr_process_idx] is not None:
+                    print(f"Error: num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu: ", num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu)
+        # ========================================================
+        pattern = r"num_Execute_Memory_Structural_icnt_injection_buffer_is_full\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_Execute_Memory_Structural_icnt_injection_buffer_is_full[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_Execute_Memory_Structural_icnt_injection_buffer_is_full[curr_process_idx] is not None:
+                    print(f"Error: num_Execute_Memory_Structural_icnt_injection_buffer_is_full[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_Execute_Memory_Structural_icnt_injection_buffer_is_full[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_Execute_Memory_Structural_icnt_injection_buffer_is_full: ", num_Execute_Memory_Structural_icnt_injection_buffer_is_full)
+        # ========================================================
+        pattern = r"num_Issue_Compute_Data_scoreboard\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_Issue_Compute_Data_scoreboard[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_Issue_Compute_Data_scoreboard[curr_process_idx] is not None:
+                    print(f"Error: num_Issue_Compute_Data_scoreboard[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_Issue_Compute_Data_scoreboard[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_Issue_Compute_Data_scoreboard: ", num_Issue_Compute_Data_scoreboard)
+        # ========================================================
+        pattern = r"num_Issue_Memory_Data_scoreboard\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_Issue_Memory_Data_scoreboard[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_Issue_Memory_Data_scoreboard[curr_process_idx] is not None:
+                    print(f"Error: num_Issue_Memory_Data_scoreboard[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_Issue_Memory_Data_scoreboard[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_Issue_Memory_Data_scoreboard: ", num_Issue_Memory_Data_scoreboard)
+        # ========================================================
+        pattern = r"num_Execute_Memory_Data_L1\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_Execute_Memory_Data_L1[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_Execute_Memory_Data_L1[curr_process_idx] is not None:
+                    print(f"Error: num_Execute_Memory_Data_L1[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_Execute_Memory_Data_L1[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_Execute_Memory_Data_L1: ", num_Execute_Memory_Data_L1)
+        # ========================================================
+        pattern = r"num_Execute_Memory_Data_L2\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_Execute_Memory_Data_L2[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_Execute_Memory_Data_L2[curr_process_idx] is not None:
+                    print(f"Error: num_Execute_Memory_Data_L2[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_Execute_Memory_Data_L2[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_Execute_Memory_Data_L2: ", num_Execute_Memory_Data_L2)
+        # ========================================================
+        pattern = r"num_Execute_Memory_Data_Main_Memory\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for num_Execute_Memory_Data_Main_Memory[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if num_Execute_Memory_Data_Main_Memory[curr_process_idx] is not None:
+                    print(f"Error: num_Execute_Memory_Data_Main_Memory[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    num_Execute_Memory_Data_Main_Memory[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("num_Execute_Memory_Data_Main_Memory: ", num_Execute_Memory_Data_Main_Memory)
+        # ========================================================
+        pattern = r"SP_UNIT_execute_clks_sum\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for SP_UNIT_execute_clks_sum[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if SP_UNIT_execute_clks_sum[curr_process_idx] is not None:
+                    print(f"Error: SP_UNIT_execute_clks_sum[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    SP_UNIT_execute_clks_sum[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("SP_UNIT_execute_clks_sum: ", SP_UNIT_execute_clks_sum)
+        # ========================================================
+        pattern = r"SFU_UNIT_execute_clks_sum\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for SFU_UNIT_execute_clks_sum[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if SFU_UNIT_execute_clks_sum[curr_process_idx] is not None:
+                    print(f"Error: SFU_UNIT_execute_clks_sum[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    SFU_UNIT_execute_clks_sum[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("SFU_UNIT_execute_clks_sum: ", SFU_UNIT_execute_clks_sum)
+        # ========================================================
+        pattern = r"INT_UNIT_execute_clks_sum\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for INT_UNIT_execute_clks_sum[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if INT_UNIT_execute_clks_sum[curr_process_idx] is not None:
+                    print(f"Error: INT_UNIT_execute_clks_sum[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    INT_UNIT_execute_clks_sum[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("INT_UNIT_execute_clks_sum: ", INT_UNIT_execute_clks_sum)
+        # ========================================================
+        pattern = r"DP_UNIT_execute_clks_sum\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for DP_UNIT_execute_clks_sum[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if DP_UNIT_execute_clks_sum[curr_process_idx] is not None:
+                    print(f"Error: DP_UNIT_execute_clks_sum[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    DP_UNIT_execute_clks_sum[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("DP_UNIT_execute_clks_sum: ", DP_UNIT_execute_clks_sum)
+        # ========================================================
+        pattern = r"TENSOR_CORE_UNIT_execute_clks_sum\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for TENSOR_CORE_UNIT_execute_clks_sum[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if TENSOR_CORE_UNIT_execute_clks_sum[curr_process_idx] is not None:
+                    print(f"Error: TENSOR_CORE_UNIT_execute_clks_sum[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    TENSOR_CORE_UNIT_execute_clks_sum[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("TENSOR_CORE_UNIT_execute_clks_sum: ", TENSOR_CORE_UNIT_execute_clks_sum)
+        # ========================================================
+        pattern = r"LDST_UNIT_execute_clks_sum\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for LDST_UNIT_execute_clks_sum[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if LDST_UNIT_execute_clks_sum[curr_process_idx] is not None:
+                    print(f"Error: LDST_UNIT_execute_clks_sum[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    LDST_UNIT_execute_clks_sum[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("LDST_UNIT_execute_clks_sum: ", LDST_UNIT_execute_clks_sum)
+        # ========================================================
+        pattern = r"SPEC_UNIT_1_execute_clks_sum\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for SPEC_UNIT_1_execute_clks_sum[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if SPEC_UNIT_1_execute_clks_sum[curr_process_idx] is not None:
+                    print(f"Error: SPEC_UNIT_1_execute_clks_sum[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    SPEC_UNIT_1_execute_clks_sum[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("SPEC_UNIT_1_execute_clks_sum: ", SPEC_UNIT_1_execute_clks_sum)
+        # ========================================================
+        pattern = r"SPEC_UNIT_2_execute_clks_sum\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for SPEC_UNIT_2_execute_clks_sum[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if SPEC_UNIT_2_execute_clks_sum[curr_process_idx] is not None:
+                    print(f"Error: SPEC_UNIT_2_execute_clks_sum[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    SPEC_UNIT_2_execute_clks_sum[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("SPEC_UNIT_2_execute_clks_sum: ", SPEC_UNIT_2_execute_clks_sum)
+        # ========================================================
+        pattern = r"SPEC_UNIT_3_execute_clks_sum\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for SPEC_UNIT_3_execute_clks_sum[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if SPEC_UNIT_3_execute_clks_sum[curr_process_idx] is not None:
+                    print(f"Error: SPEC_UNIT_3_execute_clks_sum[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    SPEC_UNIT_3_execute_clks_sum[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("SPEC_UNIT_3_execute_clks_sum: ", SPEC_UNIT_3_execute_clks_sum)
+        # ========================================================
+        pattern = r"Other_UNIT_execute_clks_sum\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for Other_UNIT_execute_clks_sum[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if Other_UNIT_execute_clks_sum[curr_process_idx] is not None:
+                    print(f"Error: Other_UNIT_execute_clks_sum[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    Other_UNIT_execute_clks_sum[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("Other_UNIT_execute_clks_sum: ", Other_UNIT_execute_clks_sum)
+        # ========================================================
+        
+    except:
+        pass
 
 # ========================================================
 Unified_L1_cache_hit_rate_summary = 0.0
@@ -888,10 +1877,16 @@ for i in range(SMs_num):
     if GMEM_total_transactions[i] is not None:
         GMEM_total_transactions_summary += GMEM_total_transactions[i]
 # ========================================================
-Number_of_read_transactions_per_read_requests_summary = \
-  float(float(GMEM_read_transactions_summary) / float(GMEM_read_requests_summary))
-Number_of_write_transactions_per_write_requests_summary = \
-  float(float(GMEM_write_transactions_summary) / float(GMEM_write_requests_summary))
+if GMEM_read_requests_summary == 0:
+    Number_of_read_transactions_per_read_requests_summary = 0.0
+else:
+    Number_of_read_transactions_per_read_requests_summary = \
+    float(float(GMEM_read_transactions_summary) / float(GMEM_read_requests_summary))
+if GMEM_write_requests_summary == 0:
+    Number_of_write_transactions_per_write_requests_summary = 0.0
+else:
+    Number_of_write_transactions_per_write_requests_summary = \
+    float(float(GMEM_write_transactions_summary) / float(GMEM_write_requests_summary))
 # ========================================================
 L2_read_transactions_summary = 0
 L2_write_transactions_summary = 0
@@ -936,8 +1931,10 @@ for i in range(SMs_num):
 if Achieved_active_warps_per_SM_summary > Theoretical_max_active_warps_per_SM:
     Achieved_active_warps_per_SM = Theoretical_max_active_warps_per_SM
 
-if Achieved_occupancy_summary > Theoretical_occupancy:
-    Achieved_occupancy_summary = Theoretical_occupancy
+# print(Achieved_occupancy_summary, Theoretical_occupancy)
+
+if Achieved_occupancy_summary > float(Theoretical_occupancy) / 100.0:
+    Achieved_occupancy_summary = Theoretical_occupancy / 100.0
 # ========================================================
 GPU_active_cycles_summary = 0
 SM_active_cycles_summary = 0
@@ -963,14 +1960,194 @@ for i in range(SMs_num):
         Simulation_time_compute_model_summary = \
             max(Simulation_time_compute_model[i], Simulation_time_compute_model_summary)
 # ========================================================
+Compute_Structural_Stall_summary = 0
+Compute_Data_Stall_summary = 0
+Memory_Structural_Stall_summary = 0
+Memory_Data_Stall_summary = 0
+Synchronization_Stall_summary = 0
+Control_Stall_summary = 0
+Idle_Stall_summary = 0
+No_Stall_summary = 0
+Other_Stall_summary = 0
+
+Compute_Structural_Stall_ratio = 0.0
+Compute_Data_Stall_ratio = 0.0
+Memory_Structural_Stall_ratio = 0.0
+Memory_Data_Stall_ratio = 0.0
+Synchronization_Stall_ratio = 0.0
+Control_Stall_ratio = 0.0
+Idle_Stall_ratio = 0.0
+No_Stall_ratio = 0.0
+Other_Stall_ratio = 0.0
+
+num_Issue_Compute_Structural_out_has_no_free_slot_summary = 0
+num_Issue_Memory_Structural_out_has_no_free_slot_summary = 0
+num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute_summary = 0
+num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory_summary = 0
+num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency_summary = 0
+num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency_summary = 0
+num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty_summary = 0
+num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty_summary = 0
+num_Writeback_Compute_Structural_bank_of_reg_is_not_idle_summary = 0
+num_Writeback_Memory_Structural_bank_of_reg_is_not_idle_summary = 0
+num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated_summary = 0
+num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated_summary = 0
+num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu_summary = 0
+num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu_summary = 0
+num_Execute_Memory_Structural_icnt_injection_buffer_is_full_summary = 0
+num_Issue_Compute_Data_scoreboard_summary = 0
+num_Issue_Memory_Data_scoreboard_summary = 0
+num_Execute_Memory_Data_L1_summary = 0
+num_Execute_Memory_Data_L2_summary = 0
+num_Execute_Memory_Data_Main_Memory_summary = 0
+
+SP_UNIT_execute_clks_sum_summary = 0
+SFU_UNIT_execute_clks_sum_summary = 0
+INT_UNIT_execute_clks_sum_summary = 0
+DP_UNIT_execute_clks_sum_summary = 0
+TENSOR_CORE_UNIT_execute_clks_sum_summary = 0
+LDST_UNIT_execute_clks_sum_summary = 0
+SPEC_UNIT_1_execute_clks_sum_summary = 0
+SPEC_UNIT_2_execute_clks_sum_summary = 0
+SPEC_UNIT_3_execute_clks_sum_summary = 0
+Other_UNIT_execute_clks_sum_summary = 0
+
+for i in range(SMs_num):
+    if Compute_Structural_Stall[i] is not None:
+        Compute_Structural_Stall_summary += Compute_Structural_Stall[i]
+    if Compute_Data_Stall[i] is not None:
+        Compute_Data_Stall_summary += Compute_Data_Stall[i]
+    if Memory_Structural_Stall[i] is not None:
+        Memory_Structural_Stall_summary += Memory_Structural_Stall[i]
+    if Memory_Data_Stall[i] is not None:
+        Memory_Data_Stall_summary += Memory_Data_Stall[i]
+    if Synchronization_Stall[i] is not None:
+        Synchronization_Stall_summary += Synchronization_Stall[i]
+    if Control_Stall[i] is not None:
+        Control_Stall_summary += Control_Stall[i]
+    if Idle_Stall[i] is not None:
+        Idle_Stall_summary += Idle_Stall[i]
+    if No_Stall[i] is not None:
+        No_Stall_summary += No_Stall[i]
+    if Other_Stall[i] is not None:
+        Other_Stall_summary += Other_Stall[i]
+        
+    if num_Issue_Compute_Structural_out_has_no_free_slot[i] is not None:
+        num_Issue_Compute_Structural_out_has_no_free_slot_summary += num_Issue_Compute_Structural_out_has_no_free_slot[i]
+    if num_Issue_Memory_Structural_out_has_no_free_slot[i] is not None:
+        num_Issue_Memory_Structural_out_has_no_free_slot_summary += num_Issue_Memory_Structural_out_has_no_free_slot[i]
+    if num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute[i] is not None:
+        num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute_summary += \
+            num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute[i]
+    if num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory[i] is not None:
+        num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory_summary += \
+            num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory[i]
+    if num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency[i] is not None:
+        num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency_summary += \
+            num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency[i]
+    if num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency[i] is not None:
+        num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency_summary += \
+            num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency[i]
+    if num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty[i] is not None:
+        num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty_summary += \
+            num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty[i]
+    if num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty[i] is not None:
+        num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty_summary += \
+            num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty[i]
+    if num_Writeback_Compute_Structural_bank_of_reg_is_not_idle[i] is not None:
+        num_Writeback_Compute_Structural_bank_of_reg_is_not_idle_summary += \
+            num_Writeback_Compute_Structural_bank_of_reg_is_not_idle[i]
+    if num_Writeback_Memory_Structural_bank_of_reg_is_not_idle[i] is not None:
+        num_Writeback_Memory_Structural_bank_of_reg_is_not_idle_summary += \
+            num_Writeback_Memory_Structural_bank_of_reg_is_not_idle[i]
+    if num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated[i] is not None:
+        num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated_summary += \
+            num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated[i]
+    if num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated[i] is not None:
+        num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated_summary += \
+            num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated[i]
+    if num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu[i] is not None:
+        num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu_summary += \
+            num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu[i]
+    if num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu[i] is not None:
+        num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu_summary += \
+            num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu[i]
+    if num_Execute_Memory_Structural_icnt_injection_buffer_is_full[i] is not None:
+        num_Execute_Memory_Structural_icnt_injection_buffer_is_full_summary += \
+            num_Execute_Memory_Structural_icnt_injection_buffer_is_full[i]
+    if num_Issue_Compute_Data_scoreboard[i] is not None:
+        num_Issue_Compute_Data_scoreboard_summary += num_Issue_Compute_Data_scoreboard[i]
+    if num_Issue_Memory_Data_scoreboard[i] is not None:
+        num_Issue_Memory_Data_scoreboard_summary += num_Issue_Memory_Data_scoreboard[i]
+    if num_Execute_Memory_Data_L1[i] is not None:
+        num_Execute_Memory_Data_L1_summary += num_Execute_Memory_Data_L1[i]
+    if num_Execute_Memory_Data_L2[i] is not None:
+        num_Execute_Memory_Data_L2_summary += num_Execute_Memory_Data_L2[i]
+    if num_Execute_Memory_Data_Main_Memory[i] is not None:
+        num_Execute_Memory_Data_Main_Memory_summary += num_Execute_Memory_Data_Main_Memory[i]
+    
+
+    if SP_UNIT_execute_clks_sum[i] is not None:
+        SP_UNIT_execute_clks_sum_summary += SP_UNIT_execute_clks_sum[i]
+    if SFU_UNIT_execute_clks_sum[i] is not None:
+        SFU_UNIT_execute_clks_sum_summary += SFU_UNIT_execute_clks_sum[i]
+    if INT_UNIT_execute_clks_sum[i] is not None:
+        INT_UNIT_execute_clks_sum_summary += INT_UNIT_execute_clks_sum[i]
+    if DP_UNIT_execute_clks_sum[i] is not None:
+        DP_UNIT_execute_clks_sum_summary += DP_UNIT_execute_clks_sum[i]
+    if TENSOR_CORE_UNIT_execute_clks_sum[i] is not None:
+        TENSOR_CORE_UNIT_execute_clks_sum_summary += TENSOR_CORE_UNIT_execute_clks_sum[i]
+    if LDST_UNIT_execute_clks_sum[i] is not None:
+        LDST_UNIT_execute_clks_sum_summary += LDST_UNIT_execute_clks_sum[i]
+    if SPEC_UNIT_1_execute_clks_sum[i] is not None:
+        SPEC_UNIT_1_execute_clks_sum_summary += SPEC_UNIT_1_execute_clks_sum[i]
+    if SPEC_UNIT_2_execute_clks_sum[i] is not None:
+        SPEC_UNIT_2_execute_clks_sum_summary += SPEC_UNIT_2_execute_clks_sum[i]
+    if SPEC_UNIT_3_execute_clks_sum[i] is not None:
+        SPEC_UNIT_3_execute_clks_sum_summary += SPEC_UNIT_3_execute_clks_sum[i]
+    if Other_UNIT_execute_clks_sum[i] is not None:
+        Other_UNIT_execute_clks_sum_summary += Other_UNIT_execute_clks_sum[i]
+    
+    
+    
+
+total_num_stalls = Compute_Structural_Stall_summary + Compute_Data_Stall_summary + \
+                   Memory_Structural_Stall_summary + Memory_Data_Stall_summary + \
+                   Synchronization_Stall_summary + Control_Stall_summary + \
+                   Idle_Stall_summary + No_Stall_summary + Other_Stall_summary
+
+if total_num_stalls != 0:
+    Compute_Structural_Stall_ratio = float(Compute_Structural_Stall_summary) / float(total_num_stalls)
+    Compute_Data_Stall_ratio = float(Compute_Data_Stall_summary) / float(total_num_stalls)
+    Memory_Structural_Stall_ratio = float(Memory_Structural_Stall_summary) / float(total_num_stalls)
+    Memory_Data_Stall_ratio = float(Memory_Data_Stall_summary) / float(total_num_stalls)
+    Synchronization_Stall_ratio = float(Synchronization_Stall_summary) / float(total_num_stalls)
+    Control_Stall_ratio = float(Control_Stall_summary) / float(total_num_stalls)
+    Idle_Stall_ratio = float(Idle_Stall_summary) / float(total_num_stalls)
+    No_Stall_ratio = float(No_Stall_summary) / float(total_num_stalls)
+    Other_Stall_ratio = float(Other_Stall_summary) / float(total_num_stalls)
+# ========================================================
 ### MAY ERROR
 Warp_instructions_executed_summary = 0
 
-for i in range(SMs_num):
-    if Warp_instructions_executed[i] is not None:
-        Warp_instructions_executed_summary += Warp_instructions_executed[i]
+# for i in range(SMs_num):
+#     if Warp_instructions_executed[i] is not None:
+#         Warp_instructions_executed_summary += Warp_instructions_executed[i]
 
-Warp_instructions_executed_summary *= SMs_num
+# Warp_instructions_executed_summary *= SMs_num
+import subprocess
+sass_files_dir = reports_dir + "/../sass_traces/kernel_" + str(kernel_id+1) + ".sass"
+command = f"awk '{{count += gsub(/ /,\"&\")}} END{{print count}}' {sass_files_dir}"
+
+result = subprocess.run(command, shell=True, text=True, capture_output=True)
+if result.returncode == 0:
+    Warp_instructions_executed_summary = int(int(result.stdout.strip()) / 3)
+else:
+    for i in range(SMs_num):
+        if Warp_instructions_executed[i] is not None:
+            Warp_instructions_executed_summary += Warp_instructions_executed[i]
+    
+    Warp_instructions_executed_summary *= SMs_num
 
 Instructions_executed_per_clock_cycle_IPC_summary = \
     float(Warp_instructions_executed_summary) / float(GPU_active_cycles_summary * SMs_num)
@@ -997,11 +2174,11 @@ with open(reports_dir + '/' + f'kernel-{kernel_id}-summary.txt', 'w') as f:
     f.write("       * Theoretical_occupancy: "+str(format(float(Theoretical_occupancy) / 100.0, '.2f'))+"\n")
     f.write("\n")
     f.write(" - L1 Cache Performance: "+"\n")
-    f.write("       * Unified_L1_cache_hit_rate: "+str(format(Unified_L1_cache_hit_rate_summary, '.2f'))+"\n")
+    f.write("       * Unified_L1_cache_hit_rate: "+str(format(Unified_L1_cache_hit_rate_summary, '.4f'))+"\n")
     f.write("       * Unified_L1_cache_requests: "+str(Unified_L1_cache_requests_summary)+"\n")
     f.write("\n")
     f.write(" - L2 Cache Performance: "+"\n")
-    f.write("       * L2_cache_hit_rate: "+str(format(L2_cache_hit_rate, '.2f'))+"\n")
+    f.write("       * L2_cache_hit_rate: "+str(format(L2_cache_hit_rate, '.4f'))+"\n")
     f.write("       * L2_cache_requests: "+str(L2_cache_requests)+"\n")
     f.write("       * L2_read_transactions: "+str(L2_read_transactions_summary)+"\n")
     f.write("       * L2_write_transactions: "+str(L2_write_transactions_summary)+"\n")
@@ -1047,6 +2224,227 @@ with open(reports_dir + '/' + f'kernel-{kernel_id}-summary.txt', 'w') as f:
     f.write("       * Simulation_time_memory_model (s): "+str(format(Simulation_time_memory_model_summary, '.2f'))+"\n")
     f.write("       * Simulation_time_compute_model (s): "+str(format(Simulation_time_compute_model_summary, '.2f'))+"\n")
     f.write("\n")
+    f.write(" - Stall Cycles: "+"\n")
+    f.write("       * Compute_Structural_Stall: "+str(int(Compute_Structural_Stall_summary))+"\n")
+    f.write("       * Compute_Data_Stall: "+str(int(Compute_Data_Stall_summary))+"\n")
+    f.write("       * Memory_Structural_Stall: "+str(int(Memory_Structural_Stall_summary))+"\n")
+    f.write("       * Memory_Data_Stall: "+str(int(Memory_Data_Stall_summary))+"\n")
+    f.write("       * Synchronization_Stall: "+str(int(Synchronization_Stall_summary))+"\n")
+    f.write("       * Control_Stall: "+str(int(Control_Stall_summary))+"\n")
+    f.write("       * Idle_Stall: "+str(int(Idle_Stall_summary))+"\n")
+    f.write("       * Other_Stall: "+str(int(Other_Stall_summary))+"\n")
+    f.write("       * No_Stall: "+str(int(No_Stall_summary))+"\n")
+    f.write("\n")
+    f.write(" - Stall Cycles Distribution: "+"\n")
+    f.write("       * Compute_Structural_Stall_ratio: "+str(format(Compute_Structural_Stall_ratio, '.6f'))+"\n")
+    f.write("       * Compute_Data_Stall_ratio: "+str(format(Compute_Data_Stall_ratio, '.6f'))+"\n")
+    f.write("       * Memory_Structural_Stall_ratio: "+str(format(Memory_Structural_Stall_ratio, '.6f'))+"\n")
+    f.write("       * Memory_Data_Stall_ratio: "+str(format(Memory_Data_Stall_ratio, '.6f'))+"\n")
+    f.write("       * Synchronization_Stall_ratio: "+str(format(Synchronization_Stall_ratio, '.6f'))+"\n")
+    f.write("       * Control_Stall_ratio: "+str(format(Control_Stall_ratio, '.6f'))+"\n")
+    f.write("       * Idle_Stall_ratio: "+str(format(Idle_Stall_ratio, '.6f'))+"\n")
+    f.write("       * Other_Stall_ratio: "+str(format(Other_Stall_ratio, '.6f'))+"\n")
+    f.write("       * No_Stall_ratio: "+str(format(No_Stall_ratio, '.6f'))+"\n")
+    f.write("\n")
+    
+    f.write(" - Memory Structural Stall Cycles Breakdown: "+"\n")
+    f.write("       * Issue_out_has_no_free_slot: "+\
+        str(num_Issue_Memory_Structural_out_has_no_free_slot_summary)+"\n")
+    f.write("       * Issue_previous_issued_inst_exec_type_is_memory: "+\
+        str(num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory_summary)+"\n")
+    f.write("       * Execute_result_bus_has_no_slot_for_latency: "+\
+        str(num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency_summary)+"\n")
+    f.write("       * Execute_m_dispatch_reg_of_fu_is_not_empty: "+\
+        str(num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty_summary)+"\n")
+    f.write("       * Writeback_bank_of_reg_is_not_idle: "+\
+        str(num_Writeback_Memory_Structural_bank_of_reg_is_not_idle_summary)+"\n")
+    f.write("       * ReadOperands_bank_reg_belonged_to_was_allocated: "+\
+        str(num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated_summary)+"\n")
+    f.write("       * ReadOperands_port_num_m_in_ports_m_in_fails_as_not_found_free_cu: "+\
+        str(num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu_summary)+"\n")
+    f.write("       * Execute_icnt_injection_buffer_is_full: "+\
+        str(num_Execute_Memory_Structural_icnt_injection_buffer_is_full_summary)+"\n")
+    f.write("\n")
+    all_Memory_Structural_cycles = num_Issue_Memory_Structural_out_has_no_free_slot_summary + \
+                                   num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory_summary + \
+                                   num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency_summary + \
+                                   num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty_summary + \
+                                   num_Writeback_Memory_Structural_bank_of_reg_is_not_idle_summary + \
+                                   num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated_summary + \
+                                   num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu_summary + \
+                                   num_Execute_Memory_Structural_icnt_injection_buffer_is_full_summary
+    f.write(" - Memory Structural Stall Cycles Breakdown Distribution: "+"\n")
+    f.write("       * Issue_out_has_no_free_slot: "+\
+        str(format(num_Issue_Memory_Structural_out_has_no_free_slot_summary / all_Memory_Structural_cycles, '.6f'))+"\n")
+    f.write("       * Issue_previous_issued_inst_exec_type_is_memory: "+\
+        str(format(num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory_summary / all_Memory_Structural_cycles, '.6f'))+"\n")
+    f.write("       * Execute_result_bus_has_no_slot_for_latency: "+\
+        str(format(num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency_summary / all_Memory_Structural_cycles, '.6f'))+"\n")
+    f.write("       * Execute_m_dispatch_reg_of_fu_is_not_empty: "+\
+        str(format(num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty_summary / all_Memory_Structural_cycles, '.6f'))+"\n")
+    f.write("       * Writeback_bank_of_reg_is_not_idle: "+\
+        str(format(num_Writeback_Memory_Structural_bank_of_reg_is_not_idle_summary / all_Memory_Structural_cycles, '.6f'))+"\n")
+    f.write("       * ReadOperands_bank_reg_belonged_to_was_allocated: "+\
+        str(format(num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated_summary / all_Memory_Structural_cycles, '.6f'))+"\n")
+    f.write("       * ReadOperands_port_num_m_in_ports_m_in_fails_as_not_found_free_cu: "+\
+        str(format(num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu_summary / all_Memory_Structural_cycles, '.6f'))+"\n")
+    f.write("       * Execute_icnt_injection_buffer_is_full: "+\
+        str(format(num_Execute_Memory_Structural_icnt_injection_buffer_is_full_summary / all_Memory_Structural_cycles, '.6f'))+"\n")
+    f.write("\n")
+    f.write(" - Compute Structural Stall Cycles Breakdown: "+"\n")
+    f.write("       * Issue_out_has_no_free_slot: "+\
+        str(num_Issue_Compute_Structural_out_has_no_free_slot_summary)+"\n")
+    f.write("       * Issue_previous_issued_inst_exec_type_is_compute: "+\
+        str(num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute_summary)+"\n")
+    f.write("       * Execute_result_bus_has_no_slot_for_latency: "+\
+        str(num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency_summary)+"\n")
+    f.write("       * Execute_m_dispatch_reg_of_fu_is_not_empty: "+\
+        str(num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty_summary)+"\n")
+    f.write("       * Writeback_bank_of_reg_is_not_idle: "+\
+        str(num_Writeback_Compute_Structural_bank_of_reg_is_not_idle_summary)+"\n")
+    f.write("       * ReadOperands_bank_reg_belonged_to_was_allocated: "+\
+        str(num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated_summary)+"\n")
+    f.write("       * ReadOperands_port_num_m_in_ports_m_in_fails_as_not_found_free_cu: "+\
+        str(num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu_summary)+"\n")
+    f.write("\n")
+    all_Compute_Structural_cycles = num_Issue_Compute_Structural_out_has_no_free_slot_summary + \
+                                    num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute_summary + \
+                                    num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency_summary + \
+                                    num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty_summary + \
+                                    num_Writeback_Compute_Structural_bank_of_reg_is_not_idle_summary + \
+                                    num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated_summary + \
+                                    num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu_summary
+    f.write(" - Compute Structural Stall Cycles Breakdown Distribution: "+"\n")
+    f.write("       * Issue_out_has_no_free_slot: "+\
+        str(format(num_Issue_Compute_Structural_out_has_no_free_slot_summary / all_Compute_Structural_cycles, '.6f'))+"\n")
+    f.write("       * Issue_previous_issued_inst_exec_type_is_compute: "+\
+        str(format(num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute_summary / all_Compute_Structural_cycles, '.6f'))+"\n")
+    f.write("       * Execute_result_bus_has_no_slot_for_latency: "+\
+        str(format(num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency_summary / all_Compute_Structural_cycles, '.6f'))+"\n")
+    f.write("       * Execute_m_dispatch_reg_of_fu_is_not_empty: "+\
+        str(format(num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty_summary / all_Compute_Structural_cycles, '.6f'))+"\n")
+    f.write("       * Writeback_bank_of_reg_is_not_idle: "+\
+        str(format(num_Writeback_Compute_Structural_bank_of_reg_is_not_idle_summary / all_Compute_Structural_cycles, '.6f'))+"\n")
+    f.write("       * ReadOperands_bank_reg_belonged_to_was_allocated: "+\
+        str(format(num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated_summary / all_Compute_Structural_cycles, '.6f'))+"\n")
+    f.write("       * ReadOperands_port_num_m_in_ports_m_in_fails_as_not_found_free_cu: "+\
+        str(format(num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu_summary / all_Compute_Structural_cycles, '.6f'))+"\n")
+    f.write("\n")
+    f.write(" - Memory Data Stall Cycles Breakdown: "+"\n")
+    f.write("       * Issue_scoreboard: "+str(num_Issue_Memory_Data_scoreboard_summary)+"\n")
+    f.write("       * Execute_L1: "+str(num_Execute_Memory_Data_L1_summary)+"\n")
+    f.write("       * Execute_L2: "+str(num_Execute_Memory_Data_L2_summary)+"\n")
+    f.write("       * Execute_Main_Memory: "+str(num_Execute_Memory_Data_Main_Memory_summary)+"\n")
+    f.write("\n")
+    all_Memory_Data_cycles = num_Issue_Memory_Data_scoreboard_summary + \
+                             num_Execute_Memory_Data_L1_summary + \
+                             num_Execute_Memory_Data_L2_summary + \
+                             num_Execute_Memory_Data_Main_Memory_summary
+    f.write(" - Memory Data Stall Cycles Breakdown Distribution: "+"\n")
+    f.write("       * Issue_scoreboard: "+str(format(num_Issue_Memory_Data_scoreboard_summary / all_Memory_Data_cycles, '.6f'))+"\n")
+    f.write("       * Execute_L1: "+str(format(num_Execute_Memory_Data_L1_summary / all_Memory_Data_cycles, '.6f'))+"\n")
+    f.write("       * Execute_L2: "+str(format(num_Execute_Memory_Data_L2_summary / all_Memory_Data_cycles, '.6f'))+"\n")
+    f.write("       * Execute_Main_Memory: "+str(format(num_Execute_Memory_Data_Main_Memory_summary / all_Memory_Data_cycles, '.6f'))+"\n")
+    f.write("\n")
+    f.write(" - Compute Data Stall Cycles Breakdown: "+"\n")
+    f.write("       * Issue_scoreboard: "+str(num_Issue_Compute_Data_scoreboard_summary)+"\n")
+    f.write("\n")
+    all_Compute_Data_cycles = num_Issue_Compute_Data_scoreboard_summary
+    f.write(" - Compute Data Stall Cycles Breakdown Distribution: "+"\n")
+    f.write("       * Issue_scoreboard: "+str(format(num_Issue_Compute_Data_scoreboard_summary / all_Compute_Data_cycles, '.6f'))+"\n")
+    f.write("\n")
+    
+    f.write(" - Function Unit Execution Cycles Breakdown: "+"\n")
+    f.write("       * SP_UNIT_execute_clks: "+str(SP_UNIT_execute_clks_sum_summary)+"\n")
+    f.write("       * SFU_UNIT_execute_clks: "+str(SFU_UNIT_execute_clks_sum_summary)+"\n")
+    f.write("       * INT_UNIT_execute_clks: "+str(INT_UNIT_execute_clks_sum_summary)+"\n")
+    f.write("       * DP_UNIT_execute_clks: "+str(DP_UNIT_execute_clks_sum_summary)+"\n")
+    f.write("       * TENSOR_CORE_UNIT_execute_clks: "+str(TENSOR_CORE_UNIT_execute_clks_sum_summary)+"\n")
+    f.write("       * LDST_UNIT_execute_clks: "+str(LDST_UNIT_execute_clks_sum_summary)+"\n")
+    f.write("       * SPEC_UNIT_1_execute_clks: "+str(SPEC_UNIT_1_execute_clks_sum_summary)+"\n")
+    f.write("       * SPEC_UNIT_2_execute_clks: "+str(SPEC_UNIT_2_execute_clks_sum_summary)+"\n")
+    f.write("       * SPEC_UNIT_3_execute_clks: "+str(SPEC_UNIT_3_execute_clks_sum_summary)+"\n")
+    f.write("       * Other_UNIT_execute_clks: "+str(Other_UNIT_execute_clks_sum_summary)+"\n")
+    f.write("\n")
+    all_Execution_Cycles = SP_UNIT_execute_clks_sum_summary + \
+                           SFU_UNIT_execute_clks_sum_summary + \
+                           INT_UNIT_execute_clks_sum_summary + \
+                           DP_UNIT_execute_clks_sum_summary + \
+                           TENSOR_CORE_UNIT_execute_clks_sum_summary + \
+                           LDST_UNIT_execute_clks_sum_summary + \
+                           SPEC_UNIT_1_execute_clks_sum_summary + \
+                           SPEC_UNIT_2_execute_clks_sum_summary + \
+                           SPEC_UNIT_3_execute_clks_sum_summary + \
+                           Other_UNIT_execute_clks_sum_summary
+    f.write(" - Function Unit Execution Cycles Breakdown Distribution: "+"\n")
+    f.write("       * SP_UNIT_execute_clks: "+str(format(SP_UNIT_execute_clks_sum_summary / all_Execution_Cycles, '.6f'))+"\n")
+    f.write("       * SFU_UNIT_execute_clks: "+str(format(SFU_UNIT_execute_clks_sum_summary / all_Execution_Cycles, '.6f'))+"\n")
+    f.write("       * INT_UNIT_execute_clks: "+str(format(INT_UNIT_execute_clks_sum_summary / all_Execution_Cycles, '.6f'))+"\n")
+    f.write("       * DP_UNIT_execute_clks: "+str(format(DP_UNIT_execute_clks_sum_summary / all_Execution_Cycles, '.6f'))+"\n")
+    f.write("       * TENSOR_CORE_UNIT_execute_clks: "+str(format(TENSOR_CORE_UNIT_execute_clks_sum_summary / all_Execution_Cycles, '.6f'))+"\n")
+    f.write("       * LDST_UNIT_execute_clks: "+str(format(LDST_UNIT_execute_clks_sum_summary / all_Execution_Cycles, '.6f'))+"\n")
+    f.write("       * SPEC_UNIT_1_execute_clks: "+str(format(SPEC_UNIT_1_execute_clks_sum_summary / all_Execution_Cycles, '.6f'))+"\n")
+    f.write("       * SPEC_UNIT_2_execute_clks: "+str(format(SPEC_UNIT_2_execute_clks_sum_summary / all_Execution_Cycles, '.6f'))+"\n")
+    f.write("       * SPEC_UNIT_3_execute_clks: "+str(format(SPEC_UNIT_3_execute_clks_sum_summary / all_Execution_Cycles, '.6f'))+"\n")
+    f.write("       * Other_UNIT_execute_clks: "+str(format(Other_UNIT_execute_clks_sum_summary / all_Execution_Cycles, '.6f'))+"\n")
+    f.write("\n")
+    
+    import datetime
+
+    now = datetime.datetime.now()
+    formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
+    f.write(" - Report Time: "+formatted_time+"\n")
+    
+    
+    
+    
 # ========================================================
     
+    """
+    /**********************************************************************************************
+    The following events that may cause stalls:
+    1      Issue: ibuffer_empty
+    2      Issue: control hazard
+    3      Issue: m_[memory]_out has no free slot
+    4      Issue: previous_issued_inst_exec_type is [memory]
+    5      Issue: m_[compute]_out has no free slot
+    6      Issue: previous_issued_inst_exec_type is [compute]
+    7      Issue: scoreboard
+    8      Execute: m_dispatch_reg of fu\[\d+\]-\w+\s is not empty
+    9      Execute: result_bus has no slot for latency-\d+
+    10     Execute: icnt_injection_buffer is full
+    11     Execute: bank-\d+ of reg-\d+ is not idle
+    12     ReadOperands: bank\[\d+\] reg-\d+ \(order:\d+\) belonged to was allocated for write
+    13     ReadOperands: bank\[\d+\] reg-\d+ \(order:\d+\) belonged to was allocated for other regs
+    14     ReadOperands: port_num-\d+/m_in_ports\[\d+\].m_in\[\d+\] fails as not found free cu
+    15     Writeback: bank-\d+ of reg-\d+ is not idle
+    **********************************************************************************************/
+    /**********************************************************************************************
+    The following events that may cause stalls:
     
+    Compute_Structural_Stall:
+        1      Issue: m_[compute]_out has no free slot
+        2      Issue: previous_issued_inst_exec_type is [compute]
+        3      Execute: [compute] result_bus has no slot for latency-\d+
+        4      Execute: [compute] m_dispatch_reg of fu\[\d+\]-\w+\s is not empty
+        5      Writeback: bank-\d+ of reg-\d+ is not idle
+        6      ReadOperands: bank\[\d+\] reg-\d+ \(order:\d+\) belonged to was allocated
+        7      ReadOperands: port_num-\d+/m_in_ports\[\d+\].m_in\[\d+\] fails as not found free cu
+    Compute_Data_Stall:
+        9      Issue: [compute] scoreboard
+    Memory_Structural_Stall:
+        1      Issue: m_[memory]_out has no free slot
+        2      Issue: previous_issued_inst_exec_type is [memory]
+        3      Execute: [memory] result_bus has no slot for latency-\d+
+        4      Execute: [memory] m_dispatch_reg of fu\[\d+\]-\w+\s is not empty
+        5      Writeback: bank-\d+ of reg-\d+ is not idle
+        6      ReadOperands: bank\[\d+\] reg-\d+ \(order:\d+\) belonged to was allocated
+        7      ReadOperands: port_num-\d+/m_in_ports\[\d+\].m_in\[\d+\] fails as not found free cu
+        8      Execute: icnt_injection_buffer is full
+    Memory_Data_Stall:
+        9      Issue: [memory] scoreboard
+        10     L1 // first calculate 9, and then allocate the remaining stalls to 10,11,12
+        11     L2
+        12     Main Memory
+    **********************************************************************************************/
+    """
