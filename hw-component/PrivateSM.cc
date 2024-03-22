@@ -56,12 +56,139 @@ stat_collector::stat_collector(unsigned num_sm, unsigned kernel_id) {
   Kernel_execution_time.resize(m_num_sm, 0);
   Simulation_time_memory_model.resize(m_num_sm, 0);
   Simulation_time_compute_model.resize(m_num_sm, 0);
+
+  Compute_Structural_Stall.resize(m_num_sm, 0);
+  Compute_Data_Stall.resize(m_num_sm, 0);
+  Memory_Structural_Stall.resize(m_num_sm, 0);
+  Memory_Data_Stall.resize(m_num_sm, 0);
+  Synchronization_Stall.resize(m_num_sm, 0);
+  Control_Stall.resize(m_num_sm, 0);
+  Idle_Stall.resize(m_num_sm, 0);
+  No_Stall.resize(m_num_sm, 0);
+  Other_Stall.resize(m_num_sm, 0);
+
+  /*
+  bool At_least_four_instns_issued;
+  bool At_least_one_Compute_Structural_Stall_found;
+  bool At_least_one_Compute_Data_Stall_found;
+  bool At_least_one_Memory_Structural_Stall_found;
+  bool At_least_one_Memory_Data_Stall_found;
+  bool At_least_one_Synchronization_Stall_found;
+  bool At_least_one_Control_Stall_found;
+  bool At_least_one_Idle_Stall_found;
+  bool At_least_one_No_Stall_found;
+  */
+  At_least_four_instns_issued = false;
+  At_least_one_Compute_Structural_Stall_found = false;
+  At_least_one_Compute_Data_Stall_found = false;
+  At_least_one_Memory_Structural_Stall_found = false;
+  At_least_one_Memory_Data_Stall_found = false;
+  At_least_one_Synchronization_Stall_found = false;
+  At_least_one_Control_Stall_found = false;
+  At_least_one_Idle_Stall_found = false;
+  At_least_one_No_Stall_found = false;
+    
+    /*
+    std::vector<unsigned> num_Issue_Compute_Structural_out_has_no_free_slot;
+    std::vector<unsigned> num_Issue_Memory_Structural_out_has_no_free_slot;
+    std::vector<unsigned> num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute;
+    std::vector<unsigned> num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory;
+    std::vector<unsigned> num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency;
+    std::vector<unsigned> num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency;
+    std::vector<unsigned> num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty;
+    std::vector<unsigned> num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty;
+    std::vector<unsigned> num_Writeback_Compute_Structural_bank_of_reg_is_not_idle;
+    std::vector<unsigned> num_Writeback_Memory_Structural_bank_of_reg_is_not_idle;
+    std::vector<unsigned> num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated;
+    std::vector<unsigned> num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated;
+    std::vector<unsigned> num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu;
+    std::vector<unsigned> num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu;
+    std::vector<unsigned> num_Execute_Memory_Structural_icnt_injection_buffer_is_full;
+    std::vector<unsigned> num_Issue_Compute_Data_scoreboard;
+    std::vector<unsigned> num_Issue_Memory_Data_scoreboard;
+    std::vector<unsigned> num_Execute_Memory_Data_L1;
+    std::vector<unsigned> num_Execute_Memory_Data_L2;
+    std::vector<unsigned> num_Execute_Memory_Data_Main_Memory;
+    */
+  num_Issue_Compute_Structural_out_has_no_free_slot.resize(m_num_sm, 0);
+  num_Issue_Memory_Structural_out_has_no_free_slot.resize(m_num_sm, 0);
+  num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute.resize(m_num_sm, 0);
+  num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory.resize(m_num_sm, 0);
+  num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency.resize(m_num_sm, 0);
+  num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency.resize(m_num_sm, 0);
+  num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty.resize(m_num_sm, 0);
+  num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty.resize(m_num_sm, 0);
+  num_Writeback_Compute_Structural_bank_of_reg_is_not_idle.resize(m_num_sm, 0);
+  num_Writeback_Memory_Structural_bank_of_reg_is_not_idle.resize(m_num_sm, 0);
+  num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated.resize(m_num_sm, 0);
+  num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated.resize(m_num_sm, 0);
+  num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu.resize(m_num_sm, 0);
+  num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu.resize(m_num_sm, 0);
+  num_Execute_Memory_Structural_icnt_injection_buffer_is_full.resize(m_num_sm, 0);
+  num_Issue_Compute_Data_scoreboard.resize(m_num_sm, 0);
+  num_Issue_Memory_Data_scoreboard.resize(m_num_sm, 0);
+  num_Execute_Memory_Data_L1.resize(m_num_sm, 0);
+  num_Execute_Memory_Data_L2.resize(m_num_sm, 0);
+  num_Execute_Memory_Data_Main_Memory.resize(m_num_sm, 0);
+
+  /*
+  std::vector<unsigned> SP_UNIT_execute_clks_sum;
+  std::vector<unsigned> SFU_UNIT_execute_clks_sum;
+  std::vector<unsigned> INT_UNIT_execute_clks_sum;
+  std::vector<unsigned> DP_UNIT_execute_clks_sum;
+  std::vector<unsigned> TENSOR_CORE_UNIT_execute_clks_sum;
+  std::vector<unsigned> LDST_UNIT_execute_clks_sum;
+  std::vector<unsigned> SPEC_UNIT_1_execute_clks_sum;
+  std::vector<unsigned> SPEC_UNIT_2_execute_clks_sum;
+  std::vector<unsigned> SPEC_UNIT_3_execute_clks_sum;
+  std::vector<unsigned> Other_UNIT_execute_clks_sum;
+  */
+  SP_UNIT_execute_clks_sum.resize(m_num_sm, 0);
+  SFU_UNIT_execute_clks_sum.resize(m_num_sm, 0);
+  INT_UNIT_execute_clks_sum.resize(m_num_sm, 0);
+  DP_UNIT_execute_clks_sum.resize(m_num_sm, 0);
+  TENSOR_CORE_UNIT_execute_clks_sum.resize(m_num_sm, 0);
+  LDST_UNIT_execute_clks_sum.resize(m_num_sm, 0);
+  SPEC_UNIT_1_execute_clks_sum.resize(m_num_sm, 0);
+  SPEC_UNIT_2_execute_clks_sum.resize(m_num_sm, 0);
+  SPEC_UNIT_3_execute_clks_sum.resize(m_num_sm, 0);
+  Other_UNIT_execute_clks_sum.resize(m_num_sm, 0);
+}
+
+bool create_directory_if_not_exists(const std::string& dir) {
+  struct stat sb;
+  if (stat(dir.c_str(), &sb) == 0 && S_ISDIR(sb.st_mode)) {
+    return true; // 目录已存在
+  } else {
+    // 使用0777权限创建目录，实际使用时可能需要更精确的权限控制
+    if (mkdir(dir.c_str(), 0777) == -1) {
+      std::cerr << "Error creating directory." << std::endl;
+      return false;
+    }
+    return true;
+  }
+}
+
+void remove_file_if_exists(const std::string& filepath) {
+  // 如果文件存在，则删除
+  if (access(filepath.c_str(), F_OK) != -1) {
+    // 删除文件
+    remove(filepath.c_str());
+  }
 }
 
 void stat_collector::dump_output(const std::string& path, unsigned rank) {
   // std::string full_path = path + std::string("/rank-") + std::to_string(rank) + std::string(".temp.txt");
-  std::string full_path = path + std::string("/kernel-") + std::to_string(get_kernel_id()) + 
+  std::string full_dir = path + std::string("/../outputs");
+  std::string full_path = path + std::string("/../outputs/kernel-") + std::to_string(get_kernel_id()) + 
                           std::string("-rank-") + std::to_string(rank) + std::string(".temp.txt");
+  if (!create_directory_if_not_exists(full_dir)) {
+    std::cout << "Error when creating directory" << full_dir << std::endl;
+    exit(0); // 错误情况
+  }
+
+  remove_file_if_exists(full_path);
+
   std::ofstream file(full_path);
   if (file.is_open()) {
     file << "From rank: " << rank << std::endl;
@@ -241,6 +368,206 @@ void stat_collector::dump_output(const std::string& path, unsigned rank) {
       file << Simulation_time_compute_model[sm_id] << " ";;
     }
     file << std::endl;
+    file << std::endl;
+    file << "Compute_Structural_Stall[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Compute_Structural_Stall[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Compute_Data_Stall[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Compute_Data_Stall[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Memory_Structural_Stall[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Memory_Structural_Stall[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Memory_Data_Stall[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Memory_Data_Stall[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Synchronization_Stall[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Synchronization_Stall[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Control_Stall[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Control_Stall[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Idle_Stall[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Idle_Stall[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "No_Stall[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << No_Stall[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Other_Stall[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Other_Stall[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << std::endl;
+    file << "num_Issue_Compute_Structural_out_has_no_free_slot[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_Issue_Compute_Structural_out_has_no_free_slot[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_Issue_Memory_Structural_out_has_no_free_slot[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_Issue_Memory_Structural_out_has_no_free_slot[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_Writeback_Compute_Structural_bank_of_reg_is_not_idle[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_Writeback_Compute_Structural_bank_of_reg_is_not_idle[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_Writeback_Memory_Structural_bank_of_reg_is_not_idle[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_Writeback_Memory_Structural_bank_of_reg_is_not_idle[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_Execute_Memory_Structural_icnt_injection_buffer_is_full[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_Execute_Memory_Structural_icnt_injection_buffer_is_full[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_Issue_Compute_Data_scoreboard[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_Issue_Compute_Data_scoreboard[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_Issue_Memory_Data_scoreboard[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_Issue_Memory_Data_scoreboard[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_Execute_Memory_Data_L1[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_Execute_Memory_Data_L1[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_Execute_Memory_Data_L2[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_Execute_Memory_Data_L2[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "num_Execute_Memory_Data_Main_Memory[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << num_Execute_Memory_Data_Main_Memory[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << std::endl;
+    file << "SP_UNIT_execute_clks_sum[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << SP_UNIT_execute_clks_sum[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "SFU_UNIT_execute_clks_sum[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << SFU_UNIT_execute_clks_sum[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "INT_UNIT_execute_clks_sum[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << INT_UNIT_execute_clks_sum[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "DP_UNIT_execute_clks_sum[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << DP_UNIT_execute_clks_sum[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "TENSOR_CORE_UNIT_execute_clks_sum[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << TENSOR_CORE_UNIT_execute_clks_sum[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "LDST_UNIT_execute_clks_sum[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << LDST_UNIT_execute_clks_sum[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "SPEC_UNIT_1_execute_clks_sum[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << SPEC_UNIT_1_execute_clks_sum[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "SPEC_UNIT_2_execute_clks_sum[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << SPEC_UNIT_2_execute_clks_sum[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "SPEC_UNIT_3_execute_clks_sum[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << SPEC_UNIT_3_execute_clks_sum[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Other_UNIT_execute_clks_sum[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Other_UNIT_execute_clks_sum[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << std::endl;
+
 
     file.close();
   }
@@ -292,6 +619,10 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
     unsigned _warps_per_block = appcfg->get_num_warp_per_block(kid);
     m_warp_active_status.push_back(std::vector<bool>(_warps_per_block, false));
   }
+  m_thread_block_has_executed_status.reserve(kernel_block_pair.size());
+  for (auto it = kernel_block_pair.begin(); it != kernel_block_pair.end(); it++) {
+    m_thread_block_has_executed_status.push_back(false);
+  }
 
   /* m_num_warps_per_sm[i] stores the i-th kernel's warps number that are 
    * allocated to this SM. m_num_warps_per_sm's first dim is the total num 
@@ -306,6 +637,13 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
     unsigned kid = it->first - 1;
     unsigned _warps_per_block = appcfg->get_num_warp_per_block(kid);
     m_num_warps_per_sm[kid] += _warps_per_block;
+  }
+
+  // std::map<std::pair<unsigned, unsigned>> kernel_id_block_id_last_fetch_wid;
+  for (auto it = kernel_block_pair.begin(); it != kernel_block_pair.end(); it++) {
+    unsigned kid = it->first - 1;
+    unsigned block_id = it->second;
+    kernel_id_block_id_last_fetch_wid[{kid, block_id}] = 0;
   }
 
   m_num_blocks_per_kernel.resize(appcfg->get_kernels_num(), 0);
@@ -541,9 +879,11 @@ PrivateSM::PrivateSM(const unsigned smid, trace_parser* tracer, hw_config* hw_cf
     m_issue_port.push_back(OC_EX_TENSOR_CORE);
   }
 
-  m_fu.push_back(new mem_unit(&m_pipeline_reg[EX_WB], 0, m_hw_cfg, this->tracer));
-  m_dispatch_port.push_back(ID_OC_MEM);
-  m_issue_port.push_back(OC_EX_MEM);
+  for (unsigned k = 0; k < m_hw_cfg->get_num_mem_units(); k++) {
+    m_fu.push_back(new mem_unit(&m_pipeline_reg[EX_WB], k, m_hw_cfg, this->tracer));
+    m_dispatch_port.push_back(ID_OC_MEM);
+    m_issue_port.push_back(OC_EX_MEM);
+  }
 
   for (unsigned k = 0; k < m_hw_cfg->get_specialized_unit_size(); k++) {
     m_fu.push_back(new specialized_unit(&m_pipeline_reg[EX_WB], k, m_hw_cfg, this->tracer, k));
@@ -695,12 +1035,42 @@ void insert_into_active_warps_id(std::vector<unsigned>* active_warps_id, unsigne
   }
 } 
 
-void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
+void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY, stat_collector* stat_coll){
+  // unsigned MEM_ACCESS_LATENCY = 5;
   m_cycle++;
+
+  // if (m_cycle<48515)
   
+  if (_CALIBRATION_LOG_) {
+    std::cout << "#: m_cycle: " << m_cycle << std::endl;
+  }
+
+  if (m_cycle > 2000000) {std::cout << "ECIT BY CYCLE!!!" << std::endl; exit(0);}
+
   bool active_during_this_cycle = false;
 
   std::vector<unsigned> active_warps_id;
+
+  bool flag_Issue_Compute_Structural_out_has_no_free_slot = false;
+  bool flag_Issue_Memory_Structural_out_has_no_free_slot = false;
+  bool flag_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute = false;
+  bool flag_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory = false;
+  bool flag_Execute_Compute_Structural_result_bus_has_no_slot_for_latency = false;
+  bool flag_Execute_Memory_Structural_result_bus_has_no_slot_for_latency = false;
+  bool flag_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty = false;
+  bool flag_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty = false;
+  bool flag_Writeback_Compute_Structural_bank_of_reg_is_not_idle = false;
+  bool flag_Writeback_Memory_Structural_bank_of_reg_is_not_idle = false;
+  bool flag_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated = false;
+  bool flag_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated = false;
+  bool flag_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu = false;
+  bool flag_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu = false;
+  bool flag_Execute_Memory_Structural_icnt_injection_buffer_is_full = false;
+  bool flag_Issue_Compute_Data_scoreboard = false;
+  bool flag_Issue_Memory_Data_scoreboard = false;
+  bool flag_Execute_Memory_Data_L1 = false;
+  bool flag_Execute_Memory_Data_L2 = false;
+  bool flag_Execute_Memory_Data_Main_Memory = false;
 
   // std::cout << "# cycle: " << m_cycle << std::endl;
 
@@ -711,7 +1081,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
   // for (auto it_kernel_block_pair = kernel_block_pair.begin(); 
   //           it_kernel_block_pair != kernel_block_pair.end(); 
   //           it_kernel_block_pair++) {
-
+START_TIMER(0);
 
     /* Variables that depend on it_kernel_block_pair:
      *   kid, block_id, warps_per_block, gwarp_id_start, gwarp_id_end
@@ -752,15 +1122,25 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
     // std::cout << "$ SM-" << m_smid << " Kernel-" << kid << " Block-" << block_id 
     //           << ", gwarp_id_start: " << gwarp_id_start << ", gwarp_id_end: " 
     //           << gwarp_id_end << std::endl;
-
+    if (m_cycle == 1) {
+      for (auto it_kernel_block_pair_1 = kernel_block_pair.begin(); 
+                it_kernel_block_pair_1 != kernel_block_pair.end(); // TODO: here only first kernel is considered
+                it_kernel_block_pair_1++) {
+        if (it_kernel_block_pair_1->first - 1 != KERNEL_EVALUATION) {
+          unsigned _index_ = std::distance(kernel_block_pair.begin(), it_kernel_block_pair_1);
+          m_thread_block_has_executed_status[_index_] = true;
+        }
+      }
+    }
     
-    for (auto it_kernel_block_pair = kernel_block_pair.begin(); 
-              it_kernel_block_pair != kernel_block_pair.end(); // TODO: here only first kernel is considered
-              it_kernel_block_pair++) {
-      if (it_kernel_block_pair->first - 1 != KERNEL_EVALUATION) continue;
+    for (auto it_kernel_block_pair_2 = kernel_block_pair.begin(); 
+              it_kernel_block_pair_2 != kernel_block_pair.end(); // TODO: here only first kernel is considered
+              it_kernel_block_pair_2++) {
+      if (it_kernel_block_pair_2->first - 1 != KERNEL_EVALUATION) continue;
+      
       /* -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
        * Here, kernel_block_pair is (1,80), (1,160), (1,0), (2,0), (3,0), (4,0)
-       * for it_kernel_block_pair : kernel_block_pair:
+       * for it_kernel_block_pair_2 : kernel_block_pair:
        *   index           =   0,   1,   2,   3,   4,   5
        *   kid             =   0,   0,   0,   1,   2,   3
        *   block_id        =  80, 160,   0,   0,   0,   0
@@ -768,37 +1148,77 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
        *   gwarp_id_start  =  80, 160,   0,   0,   0,   0
        *   gwarp_id_end    =  81, 161,   1,   1,   1,   1
        */
-      unsigned _index_ = std::distance(kernel_block_pair.begin(), it_kernel_block_pair);
-      unsigned _kid_ = it_kernel_block_pair->first - 1;
-      unsigned _block_id_ = it_kernel_block_pair->second;
-      unsigned _warps_per_block_ = appcfg->get_num_warp_per_block(_kid_);
-      for (unsigned _wid_ = 0; _wid_ < _warps_per_block_; _wid_++) {
-        /* m_warp_active_status[
-         *                      0 ~ kernel_block_pair.size()
-         *                     ]
-         *                     [
-         *                      0 ~ warps_per_block_of_it_kernel_block_pair
-         *                     ] 
-         * In fact, m_warp_active_status's 1st dim is the index of (kid, block_id) pairs
-         * that are issued to the current SM, and the 2nd dim is the number of warps in 
-         * the thread block - (kid, block_id), and equals to the warp_per_block of the 
-         * kernel - kid. */
-        if (m_cycle == 1 && m_warp_active_status[_index_][_wid_] == false) {
-          m_warp_active_status[_index_][_wid_] = true;
-          m_active_warps++;
-          max_warps_init++;
-          if (_DEBUG_LOG_)
-            std::cout << "  **First time to activate warp (_index_, wid): (" 
-                      << _index_ << ", " << _wid_ << ")" 
-                      << " <=> (kid, block_id, wid): (" 
-                      << _kid_ << "," 
-                      << _block_id_ << "," 
-                      << _wid_ << ")" << std::endl;
-        }
-      }
-    }
-    
+      unsigned _index_ = std::distance(kernel_block_pair.begin(), it_kernel_block_pair_2);
 
+      if (m_thread_block_has_executed_status[_index_] == true) continue;
+
+      unsigned _kid_ = it_kernel_block_pair_2->first - 1;
+      unsigned _block_id_ = it_kernel_block_pair_2->second;
+      unsigned _warps_per_block_ = appcfg->get_num_warp_per_block(_kid_);
+      
+      if (get_num_m_warp_active_status() + _warps_per_block_ <= m_hw_cfg->get_max_warps_per_sm()) {
+        // std::cout << "    before active_warps: " << get_num_m_warp_active_status() << std::endl;
+        for (unsigned _wid_ = 0; _wid_ < _warps_per_block_; _wid_++) {
+          /* m_warp_active_status[
+          *                      0 ~ kernel_block_pair.size()
+          *                     ]
+          *                     [
+          *                      0 ~ warps_per_block_of_it_kernel_block_pair_2
+          *                     ] 
+          * In fact, m_warp_active_status's 1st dim is the index of (kid, block_id) pairs
+          * that are issued to the current SM, and the 2nd dim is the number of warps in 
+          * the thread block - (kid, block_id), and equals to the warp_per_block of the 
+          * kernel - kid. */
+          if (/*m_cycle == 1 &&*/ m_warp_active_status[_index_][_wid_] == false) {
+            m_warp_active_status[_index_][_wid_] = true;
+            m_thread_block_has_executed_status[_index_] = true;
+            m_active_warps++;
+            max_warps_init++;
+            if (_DEBUG_LOG_)
+              std::cout << "  **First time to activate warp (_index_, wid): (" 
+                        << _index_ << ", " << _wid_ << ")" 
+                        << " <=> (kid, block_id, wid): (" 
+                        << _kid_ << "," 
+                        << _block_id_ << "," 
+                        << _wid_ << ")" << std::endl;
+          }
+        }
+        // std::cout << "      after active_warps: " << get_num_m_warp_active_status() << std::endl;
+      }
+      
+    }
+    // std::cout << "@@@1";
+
+
+STOP_AND_REPORT_TIMER_rank(0);
+
+START_TIMER(1);
+    /*
+    bool flag_Issue_Compute_Structural_out_has_no_free_slot = true;                                             V
+    bool flag_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute = true;                        V
+    bool flag_Execute_Compute_Structural_result_bus_has_no_slot_for_latency = true;                             V
+    bool flag_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty = true;                              V
+    bool flag_Writeback_Compute_Structural_bank_of_reg_is_not_idle = true;                                      V
+    bool flag_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated = true;
+    bool flag_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu = true;       V
+    
+    
+    bool flag_Issue_Compute_Data_scoreboard = true;                                                             V
+
+    bool flag_Issue_Memory_Data_scoreboard = true;                                                              V
+    bool flag_Execute_Memory_Data_L1 = true;
+    bool flag_Execute_Memory_Data_L2 = true;
+    bool flag_Execute_Memory_Data_Main_Memory = true;
+
+    bool flag_Issue_Memory_Structural_out_has_no_free_slot = true;                                              V
+    bool flag_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory = true;                          V
+    bool flag_Execute_Memory_Structural_result_bus_has_no_slot_for_latency = true;                              X
+    bool flag_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty = true;                               V
+    bool flag_Writeback_Memory_Structural_bank_of_reg_is_not_idle = true;                                       V
+    bool flag_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated = true;
+    bool flag_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu = true;        V
+    bool flag_Execute_Memory_Structural_icnt_injection_buffer_is_full = true;                                   V
+    */
     /**********************************************************************************************/
     /***                                                                                        ***/
     /***                              Write back to register banks.                             ***/
@@ -889,10 +1309,12 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                         << std::endl;
 
             insert_into_active_warps_id(&active_warps_id, _wid); // here _wid id global
-          } else
+          } else {
             if (_DEBUG_LOG_)
               std::cout << "    cannot setBankState "
                            "bank_id-" << bank_id << std::endl;
+            flag_Writeback_Compute_Structural_bank_of_reg_is_not_idle = true;
+          }
         }
       }
 
@@ -915,9 +1337,18 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                     << _uid << ", "
                     << _pc << ")" << std::endl;
         }
+        set_clk_record<5>(_kid, _wid, _uid, m_cycle);
         // inc instns executed
         num_warp_instns_executed++;
 
+        // std::cout << "  **Write back instn "
+        //                "(pc, gwid, kid, "
+        //                "fetch_instn_id): (" 
+        //             << std::hex 
+        //             << _pc << ", " << std::dec 
+        //             << _wid << ", " 
+        //             << _kid << ", " 
+        //             << _uid << ")" << std::endl;
 
         if (_DEBUG_LOG_) {
           std::cout << "  **Write back instn "
@@ -939,6 +1370,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
         pipe_reg->m_valid = false;
 
         /* If the instn string of (_kid, _wid, _pc) is "EXIT", should deactivate this warp. */
+        // std::cout << _kid << " " << _wid << " " << tracer->get_one_kernel_one_warp_instn_count(_kid, _wid) << " " << _uid + 1 << std::endl;
         if (_trace_warp_inst.get_opcode() == OP_EXIT &&
             tracer->get_one_kernel_one_warp_instn_count(_kid, _wid) == _uid + 1) {
           /* m_warp_active_status[
@@ -973,6 +1405,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
            * _gwarp_id_start is the global warp id of the first warp in the block, for example,
            * 80 * 3 = 240.
            */
+          
           m_warp_active_status[_index][_wid - _gwarp_id_start] = false;
           m_active_warps--;
           insert_into_active_warps_id(&active_warps_id, _wid);
@@ -1088,8 +1521,10 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
       pipe_reg = (preg == NULL) ? NULL : *preg;
       active_during_this_cycle = true;
     }
-    
 
+STOP_AND_REPORT_TIMER_rank(1);
+START_TIMER(2);
+    // std::cout << "@@@2";
 
     /**********************************************************************************************/
     /***                                                                                        ***/
@@ -1106,7 +1541,15 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
         // if (m_fu[n]->cycle()) {
         //   active_during_this_cycle = true;
         // }
-        std::vector<unsigned> returned_wids = m_fu[n]->cycle();
+        std::vector<unsigned> returned_wids = m_fu[n]->cycle(tracer, m_scoreboard, appcfg, 
+                                                             &kernel_block_pair, 
+                                                             &m_num_warps_per_sm, 
+                                                             KERNEL_EVALUATION, 
+                                                             num_scheds,
+                                                             m_reg_bank_allocator,
+                                                             &flag_Writeback_Memory_Structural_bank_of_reg_is_not_idle,
+                                                             &clk_record,
+                                                             m_cycle);
         for (auto wid : returned_wids) {
           insert_into_active_warps_id(&active_warps_id, wid);
           active_during_this_cycle = true;
@@ -1167,6 +1610,11 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
             unsigned offset_fu = 0;
             bool schedule_wb_now = false;
             int resbus = -1;
+            
+            
+
+
+
 
             switch (tmp_inst_trace->get_func_unit()) {
               // In PrivateSM.cc, m_fu[SP_UNIT-1] => SP_UNIT_PIPELINE.
@@ -1222,12 +1670,15 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                       break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
+                      flag_Execute_Compute_Structural_result_bus_has_no_slot_for_latency = true;
                     }
 
                     // std::cout << "@@@@@@" 
                     //           << (*inp.m_out[i]).get_size() << std::endl;
                     // std::cout << "######" 
                     //           << m_hw_cfg->get_num_sp_units() << std::endl;
+                  } else {
+                    flag_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty = true;
                   }
                 }
                 break;
@@ -1280,12 +1731,15 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                       break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
+                      flag_Execute_Compute_Structural_result_bus_has_no_slot_for_latency = true;
                     }
 
                     // std::cout << "@@@@@@" 
                     //           << (*inp.m_out[i]).get_size() << std::endl;
                     // std::cout << "######" 
                     //           << m_hw_cfg->get_num_dp_units() << std::endl;
+                  } else {
+                    flag_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty = true;
                   }
                 }
                 break;
@@ -1337,12 +1791,15 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                       break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
+                      flag_Execute_Compute_Structural_result_bus_has_no_slot_for_latency = true;
                     }
 
                     // std::cout << "@@@@@@" 
                     //           << (*inp.m_out[i]).get_size() << std::endl;
                     // std::cout << "######" 
                     //           << m_hw_cfg->get_num_sfu_units() << std::endl;
+                  } else {
+                    flag_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty = true;
                   }
                 }
                 break;
@@ -1395,12 +1852,15 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                       break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
+                      flag_Execute_Compute_Structural_result_bus_has_no_slot_for_latency = true;
                     }
 
                     // std::cout << "@@@@@@" 
                     //           << (*inp.m_out[i]).get_size() << std::endl;
                     // std::cout << "######" 
                     //           << m_hw_cfg->get_num_tensor_core_units() << std::endl;
+                  } else {
+                    flag_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty = true;
                   }
                 }
                 break;
@@ -1465,6 +1925,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                       break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
+                      flag_Execute_Compute_Structural_result_bus_has_no_slot_for_latency = true;
                     }
                     
 
@@ -1480,10 +1941,65 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                                 << " resbus: " << resbus
                                 << std::endl;
                     }
+                    
+                    flag_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty = true;
+                  
                   }
                 }
                 break;
-              case LDST_UNIT:
+              case LDST_UNIT: {
+                std::vector<std::string> opcode_tokens = tmp_inst_trace->get_opcode_tokens();
+                // std::cout << "opcode_tokens: ";
+                // for (auto x : opcode_tokens) {
+                //   std::cout << x << " ";
+                // }
+                // std::cout << tmp_inst_trace->get_func_unit() << std::endl;
+                /*
+                LDC.U16/LDC.U8/LDC                              => LDC v
+                LDS.U.128/LDS.U16/LDS.64/LDS.U                  => LDS v
+                LDG.E.U16.CONSTANT.GPU/LDG.E.128.CONSTANT.GPU/
+                LDG.E.CONSTANT.SYS/LDG.E.U16.CONSTANT.SYS/
+                LDG.E.64.CONSTANT.SYS/LDG.E.64.CONSTANT.GPU/
+                LDG.E.128.CONSTANT.SYS                          => CONSTANT v
+                LDG.E.U16.STRONG.GPU/LDG.E.EL.STRONG.GPU/
+                LDG.E.STRONG.SYS                                => LDG && STRONG v
+                LDL.LU/LDL.64                                   => LDL v
+                LD.E.SYS                                        => LD. v
+                LDG.E.128.SYS/LDG.E.U16.SYS/LDG.E.SYS/
+                LDG.E.64.SYS/LDG.E.U8.SYS/LDG.E.EF.SYS/
+                LDG.E.EF.U16.SYS                                => ""
+
+                STL/STL.64                                      => STL v
+                STS.U16/STS/STS.128/STS.64                      => STS v
+                STG.E.EF.STRONG.GPU/STG.E.EF.U16.SYS/
+                STG.E.64.SYS/STG.E.128.SYS/
+                STG.E.U16.SYS/STG.E.SYS/
+                STG.E.U16.STRONG.GPU/STG.E.STRONG.SYS/
+                STG.E.U8.SYS                                    => STG v
+                */
+                (*inp.m_out[i]).set_latency(33, reg_id);
+                for (const auto& token : opcode_tokens) {
+                  if (token.find("CONSTANT") != std::string::npos) {
+                    (*inp.m_out[i]).set_latency(8, reg_id);
+                  } else if (token.find("LDC") != std::string::npos) {
+                    (*inp.m_out[i]).set_latency(8, reg_id);
+                  } else if (token.find("LDS") != std::string::npos) {
+                    (*inp.m_out[i]).set_latency(33, reg_id);
+                  } else if (token.find("STRONG") != std::string::npos) {
+                    (*inp.m_out[i]).set_latency(MEM_ACCESS_LATENCY, reg_id);
+                  } else if (token.find("LDL") != std::string::npos) {
+                    (*inp.m_out[i]).set_latency(302, reg_id);
+                  } else if (token.find("LD.") != std::string::npos) {
+                    (*inp.m_out[i]).set_latency(33, reg_id);
+                  } else if (token.find("STL") != std::string::npos) {
+                    (*inp.m_out[i]).set_latency(302, reg_id);
+                  } else if (token.find("STS") != std::string::npos) {
+                    (*inp.m_out[i]).set_latency(33, reg_id);
+                  } else if (token.find("STG") != std::string::npos) {
+                    (*inp.m_out[i]).set_latency(MEM_ACCESS_LATENCY, reg_id);
+                  }
+                }
+
                 if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                   std::cout << "    LDST unit latency: " 
                             << tmp_inst_trace->get_latency() 
@@ -1498,8 +2014,16 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                 }
                 // TODO: get latency from memory_model from reuse distance.
                 // (*inp.m_out[i]).set_latency(tmp_inst_trace->get_latency(), reg_id); // yangjianchao16 0310
-                (*inp.m_out[i]).set_latency(MEM_ACCESS_LATENCY, reg_id);
+                
+                // mem_instn* mem_instns_ptr = 
+                //   tracer->get_one_kernel_one_block_one_uid_mem_instn((*inp.m_out[i]).get_kid(reg_id), 
+                //                                                      (*inp.m_out[i]).get_wid(reg_id), 
+                //                                                      (*inp.m_out[i]).get_uid(reg_id)
+                //                                                     );
+                // std::cout << " LDG/STG: " << mem_instns_ptr->opcode << " " << mem_instns_ptr->has_mem_instn_type() << std::endl;
+                
                 (*inp.m_out[i]).set_initial_interval(tmp_inst_trace->get_initiation_interval(), reg_id);
+                
                 // std::cout << "  LDST initial interval: " 
                 //           << tmp_inst_trace->get_initiation_interval() 
                 //           << std::endl;
@@ -1507,7 +2031,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                 offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units() 
                             + m_hw_cfg->get_num_int_units() + m_hw_cfg->get_num_dp_units()
                             + m_hw_cfg->get_num_tensor_core_units();
-                for (unsigned _ = 0; _ < 1; _++) {
+                for (unsigned _ = 0; _ < m_hw_cfg->get_num_mem_units(); _++) {
                   // if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
                   if (m_fu[offset_fu + _]->can_issue(MEM_ACCESS_LATENCY)) { // yangjianchao16 0310
                     schedule_wb_now = !m_fu[offset_fu + _]->stallable();
@@ -1543,16 +2067,20 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                       break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
+                      flag_Execute_Memory_Structural_icnt_injection_buffer_is_full = true;
                     }
 
                     // std::cout << "@@@@@@" 
                     //           << (*inp.m_out[i]).get_size() << std::endl;
                     // std::cout << "######" 
                     //           << 1 << std::endl;
+                  } else {
+                    flag_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty = true;
                   }
                 }
 
                 break;
+              }
               case SPEC_UNIT_1:
                 if (_DEBUG_LOG_ || _EXECUTE_DEBUG_LOG_) {
                   std::cout << "    SPEC_UNIT_1 unit latency: " 
@@ -1571,7 +2099,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                 offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units() 
                             + m_hw_cfg->get_num_int_units() + m_hw_cfg->get_num_dp_units()
                             + m_hw_cfg->get_num_tensor_core_units()
-                            + 1;
+                            + m_hw_cfg->get_num_mem_units();
                 for (unsigned _ = 0; _ < 1; _++) {
                   if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
                     schedule_wb_now = !m_fu[offset_fu + _]->stallable();
@@ -1604,12 +2132,15 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                       break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
+                      flag_Execute_Compute_Structural_result_bus_has_no_slot_for_latency = true;
                     }
 
                     // std::cout << "@@@@@@" 
                     //           << (*inp.m_out[i]).get_size() << std::endl;
                     // std::cout << "######" 
                     //           << 1 << std::endl;
+                  } else {
+                    flag_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty = true;
                   }
                 }
                 break;
@@ -1631,7 +2162,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                 offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units() 
                             + m_hw_cfg->get_num_int_units() + m_hw_cfg->get_num_dp_units()
                             + m_hw_cfg->get_num_tensor_core_units()
-                            + 1;
+                            + m_hw_cfg->get_num_mem_units();
                 for (unsigned _ = 1; _ < 2; _++) {
                   if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
                     schedule_wb_now = !m_fu[offset_fu + _]->stallable();
@@ -1664,12 +2195,15 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                       break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
+                      flag_Execute_Compute_Structural_result_bus_has_no_slot_for_latency = true;
                     }
 
                     // std::cout << "@@@@@@" 
                     //           << (*inp.m_out[i]).get_size() << std::endl;
                     // std::cout << "######" 
                     //           << 1 << std::endl;
+                  } else {
+                    flag_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty = true;
                   }
                 }
                 break;
@@ -1691,7 +2225,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                 offset_fu = m_hw_cfg->get_num_sp_units() + m_hw_cfg->get_num_sfu_units() 
                             + m_hw_cfg->get_num_int_units() + m_hw_cfg->get_num_dp_units()
                             + m_hw_cfg->get_num_tensor_core_units()
-                            + 1;
+                            + m_hw_cfg->get_num_mem_units();
                 for (unsigned _ = 2; _ < 3; _++) {
                   if (m_fu[offset_fu + _]->can_issue(tmp_inst_trace->get_latency())) {
                     schedule_wb_now = !m_fu[offset_fu + _]->stallable();
@@ -1724,12 +2258,15 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                       break;
                     } else {
                       /* stall issue (cannot reserve result bus) */
+                      flag_Execute_Compute_Structural_result_bus_has_no_slot_for_latency = true;
                     }
 
                     // std::cout << "@@@@@@" 
                     //           << (*inp.m_out[i]).get_size() << std::endl;
                     // std::cout << "######" 
                     //           << 1 << std::endl;
+                  } else {
+                    flag_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty = true;
                   }
                 }
                 break;
@@ -1742,7 +2279,10 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
         }
       }
     }
-    
+    // std::cout << "@@@3";
+
+STOP_AND_REPORT_TIMER_rank(2);
+START_TIMER(3);
 
     /**********************************************************************************************/
     /***                                                                                        ***/
@@ -1753,9 +2293,19 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
       if (_DEBUG_LOG_)
         std::cout << "  **Read Operands: " << "reg_file_port_idx: " 
                   << _iter << std::endl;
-      m_operand_collector->step();
+      m_operand_collector->step(&flag_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+                                &flag_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated,
+                                &flag_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated,
+                                &flag_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+                                tracer,
+                                &clk_record, 
+                                m_cycle
+                                );
     }
+    // std::cout << "@@@4";
 
+STOP_AND_REPORT_TIMER_rank(3);
+START_TIMER(4);
 
     /**********************************************************************************************/
     /***                                                                                        ***/
@@ -1771,20 +2321,57 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
      *   unsigned gwarp_id_start = warps_per_block * block_id;
      *   unsigned gwarp_id_end = gwarp_id_start + warps_per_block - 1;
      */
+    
+    /*
+    Algorithm 1 Instruction Stall Classification
+ 
+    if No active warps to consider then
+      classify idle stall
+      stat_coll->set_At_least_one_Idle_Stall_found(true);                         V
+    else if The next instruction to issue is unavailable then
+      classify control stall
+      stat_coll->set_At_least_one_Control_Stall_found(true);                      X
+    else if Warp is blocked for a synchronization then
+      classify synchronization stall
+      stat_coll->set_At_least_one_Synchronization_Stall_found(true);              X
+    else if Instruction has a data hazard on a pending load then
+      classify memory data stall
+      stat_coll->set_At_least_one_Memory_Data_Stall_found(true);                  V
+    else if Instruction has a structural hazard on load/store unit then
+      classify memory structural stall
+      stat_coll->set_At_least_one_Memory_Structural_Stall_found(true);            V
+    else if Instruction has a data hazard on a pending compute operation then
+      classify compute data stall
+      stat_coll->set_At_least_one_Compute_Data_Stall_found(true);                 V
+    else if Instruction has a structural hazard on a compute unit then
+      classify compute structural stall
+      stat_coll->set_At_least_one_Compute_Structural_Stall_found(true);           V
+    else if Instruction is able to issue then
+      classify no stall
+      stat_coll->set_At_least_one_No_Stall_found(true);                           V
+    end if
+    */
 
+    
     unsigned max_issue_per_warp = m_hw_cfg->get_max_insn_issue_per_warp();
     if (_DEBUG_LOG_)
       std::cout << "  **ISSUE stage: " << std::endl;
+    // Loop for four warp shedulers
+    unsigned total_issued_instn_num = 0;
     for (unsigned _sched_id = 0; _sched_id < num_scheds; _sched_id++) {
       auto sched_id = (last_issue_sched_id + _sched_id) % num_scheds;
       if (_DEBUG_LOG_)
         std::cout << "    D: issue sched_id: " << sched_id << std::endl;
       
+      // std::cout << "### 1" << std::endl;
+      // std::cout << "kernel_block_pair.size(): " << kernel_block_pair.size() << std::endl;
+      // it_kernel_block_pair is the current block that is being considered.
       for (unsigned i = 0; i < kernel_block_pair.size(); i++) {
+        // std::cout << "### 2" << std::endl;
         auto it_kernel_block_pair = 
           kernel_block_pair.begin() + 
           (last_issue_block_index_per_sched[sched_id] + i) % kernel_block_pair.size();
-
+        // std::cout << "### 3" << std::endl;
         if (it_kernel_block_pair->first - 1 != KERNEL_EVALUATION) continue;
 
 
@@ -1833,7 +2420,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
             gwid++) {
           // std::cout << last_issue_warp_ids.size() << std::endl;
           // for (auto it = last_issue_warp_ids.begin(); it != last_issue_warp_ids.end(); it++) {
-          //   std::cout << *it << std::endl;
+          //   std::cout << it->second << std::endl;
           // }
 
           /* Here, wid is actually in the bound [_gwarp_id_start, _gwarp_id_end]. */
@@ -1896,6 +2483,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
               }
             }
           }
+          // std::cout << " @_block_id: " << _kid << " " << _kid_block_id_count  << std::endl;
 
           /* With the above assumption, for _wid from (2,80), global_all_kernels_warp_id:
            * slot 12/13/14 in the IBuffer will be filled.  */
@@ -1904,7 +2492,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
             _kid_block_id_count * _warps_per_block +
             std::accumulate(m_num_warps_per_sm.begin(), 
                             m_num_warps_per_sm.begin() + _kid, 0);
-
+          
           // auto global_all_kernels_warp_id = wid + std::accumulate(m_num_warps_per_sm.begin(), m_num_warps_per_sm.begin() + _kid, 0);
           // std::cout << "D: global_all_kernels_warp_id: " << global_all_kernels_warp_id << std::endl;
           // std::cout << "D: m_ibuffer->is_not_empty(global_all_kernels_warp_id): " 
@@ -2027,11 +2615,26 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                                              ar1,
                                              ar2);
 
+              // get the function unit of the instn
+              auto fu = tmp_inst_trace->get_func_unit();
+
+              if (check_is_scoreboard_collision) {
+                if (fu == LDST_UNIT) {
+                  stat_coll->set_At_least_one_Memory_Data_Stall_found(true);
+                  flag_Issue_Memory_Data_scoreboard = true;
+                } else {
+                  stat_coll->set_At_least_one_Compute_Data_Stall_found(true);
+                  flag_Issue_Compute_Data_scoreboard = true;
+                }
+              }
+              
               if (_DEBUG_LOG_)
                 std::cout << "  check_is_scoreboard_collision: " 
-                          << check_is_scoreboard_collision << std::endl;
-
+                          << check_is_scoreboard_collision << " " << global_all_kernels_warp_id << std::endl;
+              // if (check_is_scoreboard_collision)
+              //   m_scoreboard->printContents(global_all_kernels_warp_id);
               if (tmp_trace_warp_inst->get_opcode() == OP_EXIT && 
+                  tracer->get_one_kernel_one_warp_instn_count(_kid, _gwid) == _fetch_instn_id + 1 &&
                   m_scoreboard->regs_size(global_all_kernels_warp_id) > 0) {
                 check_is_scoreboard_collision = true;
               }
@@ -2041,8 +2644,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                 continue;
               }
               
-              // get the function unit of the instn
-              auto fu = tmp_inst_trace->get_func_unit();
+              
               
               if (_DEBUG_LOG_)
                 std::cout << "  Execute on FU: ";
@@ -2075,15 +2677,22 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                     std::cout << "NON_UNIT" << std::endl;
                   assert(0);
                   break;
-                case SP_UNIT:
+                case SP_UNIT: {
                   if (_DEBUG_LOG_)
                     std::cout << "SP_UNIT" << std::endl;
+                  bool _has_free_slot_sp = m_sp_out->has_free(m_hw_cfg->get_sub_core_model(), sched_id);
+                  if (!_has_free_slot_sp) {
+                    flag_Issue_Compute_Structural_out_has_no_free_slot = true;
+                  }
+                  bool pre = (previous_issued_inst_exec_type != exec_unit_type_t::SP);
+                  if (!pre) {
+                    flag_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute = true;
+                  }
                   sp_pipe_avail = 
                     (m_hw_cfg->get_num_sp_units() > 0) &&
-                    m_sp_out->has_free(m_hw_cfg->get_sub_core_model(), 
-                                      sched_id) &&
+                    _has_free_slot_sp &&
                     (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
-                    previous_issued_inst_exec_type != exec_unit_type_t::SP);
+                    pre);
                   if (_DEBUG_LOG_)
                     std::cout << "sp_pipe_avail: " << sp_pipe_avail << std::endl;
                   if (sp_pipe_avail) {
@@ -2094,17 +2703,27 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                     previous_issued_inst_exec_type = exec_unit_type_t::SP;
                     
                     if (_DEBUG_LOG_) m_sp_out->print();
+                  } else {
+                    stat_coll->set_At_least_one_Compute_Structural_Stall_found(true);
                   }
                   break;
-                case SFU_UNIT:
+                }
+                case SFU_UNIT: {
                   if (_DEBUG_LOG_)
                     std::cout << "SFU_UNIT" << std::endl;
+                  bool _has_free_slot_sfu = m_sfu_out->has_free(m_hw_cfg->get_sub_core_model(), sched_id);
+                  if (!_has_free_slot_sfu) {
+                    flag_Issue_Compute_Structural_out_has_no_free_slot = true;
+                  }
+                  bool pre = (previous_issued_inst_exec_type != exec_unit_type_t::SFU);
+                  if (!pre) {
+                    flag_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute = true;
+                  }
                   sfu_pipe_avail = 
                     (m_hw_cfg->get_num_sfu_units() > 0) &&
-                    m_sfu_out->has_free(m_hw_cfg->get_sub_core_model(), 
-                                        sched_id) &&
+                    _has_free_slot_sfu &&
                     (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
-                    previous_issued_inst_exec_type != exec_unit_type_t::SFU);
+                    pre);
                   if (_DEBUG_LOG_)
                     std::cout << "sfu_pipe_avail: " << sfu_pipe_avail << std::endl;
                   if (sfu_pipe_avail) {
@@ -2115,17 +2734,27 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                     previous_issued_inst_exec_type = exec_unit_type_t::SFU;
                     
                     if (_DEBUG_LOG_) m_sfu_out->print();
+                  } else {
+                    stat_coll->set_At_least_one_Compute_Structural_Stall_found(true);
                   }
                   break;
-                case INT_UNIT:
+                }
+                case INT_UNIT: {
                   if (_DEBUG_LOG_)
                     std::cout << "INT_UNIT" << std::endl;
+                  bool _has_free_slot_int = m_int_out->has_free(m_hw_cfg->get_sub_core_model(), sched_id);
+                  if (!_has_free_slot_int) {
+                    flag_Issue_Compute_Structural_out_has_no_free_slot = true;
+                  }
+                  bool pre = (previous_issued_inst_exec_type != exec_unit_type_t::INT);
+                  if (!pre) {
+                    flag_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute = true;
+                  }
                   int_pipe_avail = 
                     (m_hw_cfg->get_num_int_units() > 0) &&
-                    m_int_out->has_free(m_hw_cfg->get_sub_core_model(), 
-                                        sched_id) &&
+                    _has_free_slot_int &&
                     (!m_hw_cfg->get_dual_issue_diff_exec_units() || 
-                    previous_issued_inst_exec_type != exec_unit_type_t::INT);
+                    pre);
                   if (_DEBUG_LOG_)
                     std::cout << "  int_pipe_avail: " << int_pipe_avail << std::endl;
                   if (int_pipe_avail) {
@@ -2136,17 +2765,27 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                     previous_issued_inst_exec_type = exec_unit_type_t::INT;
                     
                     if (_DEBUG_LOG_) m_int_out->print();
+                  } else {
+                    stat_coll->set_At_least_one_Compute_Structural_Stall_found(true);
                   }
                   break;
-                case DP_UNIT:
+                }
+                case DP_UNIT: {
                   if (_DEBUG_LOG_)
                     std::cout << "DP_UNIT" << std::endl;
+                  bool _has_free_slot_dp = m_dp_out->has_free(m_hw_cfg->get_sub_core_model(), sched_id);
+                  if (!_has_free_slot_dp) {
+                    flag_Issue_Compute_Structural_out_has_no_free_slot = true;
+                  }
+                  bool pre = (previous_issued_inst_exec_type != exec_unit_type_t::DP);
+                  if (!pre) {
+                    flag_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute = true;
+                  }
                   dp_pipe_avail = 
                     (m_hw_cfg->get_num_dp_units() > 0) &&
-                    m_dp_out->has_free(m_hw_cfg->get_sub_core_model(), 
-                                      sched_id) &&
+                    _has_free_slot_dp &&
                     (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
-                    previous_issued_inst_exec_type != exec_unit_type_t::DP);
+                    pre);
                   if (_DEBUG_LOG_)
                     std::cout << "  dp_pipe_avail: " << dp_pipe_avail << std::endl;
                   if (dp_pipe_avail) {
@@ -2157,17 +2796,27 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                     previous_issued_inst_exec_type = exec_unit_type_t::DP;
                     
                     if (_DEBUG_LOG_) m_dp_out->print();
+                  } else {
+                    stat_coll->set_At_least_one_Compute_Structural_Stall_found(true);
                   }
                   break;
-                case TENSOR_CORE_UNIT:
+                }
+                case TENSOR_CORE_UNIT: {
                   if (_DEBUG_LOG_)
                     std::cout << "TENSOR_CORE_UNIT" << std::endl;
+                  bool _has_free_slot_tc = m_tensor_core_out->has_free(m_hw_cfg->get_sub_core_model(), sched_id);
+                  if (!_has_free_slot_tc) {
+                    flag_Issue_Compute_Structural_out_has_no_free_slot = true;
+                  }
+                  bool pre = (previous_issued_inst_exec_type != exec_unit_type_t::TENSOR);
+                  if (!pre) {
+                    flag_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute = true;
+                  }
                   tensor_core_pipe_avail = 
                     (m_hw_cfg->get_num_tensor_core_units() > 0) &&
-                    m_tensor_core_out->has_free(m_hw_cfg->get_sub_core_model(), 
-                                                sched_id) &&
+                    _has_free_slot_tc &&
                     (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
-                    previous_issued_inst_exec_type != exec_unit_type_t::TENSOR);
+                    pre);
                   if (_DEBUG_LOG_)
                     std::cout << "  tensor_core_pipe_avail: " << tensor_core_pipe_avail << std::endl;
                   if (tensor_core_pipe_avail) {
@@ -2178,16 +2827,27 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                     previous_issued_inst_exec_type = exec_unit_type_t::TENSOR;
                     
                     if (_DEBUG_LOG_) m_tensor_core_out->print();
+                  } else {
+                    stat_coll->set_At_least_one_Compute_Structural_Stall_found(true);
                   }
                   break;
-                case LDST_UNIT:
+                }
+                case LDST_UNIT: {
                   if (_DEBUG_LOG_)
                     std::cout << "LDST_UNIT" << std::endl;
+                  bool _has_free_slot_mem = m_mem_out->has_free(m_hw_cfg->get_sub_core_model(), sched_id);
+                  if (!_has_free_slot_mem) {
+                    flag_Issue_Memory_Structural_out_has_no_free_slot = true;
+                  }
+                  bool pre = (previous_issued_inst_exec_type != exec_unit_type_t::LDST);
+                  if (!pre) {
+                    flag_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory = true;
+                  }
                   ldst_pipe_avail = 
-                    m_mem_out->has_free(m_hw_cfg->get_sub_core_model(), 
-                                        sched_id) &&
+                    (m_hw_cfg->get_num_mem_units() > 0) &&
+                    _has_free_slot_mem &&
                     (!m_hw_cfg->get_dual_issue_diff_exec_units() || 
-                    previous_issued_inst_exec_type != exec_unit_type_t::LDST);
+                    pre);
                   if (_DEBUG_LOG_)
                     std::cout << "  ldst_pipe_avail: " << ldst_pipe_avail << std::endl;
                   if (ldst_pipe_avail) {
@@ -2198,17 +2858,27 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                     previous_issued_inst_exec_type = exec_unit_type_t::LDST;
                     
                     if (_DEBUG_LOG_) m_mem_out->print();
+                  } else {
+                    stat_coll->set_At_least_one_Memory_Structural_Stall_found(true);
                   }
                   break;
-                case SPEC_UNIT_1:
+                }
+                case SPEC_UNIT_1: {
                   if (_DEBUG_LOG_)
                     std::cout << "SPEC_UNIT_1" << std::endl;
+                  bool _has_free_slot_spec1 = m_spec_cores_out[0]->has_free(m_hw_cfg->get_sub_core_model(), sched_id);
+                  if (!_has_free_slot_spec1) {
+                    flag_Issue_Compute_Structural_out_has_no_free_slot = true;
+                  }
+                  bool pre = (previous_issued_inst_exec_type != exec_unit_type_t::SPECIALIZED);
+                  if (!pre) {
+                    flag_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute = true;
+                  }
                   spec_1_pipe_avail = 
                     (m_hw_cfg->get_specialized_unit_1_enabled()) &&
-                    m_spec_cores_out[0]->has_free(m_hw_cfg->get_sub_core_model(), 
-                                                  sched_id) &&
+                    _has_free_slot_spec1 &&
                     (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
-                    previous_issued_inst_exec_type != exec_unit_type_t::SPECIALIZED);
+                    pre);
                   if (_DEBUG_LOG_)
                     std::cout << "  spec_1_pipe_avail: " << spec_1_pipe_avail << std::endl;
                   if (spec_1_pipe_avail) {
@@ -2219,17 +2889,27 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                     previous_issued_inst_exec_type = exec_unit_type_t::SPECIALIZED;
                     
                     if (_DEBUG_LOG_) m_spec_cores_out[0]->print();
+                  } else {
+                    stat_coll->set_At_least_one_Compute_Structural_Stall_found(true);
                   }
                   break;
-                case SPEC_UNIT_2:
+                }
+                case SPEC_UNIT_2: {
                   if (_DEBUG_LOG_)
                     std::cout << "SPEC_UNIT_2" << std::endl;
+                  bool _has_free_slot_spec2 = m_spec_cores_out[1]->has_free(m_hw_cfg->get_sub_core_model(), sched_id);
+                  if (!_has_free_slot_spec2) {
+                    flag_Issue_Compute_Structural_out_has_no_free_slot = true;
+                  }
+                  bool pre = (previous_issued_inst_exec_type != exec_unit_type_t::SPECIALIZED);
+                  if (!pre) {
+                    flag_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute = true;
+                  }
                   spec_2_pipe_avail = 
                     (m_hw_cfg->get_specialized_unit_2_enabled()) &&
-                    m_spec_cores_out[1]->has_free(m_hw_cfg->get_sub_core_model(), 
-                                                  sched_id) &&
+                    _has_free_slot_spec2 &&
                     (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
-                    previous_issued_inst_exec_type != exec_unit_type_t::SPECIALIZED);
+                    pre);
                   if (_DEBUG_LOG_)
                     std::cout << "  spec_2_pipe_avail: " << spec_2_pipe_avail << std::endl;
                   if (spec_2_pipe_avail) {
@@ -2240,17 +2920,27 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                     previous_issued_inst_exec_type = exec_unit_type_t::SPECIALIZED;
                     
                     if (_DEBUG_LOG_) m_spec_cores_out[1]->print();
+                  } else {
+                    stat_coll->set_At_least_one_Compute_Structural_Stall_found(true);
                   }
                   break;
-                case SPEC_UNIT_3:
+                }
+                case SPEC_UNIT_3: {
                   if (_DEBUG_LOG_)
                     std::cout << "SPEC_UNIT_3" << std::endl;
+                  bool _has_free_slot_spec3 = m_spec_cores_out[2]->has_free(m_hw_cfg->get_sub_core_model(), sched_id);
+                  if (!_has_free_slot_spec3) {
+                    flag_Issue_Compute_Structural_out_has_no_free_slot = true;
+                  }
+                  bool pre = (previous_issued_inst_exec_type != exec_unit_type_t::SPECIALIZED);
+                  if (!pre) {
+                    flag_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute = true;
+                  }
                   spec_3_pipe_avail = 
                     (m_hw_cfg->get_specialized_unit_3_enabled()) &&
-                    m_spec_cores_out[2]->has_free(m_hw_cfg->get_sub_core_model(), 
-                                                  sched_id) &&
+                    _has_free_slot_spec3 &&
                     (!m_hw_cfg->get_dual_issue_diff_exec_units() ||
-                    previous_issued_inst_exec_type != exec_unit_type_t::SPECIALIZED);
+                    pre);
                   if (_DEBUG_LOG_)
                     std::cout << "  spec_3_pipe_avail: " << spec_3_pipe_avail << std::endl;
                   if (spec_3_pipe_avail) {
@@ -2261,8 +2951,11 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                     previous_issued_inst_exec_type = exec_unit_type_t::SPECIALIZED;
                     
                     if (_DEBUG_LOG_) m_spec_cores_out[2]->print();
+                  } else {
+                    stat_coll->set_At_least_one_Compute_Structural_Stall_found(true);
                   }
                   break;
+                }
                 default:
                   if (_DEBUG_LOG_)
                     std::cout << "default UNIT" << std::endl;
@@ -2321,7 +3014,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
               }
 
               if (warp_inst_issued) {
-                
+                total_issued_instn_num++;
                 if (_CALIBRATION_LOG_) {
                   std::cout << "    ISSUE: ("
                             << _kid << ", "
@@ -2329,8 +3022,11 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                             << _fetch_instn_id << ", "
                             << _pc << ")" << std::endl;
                 }
+                set_clk_record<2>(_kid, _gwid, _fetch_instn_id, m_cycle);
               }
               
+            } else {
+              stat_coll->set_At_least_one_Idle_Stall_found(true);
             }
 
             if (warp_inst_issued) {
@@ -2371,7 +3067,15 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
     
     last_issue_sched_id = (last_issue_sched_id + 1) % num_scheds;
 
-    
+    if (total_issued_instn_num >= num_scheds) {
+      stat_coll->set_At_least_one_No_Stall_found(true);
+    }
+    // std::cout << "total_issued_instn_num: " << (total_issued_instn_num >= num_scheds) << std::endl;
+    // std::cout << "@@@5";
+
+STOP_AND_REPORT_TIMER_rank(4);
+START_TIMER(5);
+
     /**********************************************************************************************/
     /***                                                                                        ***/
     /***                           Fetch and Decode instns to Fbuffer.                          ***/
@@ -2418,6 +3122,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
         auto _wid = m_inst_fetch_buffer->wid;
         auto _kid = m_inst_fetch_buffer->kid;
         auto _uid = m_inst_fetch_buffer->uid;
+        // std::cout << "_wid: " << _wid << " _kid: " << _kid << " _uid: " << _uid << std::endl;
 
         unsigned __pc, __wid, __kid, __uid;                         // yangjianchao16 add 20240131
 
@@ -2479,7 +3184,12 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
           _kid_block_id_count * _warps_per_block +
           std::accumulate(m_num_warps_per_sm.begin(), 
                           m_num_warps_per_sm.begin() + _kid, 0);
+        // auto global_all_kernels_warp_id = _wid;
         
+        // std::cout << "global_all_kernels_warp_id: " << global_all_kernels_warp_id << std::endl;
+
+        // std::cout << "@@@ " << m_ibuffer->has_free_slot(global_all_kernels_warp_id) 
+        //           << " " << std::hex << _pc << std::dec << " " << _wid << " " << _kid << " " << _uid << std::endl;
         if (m_ibuffer->has_free_slot(global_all_kernels_warp_id)) {
           auto _entry = ibuffer_entry(_pc, _wid, _kid, _uid);
           m_ibuffer->push_back(global_all_kernels_warp_id, _entry);
@@ -2494,6 +3204,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                       << _entry.pc << ")" << std::endl;
             
           }
+          set_clk_record<1>(_entry.kid, _entry.wid, _entry.uid, m_cycle);
 
           if (m_inst_fetch_buffer_copy->m_valid) {
             ibuffer_entry __entry = ibuffer_entry(__pc, __wid, __kid, __uid);       // yangjianchao16 add 20240131
@@ -2506,6 +3217,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                         << __entry.uid << ", "
                         << __entry.pc << ")" << std::endl;
             }
+            set_clk_record<1>(__entry.kid, __entry.wid, __entry.uid, m_cycle);
           }
 
           if (_DEBUG_LOG_) {
@@ -2526,7 +3238,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                        "m_valid == false" << std::endl;
       }
       
-      // std::cout << "D: _gwarp_id_start, _gwarp_id_end: " << _gwarp_id_start << " " << _gwarp_id_end << std::endl;
+      // std::cout << "@@@ 1" << std::endl;
       
       /* Continue the loop in advance based on the state. */
       if (m_inst_fetch_buffer->m_valid) {
@@ -2543,92 +3255,87 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
       //             << " " << it_kernel_block_pair->second << std::endl;
       //   std::cout << "@ KERNEL_EVALUATION: " << KERNEL_EVALUATION << std::endl;
       // }
+
+      unsigned all_blocks_in_this_sm = 0;
+      unsigned first_block_in_this_sm = -1;
+      for (auto it_kernel_block_pair_ = kernel_block_pair.begin(); 
+                it_kernel_block_pair_ != kernel_block_pair.end();
+                it_kernel_block_pair_++) {
+        // std::cout << "it_kernel_block_pair_: " << it_kernel_block_pair_->first << " " 
+        //           << it_kernel_block_pair_->second << " " << KERNEL_EVALUATION << std::endl;
+        if ((it_kernel_block_pair_->first - 1) == KERNEL_EVALUATION) {
+          all_blocks_in_this_sm += 1;
+          // std::cout << "   all_blocks_in_this_sm+1" << std::endl;
+          if (first_block_in_this_sm == -1) {
+            first_block_in_this_sm = std::distance(kernel_block_pair.begin(), it_kernel_block_pair_);
+          }
+        }
+      }
+
+
+
+      // std::cout << "all_blocks_in_this_sm: " << all_blocks_in_this_sm << std::endl;
+    if (true) {
       
+      std::vector<std::pair<int, int>> kernel_block_pair_need_to_check;
       for (auto it_kernel_block_pair = kernel_block_pair.begin(); 
                 it_kernel_block_pair != kernel_block_pair.end();
                 it_kernel_block_pair++) {
         if (it_kernel_block_pair->first - 1 != KERNEL_EVALUATION) continue;
+        unsigned _index= std::distance(kernel_block_pair.begin(), it_kernel_block_pair);
+        if (m_thread_block_has_executed_status[_index] == true && get_num_m_warp_active_status(_index) > 0) {
+          kernel_block_pair_need_to_check.push_back(*it_kernel_block_pair);
+        }
+      }
 
-        // std::cout << " it_kernel_block_pair: " << it_kernel_block_pair->first << " " 
-        //           << it_kernel_block_pair->second << std::endl;
-        /* Calculate the distance of it_kernel_block_pair to kernel_block_pair.begin(). */
-        unsigned _index = std::distance(kernel_block_pair.begin(), it_kernel_block_pair);
-        if (_index != distance_last_fetch_kid) continue;
-        
-        /* Terminate the loop in advance based on the state. */
+      // std::cout << "kernel_block_pair_need_to_check: " << kernel_block_pair_need_to_check.size() << std::endl;
+
+      for (unsigned check_block_id_index_idx = 0; check_block_id_index_idx < kernel_block_pair_need_to_check.size(); check_block_id_index_idx++) {
         if (m_inst_fetch_buffer->m_valid) break;
         
-        /* -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
-         * Here, kernel_block_pair is (1,80), (1,160), (1,0), (2,0), (3,0), (4,0)
-         * for it_kernel_block_pair : kernel_block_pair:
-         *   _index           =   0,   1,   2,   3,   4,   5
-         *   _kid             =   0,   0,   0,   1,   2,   3
-         *   _block_id        =  80, 160,   0,   0,   0,   0
-         *   _warps_per_block =   3,   3,   3,   3,   3,   3
-         *   _gwarp_id_start  = 240, 480,   0,   0,   0,   0
-         *   _gwarp_id_end    = 242, 482,   1,   1,   1,   1
-         */
+        unsigned check_block_id = (check_block_id_index_idx + last_check_block_id_index_idx) % kernel_block_pair_need_to_check.size();
         
-        unsigned _kid = it_kernel_block_pair->first - 1;
-        unsigned _block_id = it_kernel_block_pair->second;
+        unsigned _kid = kernel_block_pair_need_to_check[check_block_id].first - 1;
+        unsigned _block_id = kernel_block_pair_need_to_check[check_block_id].second;
         unsigned _warps_per_block = appcfg->get_num_warp_per_block(_kid);
         unsigned _gwarp_id_start = _warps_per_block * _block_id;
         unsigned _gwarp_id_end = _gwarp_id_start + _warps_per_block - 1;
-        
-        /* FETCH */
-        /* Here, gwid is the global warp id in the whole kernel, for example,
-         *   -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
-         * and there are 3 warps per block in the 1st kernel, then in the following loop:
-         *   _gwarp_id_start = 80 * 3 = 240, 
-         *   _gwarp_id_end   = 80 + 3 - 1 = 242,
-         *   gwid = 240, 241, 242. */
-        for (auto gwid = _gwarp_id_start; gwid <= _gwarp_id_end; gwid++) {
-          /* Round-robin issue */
-          /* In fact, here wid is still in the bound [_gwarp_id_start, _gwarp_id_end], and
-           * it is just a reorder of the loop to simulate the round-robin issue. So with the 
-           * last supposition, gwid = 240 or 241 or 242. 
-           * The reason that here we need the global warp id in the whole kernel, is that, we
-           * will get new instns, where the get_one_kernel_one_warp_instn_size function should
-           * be passed the parameter (kernel id, global warp id in the whole kernel). */
-          auto wid = (last_fetch_warp_id[_kid] + gwid) % _warps_per_block + _gwarp_id_start;
-          
-          // std::cout << "gwid: " << gwid << std::endl;
-          // std::cout << "_gwarp_id_start: " << _gwarp_id_start << std::endl;
-          // std::cout << "_gwarp_id_end: " << _gwarp_id_end << std::endl;
-          // std::cout << "wid: " << wid << std::endl;
 
-          // std::cout << "D: last_fetch_warp_id[_kid], gwid, wid: " 
-          //           << last_fetch_warp_id[_kid] << " " << gwid << " " << wid << std::endl;
+        for (auto gwid = _gwarp_id_start; gwid <= _gwarp_id_end; gwid++) {
+          unsigned wid = (gwid + kernel_id_block_id_last_fetch_wid[{_kid, check_block_id}]) % _warps_per_block  + _gwarp_id_start;
           
-          /* check if the ibuffer has free slot */
+          unsigned _index;
+          for (auto it_kernel_block_pair = kernel_block_pair.begin(); 
+                    it_kernel_block_pair != kernel_block_pair.end();
+                    it_kernel_block_pair++) {
+            if ((it_kernel_block_pair->first - 1 == _kid) && (it_kernel_block_pair->second == _block_id)) {
+              _index = std::distance(kernel_block_pair.begin(), it_kernel_block_pair);
+            }
+          }
+          
+          unsigned _w_id_ = (unsigned)(gwid % _warps_per_block);
+          if (!(m_thread_block_has_executed_status[_index] == true && m_warp_active_status[_index][_w_id_])) continue;
+
           bool fetch_instn = false;
+
           while (!m_inst_fetch_buffer->m_valid) {
-            /* curr_instn_id_per_warp stores the current instn id of each warp, which is indexed 
-             * using the object curr_instn_id_per_warp_entry(_kid,_block_id,gwid-_gwarp_id_start).
-             * After accessing a new instn, the value curr_instn_id_per_warp[_entry] should plus 1. */
-            
-            // std::cout << "D: Access curr_instn_id_per_warp: " << _kid << " " <<  _block_id << " " << gwid - _gwarp_id_start << std::endl;
-            
-            
             curr_instn_id_per_warp_entry _entry = curr_instn_id_per_warp_entry(_kid, _block_id, wid - _gwarp_id_start);
             unsigned fetch_instn_id = curr_instn_id_per_warp[_entry];
             
-            // std::cout << "D: fetch_instn_id: " << fetch_instn_id << std::endl;
+            unsigned one_warp_instn_size = tracer->get_one_kernel_one_warp_instn_size(_kid, wid);
             
-            if (tracer->get_one_kernel_one_warp_instn_size(_kid, wid) <= fetch_instn_id) break;
+            if (one_warp_instn_size <= fetch_instn_id) {
+              unsigned _wid_1 = wid - _gwarp_id_start;
+              m_warp_active_status[_index][_wid_1] = false;
+              break;
+            }
 
             compute_instn* tmp = tracer->get_one_kernel_one_warp_one_instn(_kid, wid, fetch_instn_id);
             
-            // std::cout << "D: @@@ " << tmp << std::endl;
             _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
-            
-            // m_inst_fetch_buffer = inst_fetch_buffer_entry(tmp_inst_trace->m_pc, wid, _kid, fetch_instn_id);
-            // if (tmp_inst_trace != nullptr) {
-            
+
               if (!tmp_inst_trace->m_valid) break;
 
-              // std::cout << "D: @@@ "  << tmp_inst_trace->m_pc << std::endl;
-            
               m_inst_fetch_buffer->pc = tmp_inst_trace->m_pc;
               /* MOST IMPORTANT: From here that <kid, wid, uid, pc> that are transferred in the 
                * pipeline is defined. The most important thing is that, the wid is the global
@@ -2644,7 +3351,203 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
               m_inst_fetch_buffer->kid = _kid;
               m_inst_fetch_buffer->uid = fetch_instn_id;
               m_inst_fetch_buffer->m_valid = true;
+              
+              active_during_this_cycle = true;
+              insert_into_active_warps_id(&active_warps_id, wid);
 
+              if (_CALIBRATION_LOG_) {
+                std::cout << "    FETCH: ("
+                          << _kid << ", "
+                          << wid << ", "
+                          << fetch_instn_id << ", "
+                          << tmp_inst_trace->m_pc << ")" << std::endl;
+              }
+              set_clk_record<0>(_kid, wid, fetch_instn_id, m_cycle);
+              
+              fetch_instn = true;
+              
+              curr_instn_id_per_warp[_entry] += 2;               // yangjianchao16 add 20240131
+              
+              /* COPY FETCH START */              // yangjianchao16 add 20240131
+              if (fetch_instn_id + 1 < tracer->get_one_kernel_one_warp_one_instn_max_size(_kid, wid)) {
+                tmp = tracer->get_one_kernel_one_warp_one_instn(_kid, wid, fetch_instn_id + 1);
+                tmp_inst_trace = tmp->inst_trace;
+                if (!tmp_inst_trace->m_valid) break;
+                m_inst_fetch_buffer_copy->pc = tmp_inst_trace->m_pc;
+                m_inst_fetch_buffer_copy->wid = wid;
+                m_inst_fetch_buffer_copy->kid = _kid;
+                m_inst_fetch_buffer_copy->uid = fetch_instn_id + 1;
+                m_inst_fetch_buffer_copy->m_valid = true;
+              } else {
+                m_inst_fetch_buffer_copy->pc = tmp_inst_trace->m_pc;
+                m_inst_fetch_buffer_copy->wid = wid;
+                m_inst_fetch_buffer_copy->kid = _kid;
+                m_inst_fetch_buffer_copy->uid = fetch_instn_id;
+                m_inst_fetch_buffer_copy->m_valid = false;
+              }
+              
+              if (_CALIBRATION_LOG_) {
+                std::cout << "    FETCH: ("
+                          << _kid << ", "
+                          << wid << ", "
+                          << fetch_instn_id + 1 << ", "
+                          << tmp_inst_trace->m_pc << ")" << std::endl;
+              }
+              set_clk_record<0>(_kid, wid, fetch_instn_id + 1, m_cycle);
+          }
+        }
+        kernel_id_block_id_last_fetch_wid[{_kid, check_block_id}] = 
+          (kernel_id_block_id_last_fetch_wid[{_kid, check_block_id}] + 1) % _warps_per_block;
+      }
+      
+      // last_check_block_id_index_idx = (last_check_block_id_index_idx + 1) % kernel_block_pair_need_to_check.size();
+      last_check_block_id_index_idx++;
+    }
+
+    if (false) {
+      unsigned _index_ = -1;
+      for (auto it_kernel_block_pair = kernel_block_pair.begin(); 
+                it_kernel_block_pair != kernel_block_pair.end();
+                it_kernel_block_pair++) {
+        if (it_kernel_block_pair->first - 1 != KERNEL_EVALUATION) continue;
+        _index_++;
+        // std::cout << "        _index_ : " << _index_ << std::endl;
+        // std::cout << "        distance_last_fetch_kid : " << distance_last_fetch_kid << std::endl;
+        // std::cout << "@@@ 3" << std::endl;
+        // std::cout << " it_kernel_block_pair: " << it_kernel_block_pair->first << " " 
+        //           << it_kernel_block_pair->second << std::endl;
+        /* Calculate the distance of it_kernel_block_pair to kernel_block_pair.begin(). */
+        // unsigned _index_ = std::distance(kernel_block_pair.begin(), it_kernel_block_pair);
+
+        if (_index_ < distance_last_fetch_kid) continue;
+        else if (_index_ > distance_last_fetch_kid) break;
+        // std::cout << "@@@ 4" << std::endl;
+        /* Terminate the loop in advance based on the state. */
+        if (m_inst_fetch_buffer->m_valid) break;
+        
+        /* -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
+         * Here, kernel_block_pair is (1,80), (1,160), (1,0), (2,0), (3,0), (4,0)
+         * for it_kernel_block_pair : kernel_block_pair:
+         *   _index_          =   0,   1,   2,   3,   4,   5
+         *   _kid             =   0,   0,   0,   1,   2,   3
+         *   _block_id        =  80, 160,   0,   0,   0,   0
+         *   _warps_per_block =   3,   3,   3,   3,   3,   3
+         *   _gwarp_id_start  = 240, 480,   0,   0,   0,   0
+         *   _gwarp_id_end    = 242, 482,   1,   1,   1,   1
+         */
+        
+        unsigned _kid = it_kernel_block_pair->first - 1;
+        unsigned _block_id = it_kernel_block_pair->second;
+        unsigned _warps_per_block = appcfg->get_num_warp_per_block(_kid);
+        unsigned _gwarp_id_start = _warps_per_block * _block_id;
+        unsigned _gwarp_id_end = _gwarp_id_start + _warps_per_block - 1;
+        // std::cout << "@@@ 5" << std::endl;
+        // std::cout << "D: _gwarp_id_start, _gwarp_id_end: " << _gwarp_id_start << " " << _gwarp_id_end << std::endl;
+
+        /* FETCH */
+        /* Here, gwid is the global warp id in the whole kernel, for example,
+         *   -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
+         * and there are 3 warps per block in the 1st kernel, then in the following loop:
+         *   _gwarp_id_start = 80 * 3 = 240, 
+         *   _gwarp_id_end   = 80 + 3 - 1 = 242,
+         *   gwid = 240, 241, 242. */
+
+        bool need_contiue_fetch_outer = false;
+
+        for (auto gwid = _gwarp_id_start; gwid <= _gwarp_id_end; gwid++) {
+          /* Round-robin issue */
+          /* In fact, here wid is still in the bound [_gwarp_id_start, _gwarp_id_end], and
+           * it is just a reorder of the loop to simulate the round-robin issue. So with the 
+           * last supposition, gwid = 240 or 241 or 242. 
+           * The reason that here we need the global warp id in the whole kernel, is that, we
+           * will get new instns, where the get_one_kernel_one_warp_instn_size function should
+           * be passed the parameter (kernel id, global warp id in the whole kernel). */
+          auto wid = (last_fetch_warp_id[_kid] + gwid) % _warps_per_block + _gwarp_id_start;
+
+          unsigned _index = std::distance(kernel_block_pair.begin(), it_kernel_block_pair);
+          unsigned _w_id_ = (unsigned)(wid % _warps_per_block);
+          if (!(m_thread_block_has_executed_status[_index] == true && m_warp_active_status[_index][_w_id_])) continue;
+          
+          // std::cout << "           gwid: " << gwid << std::endl;
+          // std::cout << "           _gwarp_id_start: " << _gwarp_id_start << std::endl;
+          // std::cout << "           _gwarp_id_end: " << _gwarp_id_end << std::endl;
+          // std::cout << "           wid: " << wid << std::endl;
+
+          // std::cout << "           D: last_fetch_warp_id[_kid], gwid, wid: " 
+          //           << last_fetch_warp_id[_kid] << " " << gwid << " " << wid << std::endl;
+          
+          /* check if the ibuffer has free slot */
+          bool fetch_instn = false;
+          bool need_contiue_fetch = false;
+          // std::cout << "           D: m_inst_fetch_buffer->m_valid: " << m_inst_fetch_buffer->m_valid << std::endl;
+          while (!m_inst_fetch_buffer->m_valid) {
+            // std::cout << "@@@ " << !m_inst_fetch_buffer->m_valid << std::endl;
+            /* curr_instn_id_per_warp stores the current instn id of each warp, which is indexed 
+             * using the object curr_instn_id_per_warp_entry(_kid,_block_id,gwid-_gwarp_id_start).
+             * After accessing a new instn, the value curr_instn_id_per_warp[_entry] should plus 1. */
+            
+            // std::cout << "D: Access curr_instn_id_per_warp: " << _kid << " " <<  _block_id << " " << gwid - _gwarp_id_start << std::endl;
+            
+            
+            curr_instn_id_per_warp_entry _entry = curr_instn_id_per_warp_entry(_kid, _block_id, wid - _gwarp_id_start);
+            unsigned fetch_instn_id = curr_instn_id_per_warp[_entry];
+            
+            // std::cout << "           _kid, wid: " << _kid << " " << wid << std::endl;
+            // std::cout << "           D: fetch_instn_id: " << fetch_instn_id << std::endl;
+            // std::cout << "           D: tracer->get_one_kernel_one_warp_one_instn_max_size(_kid, wid): " << tracer->get_one_kernel_one_warp_one_instn_max_size(_kid, wid) << std::endl;
+            unsigned one_warp_instn_size = tracer->get_one_kernel_one_warp_instn_size(_kid, wid);
+            
+            if (one_warp_instn_size <= fetch_instn_id) {
+              unsigned _index_1 = std::distance(kernel_block_pair.begin(), it_kernel_block_pair);
+              unsigned _wid_1 = wid - _gwarp_id_start;
+              // std::cout << "         set m_warp_active_status[_index_1][_wid_1] = false: " << _index_1 << " " << _wid_1 << std::endl;
+              m_warp_active_status[_index_1][_wid_1] = false;
+            }
+            if (one_warp_instn_size <= fetch_instn_id) {
+              // std::cout << "           need_contiue_fetch" << std::endl;
+              need_contiue_fetch = true;
+              break;
+            }
+            // std::cout << "@@@ 6" << std::endl;
+
+
+            // std::cout << "           " << _kid << " " << wid << " " << fetch_instn_id << std::endl;
+            compute_instn* tmp = tracer->get_one_kernel_one_warp_one_instn(_kid, wid, fetch_instn_id);
+            
+            // std::cout << "D: @@@@@@ : " << (tmp == nullptr) << std::endl;
+            
+
+            _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
+            
+            // m_inst_fetch_buffer = inst_fetch_buffer_entry(tmp_inst_trace->m_pc, wid, _kid, fetch_instn_id);
+            // if (tmp_inst_trace != nullptr) {
+              // std::cout << "11111111111" << std::endl;
+              // std::cout << !tmp_inst_trace->m_valid << std::endl;
+              // std::cout << "22222222222" << std::endl;
+              if (!tmp_inst_trace->m_valid) break;
+
+              // std::cout << "D: @@@ "  << tmp_inst_trace->m_pc << std::endl;
+              // std::cout << "1111" << std::endl;
+              m_inst_fetch_buffer->pc = tmp_inst_trace->m_pc;
+              // std::cout << "2222" << std::endl;
+              /* MOST IMPORTANT: From here that <kid, wid, uid, pc> that are transferred in the 
+               * pipeline is defined. The most important thing is that, the wid is the global
+               * warp id in the whole kernel, for example,
+               *   -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
+               * and there are 3 warps per block in the 1st kernel, then:
+               * wid during the transfer in the pipeline is 
+               *   80 * 3 = 240     or 
+               *   80 * 3 + 1 = 241 or
+               *   80 * 3 + 2 = 242.
+               */
+              m_inst_fetch_buffer->wid = wid;
+              // std::cout << "3333" << std::endl;
+              m_inst_fetch_buffer->kid = _kid;
+              // std::cout << "4444" << std::endl;
+              m_inst_fetch_buffer->uid = fetch_instn_id;
+              // std::cout << "5555" << std::endl;
+              m_inst_fetch_buffer->m_valid = true;
+              // std::cout << "6666" << std::endl;
               if (_DEBUG_LOG_)
                 std::cout << "  **Fetch instn "
                              "(pc,gwid,kid,fetch_instn_id): " << "(" 
@@ -2666,6 +3569,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                           << fetch_instn_id << ", "
                           << tmp_inst_trace->m_pc << ")" << std::endl;
               }
+              set_clk_record<0>(_kid, wid, fetch_instn_id, m_cycle);
               fetch_instn = true;
               // curr_instn_id_per_warp[_entry]++;               // yangjianchao16 del 20240131
               curr_instn_id_per_warp[_entry] += 2;               // yangjianchao16 add 20240131
@@ -2675,6 +3579,7 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                           << " wid:" << _entry.warp_id << std::endl;
 
               /* COPY FETCH START */              // yangjianchao16 add 20240131
+              // std::cout << " ### " << tracer->get_one_kernel_one_warp_one_instn_max_size(_kid, wid) << std::endl;
               if (fetch_instn_id + 1 < tracer->get_one_kernel_one_warp_one_instn_max_size(_kid, wid)) {
                 tmp = tracer->get_one_kernel_one_warp_one_instn(_kid, wid, fetch_instn_id + 1);
                 tmp_inst_trace = tmp->inst_trace;
@@ -2710,11 +3615,21 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
                           << fetch_instn_id + 1 << ", "
                           << tmp_inst_trace->m_pc << ")" << std::endl;
               }
+              set_clk_record<0>(_kid, wid, fetch_instn_id + 1, m_cycle);
               /* COPY FETCH END */                // yangjianchao16 add 20240131
 
               
             // }
           }
+
+          if (gwid == _gwarp_id_end && need_contiue_fetch) {
+            need_contiue_fetch_outer = true;
+            break;
+          }
+
+          if (need_contiue_fetch) {
+            continue;
+          } 
           
           if (fetch_instn) break;
           else {
@@ -2724,16 +3639,38 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
 
         }
 
+        // std::cout << "          it_kernel_block_pair: " 
+        //           << std::distance(kernel_block_pair.begin(), it_kernel_block_pair) << " " 
+        //           << all_blocks_in_this_sm << std::endl;
+        if (need_contiue_fetch_outer && 
+            // (it_kernel_block_pair + 1 != kernel_block_pair.end())
+            (std::distance(kernel_block_pair.begin(), it_kernel_block_pair) - first_block_in_this_sm != all_blocks_in_this_sm - 1) 
+           ) {
+          distance_last_fetch_kid = (distance_last_fetch_kid + 1) % all_blocks_in_this_sm;
+          // std::cout << "                  set distance_last_fetch_kid 1 = " << distance_last_fetch_kid << std::endl;
+          continue;
+        }
+
         // last_fetch_warp_id = (last_fetch_warp_id + 1) % _warps_per_block;
         last_fetch_warp_id[_kid] = (last_fetch_warp_id[_kid] + 1) % _warps_per_block;
       }
       // std::cout << ";10 ";
       // std::cout << KERNEL_EVALUATION << " " << m_num_blocks_per_kernel[KERNEL_EVALUATION] << " ";
       // distance_last_fetch_kid = (distance_last_fetch_kid + 1) % m_num_blocks_per_kernel[KERNEL_EVALUATION];
-      distance_last_fetch_kid = (distance_last_fetch_kid + 1) % kernel_block_pair.size();
+      // distance_last_fetch_kid = (distance_last_fetch_kid + 1) % kernel_block_pair.size();
+      // std::cout << "@@@ 7 " << all_blocks_in_this_sm << std::endl;
+      distance_last_fetch_kid = (distance_last_fetch_kid + 1) % all_blocks_in_this_sm;
+      // std::cout << "                  set distance_last_fetch_kid 2 = " << distance_last_fetch_kid << std::endl;
+
       // std::cout << ";11 ";
     }
-    
+    }
+
+    // std::cout << "@@@6";
+
+STOP_AND_REPORT_TIMER_rank(5);
+START_TIMER(6);
+
     /**********************************************************************************************/
     /***                                                                                        ***/
     /***                            Release all register bank state.                            ***/
@@ -2753,6 +3690,8 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
               it_kernel_block_pair != kernel_block_pair.end();
               it_kernel_block_pair++) {
       if (it_kernel_block_pair->first - 1 != KERNEL_EVALUATION) continue;
+
+      // std::cout << "D: SM-" << m_smid << " Kernel-" << it_kernel_block_pair->first - 1 << " Block-" << it_kernel_block_pair->second << std::endl;
       
       /* -trace_issued_sm_id_0 6,0,(1,80),(1,160),(1,0),(2,0),(3,0),(4,0)
        * Here, kernel_block_pair is (1,80), (1,160), (1,0), (2,0), (3,0), (4,0)
@@ -2799,19 +3738,26 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
          * 80 * 3 = 240.
          */
 
-        // std::cout << "D: SM-" << m_smid 
+        // std::cout << "    D: SM-" << m_smid 
         //           << " Kernel-" << _kid 
         //           << " Warp-" << _w_id_ 
         //           << " active status: " 
         //           << m_warp_active_status[_index][_w_id_] << std::endl;
 
-        if (m_warp_active_status[_index][_w_id_]) {
+        if ( (m_thread_block_has_executed_status[_index] == true && m_warp_active_status[_index][_w_id_]) ||
+             (m_thread_block_has_executed_status[_index] == false) 
+           ) {
           all_warps_finished = false;
           break;
         }
+
+        // if (m_warp_active_status[_index][_w_id_]) {
+        //   all_warps_finished = false;
+        //   break;
+        // }
       }
 
-      if (!all_warps_finished) break;
+      if (!all_warps_finished) break; // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     }
     
     if (all_warps_finished) {
@@ -2825,7 +3771,172 @@ void PrivateSM::run(unsigned KERNEL_EVALUATION, unsigned MEM_ACCESS_LATENCY){
       active_cycles++;
     }
 
-    active_warps_id_size_sum += m_active_warps;
+    // std::cout << m_active_warps << " " << std::endl;
+
+    active_warps_id_size_sum +=  get_num_m_warp_active_status();
+
+    /*
+    void set_At_least_one_Compute_Structural_Stall_found(bool value) { At_least_one_Compute_Structural_Stall_found = value; }
+    void set_At_least_one_Compute_Data_Stall_found(bool value) { At_least_one_Compute_Data_Stall_found = value; }
+    void set_At_least_one_Memory_Structural_Stall_found(bool value) { At_least_one_Memory_Structural_Stall_found = value; }
+    void set_At_least_one_Memory_Data_Stall_found(bool value) { At_least_one_Memory_Data_Stall_found = value; }
+    void set_At_least_one_Synchronization_Stall_found(bool value) { At_least_one_Synchronization_Stall_found = value; }
+    void set_At_least_one_Control_Stall_found(bool value) { At_least_one_Control_Stall_found = value; }
+    void set_At_least_one_Idle_Stall_found(bool value) { At_least_one_Idle_Stall_found = value; }
+    void set_At_least_one_No_Stall_found(bool value) { At_least_one_No_Stall_found = value; }
+    */
+    /*
+    Algorithm 2 Issue Cycle Stall Classification
+    
+    if At least one instruction was able to issue then
+      classify no stall
+    else if At least one memory structural stall was found then
+      classify memory structural stall
+    else if At least one memory data stall was found then
+      classify memory data stall
+    else if At least one synchronization stall was found then
+      classify synchronization stall
+    else if At least one compute structural stall was found then
+      classify compute structural stall
+    else if At least one compute data stall was found then
+      classify compute data stall
+    else if At least one control stall was found then
+      classify control stall
+    else if At least one idle stall was found then
+      classify idle stall
+    end if
+    */
+    /*
+    bool flag_Issue_Compute_Structural_out_has_no_free_slot = false;
+    bool flag_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute = false;
+    bool flag_Execute_Compute_Structural_result_bus_has_no_slot_for_latency = false;
+    bool flag_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty = false;
+    bool flag_Writeback_Compute_Structural_bank_of_reg_is_not_idle = false;
+    bool flag_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated = false;
+    bool flag_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu = false;
+    
+    
+    bool flag_Issue_Compute_Data_scoreboard = false;
+
+    bool flag_Issue_Memory_Data_scoreboard = false;
+    bool flag_Execute_Memory_Data_L1 = false;
+    bool flag_Execute_Memory_Data_L2 = false;
+    bool flag_Execute_Memory_Data_Main_Memory = false;
+
+    bool flag_Issue_Memory_Structural_out_has_no_free_slot = false;
+    bool flag_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory = false;
+    bool flag_Execute_Memory_Structural_result_bus_has_no_slot_for_latency = false;
+    bool flag_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty = false;
+    bool flag_Writeback_Memory_Structural_bank_of_reg_is_not_idle = false;
+    bool flag_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated = false;
+    bool flag_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu = false;
+    bool flag_Execute_Memory_Structural_icnt_injection_buffer_is_full = false;
+    */
+
+    
+    if (stat_coll->get_At_least_one_No_Stall_found()) {
+      stat_coll->increment_No_Stall(m_smid);
+    } else if (stat_coll->get_At_least_one_Memory_Structural_Stall_found()) {
+      stat_coll->increment_Memory_Structural_Stall(m_smid);
+
+      stat_coll->increment_num_Issue_Memory_Structural_out_has_no_free_slot(
+        (unsigned)flag_Issue_Memory_Structural_out_has_no_free_slot, m_smid);
+      stat_coll->increment_num_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory(
+        (unsigned)flag_Issue_Memory_Structural_previous_issued_inst_exec_type_is_memory, m_smid);
+      stat_coll->increment_num_Execute_Memory_Structural_result_bus_has_no_slot_for_latency(
+        (unsigned)flag_Execute_Memory_Structural_result_bus_has_no_slot_for_latency, m_smid);
+      stat_coll->increment_num_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty(
+        (unsigned)flag_Execute_Memory_Structural_m_dispatch_reg_of_fu_is_not_empty, m_smid);
+      stat_coll->increment_num_Writeback_Memory_Structural_bank_of_reg_is_not_idle(
+        (unsigned)flag_Writeback_Memory_Structural_bank_of_reg_is_not_idle, m_smid);
+      stat_coll->increment_num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated(
+        (unsigned)flag_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated, m_smid);
+      stat_coll->increment_num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu(
+        (unsigned)flag_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu, m_smid);
+      stat_coll->increment_num_Execute_Memory_Structural_icnt_injection_buffer_is_full(
+        (unsigned)flag_Execute_Memory_Structural_icnt_injection_buffer_is_full, m_smid);
+
+    } else if (stat_coll->get_At_least_one_Memory_Data_Stall_found()) {
+      stat_coll->increment_Memory_Data_Stall(m_smid);
+
+      stat_coll->increment_num_Issue_Memory_Data_scoreboard(
+        (unsigned)flag_Issue_Memory_Data_scoreboard, m_smid);
+      stat_coll->increment_num_Execute_Memory_Data_L1(
+        (unsigned)flag_Execute_Memory_Data_L1, m_smid);
+      stat_coll->increment_num_Execute_Memory_Data_L2(
+        (unsigned)flag_Execute_Memory_Data_L2, m_smid);
+      stat_coll->increment_num_Execute_Memory_Data_Main_Memory(
+        (unsigned)flag_Execute_Memory_Data_Main_Memory, m_smid);
+
+    } else if (stat_coll->get_At_least_one_Synchronization_Stall_found()) {
+      stat_coll->increment_Synchronization_Stall(m_smid);
+    } else if (stat_coll->get_At_least_one_Compute_Structural_Stall_found()) {
+      stat_coll->increment_Compute_Structural_Stall(m_smid);
+
+      stat_coll->increment_num_Issue_Compute_Structural_out_has_no_free_slot(
+        (unsigned)flag_Issue_Compute_Structural_out_has_no_free_slot, m_smid);
+      stat_coll->increment_num_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute(
+        (unsigned)flag_Issue_Compute_Structural_previous_issued_inst_exec_type_is_compute, m_smid);
+      stat_coll->increment_num_Execute_Compute_Structural_result_bus_has_no_slot_for_latency(
+        (unsigned)flag_Execute_Compute_Structural_result_bus_has_no_slot_for_latency, m_smid);
+      stat_coll->increment_num_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty(
+        (unsigned)flag_Execute_Compute_Structural_m_dispatch_reg_of_fu_is_not_empty, m_smid);
+      stat_coll->increment_num_Writeback_Compute_Structural_bank_of_reg_is_not_idle(
+        (unsigned)flag_Writeback_Compute_Structural_bank_of_reg_is_not_idle, m_smid);
+      stat_coll->increment_num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated(
+        (unsigned)flag_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated, m_smid);
+      stat_coll->increment_num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu(
+        (unsigned)flag_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu, m_smid);
+
+    } else if (stat_coll->get_At_least_one_Compute_Data_Stall_found()) {
+      stat_coll->increment_Compute_Data_Stall(m_smid);
+
+      stat_coll->increment_num_Issue_Compute_Data_scoreboard(
+        (unsigned)flag_Issue_Compute_Data_scoreboard, m_smid);
+
+    } else if (stat_coll->get_At_least_one_Control_Stall_found()) {
+      stat_coll->increment_Control_Stall(m_smid);
+    } else if (stat_coll->get_At_least_one_Idle_Stall_found()) {
+      stat_coll->increment_Idle_Stall(m_smid);
+    } else {
+      stat_coll->increment_Other_Stall(m_smid);
+    }
+
+    stat_coll->set_At_least_four_instns_issued(false);
+    stat_coll->set_At_least_one_Compute_Structural_Stall_found(false);
+    stat_coll->set_At_least_one_Compute_Data_Stall_found(false);
+    stat_coll->set_At_least_one_Memory_Structural_Stall_found(false);
+    stat_coll->set_At_least_one_Memory_Data_Stall_found(false);
+    stat_coll->set_At_least_one_Synchronization_Stall_found(false);
+    stat_coll->set_At_least_one_Control_Stall_found(false);
+    stat_coll->set_At_least_one_Idle_Stall_found(false);
+    stat_coll->set_At_least_one_No_Stall_found(false);
+
+    if (all_warps_finished && PRINT_STALLS_DISTRIBUTION) {
+      float all_total_stalls = (float) (stat_coll->get_Compute_Structural_Stall(m_smid) + 
+                                        stat_coll->get_Compute_Data_Stall(m_smid) + 
+                                        stat_coll->get_Memory_Structural_Stall(m_smid) + 
+                                        stat_coll->get_Memory_Data_Stall(m_smid) + 
+                                        stat_coll->get_Synchronization_Stall(m_smid) + 
+                                        stat_coll->get_Control_Stall(m_smid) + 
+                                        stat_coll->get_Idle_Stall(m_smid) + 
+                                        stat_coll->get_Other_Stall(m_smid) + 
+                                        stat_coll->get_No_Stall(m_smid));
+      std::cout << "  Stalls Distribution:" << std::endl;
+      std::cout << "    Compute Structural Stall: " << (float)stat_coll->get_Compute_Structural_Stall(m_smid) / all_total_stalls << std::endl;
+      std::cout << "    Compute Data Stall: " << (float)stat_coll->get_Compute_Data_Stall(m_smid) / all_total_stalls << std::endl;
+      std::cout << "    Memory Structural Stall: " << (float)stat_coll->get_Memory_Structural_Stall(m_smid) / all_total_stalls << std::endl;
+      std::cout << "    Memory Data Stall: " << (float)stat_coll->get_Memory_Data_Stall(m_smid) / all_total_stalls << std::endl;
+      std::cout << "    Synchronization Stall: " << (float)stat_coll->get_Synchronization_Stall(m_smid) / all_total_stalls << std::endl;
+      std::cout << "    Control Stall: " << (float)stat_coll->get_Control_Stall(m_smid) / all_total_stalls << std::endl;
+      std::cout << "    Idle Stall: " << (float)stat_coll->get_Idle_Stall(m_smid) / all_total_stalls << std::endl;
+      std::cout << "    Other Stall: " << (float)stat_coll->get_Other_Stall(m_smid) / all_total_stalls << std::endl;
+      std::cout << "    No Stall: " << (float)stat_coll->get_No_Stall(m_smid) / all_total_stalls << std::endl;
+    }
+    
+
+
+STOP_AND_REPORT_TIMER_rank(6);
 
   // } /* end of it_kernel_block_pair */
 }
