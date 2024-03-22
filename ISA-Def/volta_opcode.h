@@ -106,6 +106,8 @@ static const std::unordered_map<std::string, OpcodeChar> Volta_OpcodeMap = {
     {"SEL",         OpcodeChar(OP_SEL,         INTP_OP)},
     {"SGXT",        OpcodeChar(OP_SGXT,        INTP_OP)},
     {"SHFL",        OpcodeChar(OP_SHFL,        INTP_OP)},
+    {"CCTL",        OpcodeChar(OP_CCTL,        SP_OP)},
+    {"CCTLL",       OpcodeChar(OP_CCTLL,       SP_OP)},
 
     // Predicate Instructions
     // {"PLOP3",       OpcodeChar(OP_PLOP3,       ALU_OP)},
@@ -140,8 +142,7 @@ static const std::unordered_map<std::string, OpcodeChar> Volta_OpcodeMap = {
     // {"CCTL",        OpcodeChar(OP_CCTL,        ALU_OP)},
     // {"CCTLL",       OpcodeChar(OP_CCTLL,       ALU_OP)},
     // {"ERRBAR",      OpcodeChar(OP_ERRBAR,      ALU_OP)},
-    {"CCTL",        OpcodeChar(OP_CCTL,        SP_OP)},
-    {"CCTLL",       OpcodeChar(OP_CCTLL,       SP_OP)},
+    
     {"ERRBAR",      OpcodeChar(OP_ERRBAR,      SP_OP)},
     // {"MEMBAR",      OpcodeChar(OP_MEMBAR,      MEMORY_BARRIER_OP)},
     // {"CCTLT",       OpcodeChar(OP_CCTLT,       ALU_OP)},
