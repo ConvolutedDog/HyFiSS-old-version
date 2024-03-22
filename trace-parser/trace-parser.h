@@ -262,10 +262,36 @@ class issue_config {
     return result;
   }
 
+  std::vector<std::pair<int, int>> get_kernel_block_by_smid_0(int smid) {
+    std::vector<std::pair<int, int>> result;
+    for (auto iter = trace_issued_sm_id_blocks.begin();
+              iter != trace_issued_sm_id_blocks.end(); ++iter) {
+      // if ((*iter)[0].sm_id == (unsigned)smid) {
+        for (auto iter2 = iter->begin(); iter2 != iter->end(); ++iter2) {
+          // judge if std::make_pair(iter2->kernel_id, iter2->block_id) is in result
+          bool is_in_result = false;
+          for (auto iter3 = result.begin(); iter3 != result.end(); ++iter3) {
+            if ((iter3->first == iter2->kernel_id) && (iter3->second == iter2->block_id)) {
+              is_in_result = true;
+              break;
+            }
+          }
+          if (!is_in_result) {
+            result.push_back(std::make_pair(iter2->kernel_id, iter2->block_id));
+            // std::cout << "$" << smid << "$" << iter2->kernel_id << "$" << iter2->block_id << "$" << std::endl;
+          }   
+        }
+      // }
+    }
+    return result;
+  }
+
   int get_trace_issued_sms_num() { return trace_issued_sms_num; }
 
   int get_sm_id_of_one_block(unsigned kernel_id, unsigned block_id);
   int get_sm_id_of_one_block_fast(unsigned kernel_id, unsigned block_id);
+
+  std::vector<int> get_trace_issued_sms_vector() { return trace_issued_sms_vector; }
 
  private:
   bool m_valid;
@@ -582,6 +608,11 @@ class trace_parser {
     return conpute_instns[kernel_id][warp_id].size();
   }
 
+  mem_instn* get_one_kernel_one_block_one_uid_mem_instn(int kernel_id, int gwarp_id, int uid) {
+    unsigned block_id = (unsigned) (gwarp_id / appcfg.get_num_warp_per_block(kernel_id));
+    return &mem_instns[kernel_id][block_id][uid];
+  }
+
   unsigned get_one_kernel_one_warp_instn_count(int kernel_id, int warp_id) {
     return conpute_instns[kernel_id][warp_id].size();
   }
@@ -591,6 +622,18 @@ class trace_parser {
   }
 
   bool get_m_valid() { return m_valid; }
+
+  unsigned get_the_least_sm_id_of_all_blocks() {
+    // find the least sm_id from issuecfg.get_trace_issued_sms_vector()
+    std::vector<int> trace_issued_sms = issuecfg.get_trace_issued_sms_vector();
+    unsigned least_sm_id = trace_issued_sms[0];
+    for (auto iter = trace_issued_sms.begin(); iter != trace_issued_sms.end(); ++iter) {
+      if (*iter < least_sm_id) {
+        least_sm_id = *iter;
+      }
+    }
+    return least_sm_id;
+  }
 
  private:
   /* configs_filepath is path to kernelslist.g */
