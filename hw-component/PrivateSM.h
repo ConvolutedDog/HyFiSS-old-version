@@ -488,7 +488,28 @@ class stat_collector {
   void increment_SPEC_UNIT_3_execute_clks_sum(unsigned smid, unsigned long long value) { SPEC_UNIT_3_execute_clks_sum[smid] += value; }
   void increment_Other_UNIT_execute_clks_sum(unsigned smid, unsigned long long value) { Other_UNIT_execute_clks_sum[smid] += value; }
 
-
+  /*
+  std::vector<unsigned long long> SP_UNIT_Instns_num;
+  std::vector<unsigned long long> SFU_UNIT_Instns_num;
+  std::vector<unsigned long long> INT_UNIT_Instns_num;
+  std::vector<unsigned long long> DP_UNIT_Instns_num;
+  std::vector<unsigned long long> TENSOR_CORE_UNIT_Instns_num;
+  std::vector<unsigned long long> LDST_UNIT_Instns_num;
+  std::vector<unsigned long long> SPEC_UNIT_1_Instns_num;
+  std::vector<unsigned long long> SPEC_UNIT_2_Instns_num;
+  std::vector<unsigned long long> SPEC_UNIT_3_Instns_num;
+  std::vector<unsigned long long> Other_UNIT_Instns_num;
+  */
+  void increment_SP_UNIT_Instns_num(unsigned smid) { SP_UNIT_Instns_num[smid]++; }
+  void increment_SFU_UNIT_Instns_num(unsigned smid) { SFU_UNIT_Instns_num[smid]++; }
+  void increment_INT_UNIT_Instns_num(unsigned smid) { INT_UNIT_Instns_num[smid]++; }
+  void increment_DP_UNIT_Instns_num(unsigned smid) { DP_UNIT_Instns_num[smid]++; }
+  void increment_TENSOR_CORE_UNIT_Instns_num(unsigned smid) { TENSOR_CORE_UNIT_Instns_num[smid]++; }
+  void increment_LDST_UNIT_Instns_num(unsigned smid) { LDST_UNIT_Instns_num[smid]++; }
+  void increment_SPEC_UNIT_1_Instns_num(unsigned smid) { SPEC_UNIT_1_Instns_num[smid]++; }
+  void increment_SPEC_UNIT_2_Instns_num(unsigned smid) { SPEC_UNIT_2_Instns_num[smid]++; }
+  void increment_SPEC_UNIT_3_Instns_num(unsigned smid) { SPEC_UNIT_3_Instns_num[smid]++; }
+  void increment_Other_UNIT_Instns_num(unsigned smid) { Other_UNIT_Instns_num[smid]++; }
 
   void dump_output(const std::string& path, unsigned rank);
 
@@ -750,6 +771,17 @@ class stat_collector {
   std::vector<unsigned long long> SPEC_UNIT_2_execute_clks_sum;
   std::vector<unsigned long long> SPEC_UNIT_3_execute_clks_sum;
   std::vector<unsigned long long> Other_UNIT_execute_clks_sum;
+
+  std::vector<unsigned long long> SP_UNIT_Instns_num;
+  std::vector<unsigned long long> SFU_UNIT_Instns_num;
+  std::vector<unsigned long long> INT_UNIT_Instns_num;
+  std::vector<unsigned long long> DP_UNIT_Instns_num;
+  std::vector<unsigned long long> TENSOR_CORE_UNIT_Instns_num;
+  std::vector<unsigned long long> LDST_UNIT_Instns_num;
+  std::vector<unsigned long long> SPEC_UNIT_1_Instns_num;
+  std::vector<unsigned long long> SPEC_UNIT_2_Instns_num;
+  std::vector<unsigned long long> SPEC_UNIT_3_Instns_num;
+  std::vector<unsigned long long> Other_UNIT_Instns_num;
 
 };
 
