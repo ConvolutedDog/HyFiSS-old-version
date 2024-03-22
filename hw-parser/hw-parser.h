@@ -119,6 +119,7 @@ class hw_config {
     num_dp_units = 0;
     num_int_units = 0;
     num_tensor_core_units = 0;
+    num_mem_units = 0;
 
     /* Instruction Latencies, ADD,MAX,MUL,MAD,DIV,[SHFL] */
     opcode_latency_int = std::vector<unsigned>(6, 0);
@@ -393,6 +394,7 @@ class hw_config {
   unsigned get_num_dp_units() const { return num_dp_units; }
   unsigned get_num_int_units() const { return num_int_units; }
   unsigned get_num_tensor_core_units() const { return num_tensor_core_units; }
+  unsigned get_num_mem_units() const { return num_mem_units; }
   unsigned get_opcode_latency_int(opcode_operation op) const {
     return opcode_latency_int[op];
   }
@@ -694,6 +696,7 @@ class hw_config {
   unsigned num_dp_units;
   unsigned num_int_units;
   unsigned num_tensor_core_units;
+  unsigned num_mem_units;
 
 
   /* Instruction Latencies, ADD,MAX,MUL,MAD,DIV,[SHFL] */
