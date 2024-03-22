@@ -81,11 +81,11 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    
+    std::map<std::pair<int, int>, std::vector<std::string>> warp_content;
 
     for (const auto& sass_file : sass_files) {
-        std::map<std::pair<int, int>, std::ofstream> f_open;
-        std::set<int> have_created_gwarp_ids;
+        // std::map<std::pair<int, int>, std::ofstream> f_open;
+        // std::set<int> have_created_gwarp_ids;
 
         std::cout << "Processing " << sass_file << "\n";
         std::ifstream file(sass_file);
@@ -98,23 +98,44 @@ int main(int argc, char *argv[]) {
 
         for (size_t i = 0; i < tokens.size() / 3; ++i) {
             int gwarp_id = std::stoi(tokens[i*3 + 2], nullptr, 16);
-            if (have_created_gwarp_ids.find(gwarp_id) == have_created_gwarp_ids.end()) {
-                have_created_gwarp_ids.insert(gwarp_id);
-                std::string outputPath = sass_dir + 
-                                         "/kernel_" + 
-                                         std::to_string(kernel_id) + 
-                                         "_gwarp_id_" + 
-                                         std::to_string(gwarp_id) + 
-                                         ".split.sass";
-                if (!fileExists(outputPath)) {
-                    f_open[{kernel_id, gwarp_id}].open(outputPath);
-                }
+            // if (have_created_gwarp_ids.find(gwarp_id) == have_created_gwarp_ids.end()) {
+            //     have_created_gwarp_ids.insert(gwarp_id);
+            if (warp_content.find({kernel_id, gwarp_id}) == warp_content.end()) {
+                // std::string outputPath = sass_dir + 
+                //                          "/kernel_" + 
+                //                          std::to_string(kernel_id) + 
+                //                          "_gwarp_id_" + 
+                //                          std::to_string(gwarp_id) + 
+                //                          ".split.sass";
+                // if (!fileExists(outputPath)) {
+                //     f_open[{kernel_id, gwarp_id}].open(outputPath);
+                // }
+                warp_content[{kernel_id, gwarp_id}] = std::vector<std::string>();
             }
-            f_open[{kernel_id, gwarp_id}] << tokens[i*3] << " " << tokens[i*3 + 1] << "\n";
+            // f_open[{kernel_id, gwarp_id}] << tokens[i*3] << " " << tokens[i*3 + 1] << "\n";
+            warp_content[{kernel_id, gwarp_id}].push_back(tokens[i*3] + " " + tokens[i*3 + 1] + "\n");
         }
 
-        for (auto& item : f_open) {
-            item.second.close();
+        // for (auto& item : f_open) {
+        //     item.second.close();
+        // }
+
+        file.close();
+
+        // Print the content of each split file
+        for (auto& item : warp_content) {
+            std::string outputPath = sass_dir + 
+                                     "/kernel_" + 
+                                     std::to_string(item.first.first) + 
+                                     "_gwarp_id_" + 
+                                     std::to_string(item.first.second) + 
+                                     ".split.sass";
+            std::ofstream f_open;
+            f_open.open(outputPath);
+            for (auto& line : item.second) {
+                f_open << line;
+            }
+            f_open.close();
         }
     }
 
