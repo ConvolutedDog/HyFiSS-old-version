@@ -105,13 +105,15 @@ void opndcoll_rfu_t::init(hw_config* hw_cfg,
   m_initialized = true;
 }
 
-void opndcoll_rfu_t::dispatch_ready_cu() {
+void opndcoll_rfu_t::dispatch_ready_cu(std::map<std::tuple<unsigned, unsigned, unsigned>, 
+                                         std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>>* clk_record,
+                                       unsigned cycle) {
   // std::cout << "m_dispatch_units.size(): " << m_dispatch_units.size() << std::endl;
   for (unsigned p = 0; p < m_dispatch_units.size(); ++p) {
     dispatch_unit_t &du = m_dispatch_units[p];
     collector_unit_t *cu = du.find_ready();
     if (cu) {
-      cu->dispatch();
+      cu->dispatch(clk_record, cycle);
       ///*//*/ if (_DEBUG_LOG_)
         // std::cout << "    cu is not NULL " << cu << std::endl;
     } else {
@@ -121,7 +123,12 @@ void opndcoll_rfu_t::dispatch_ready_cu() {
   }
 }
 
-void opndcoll_rfu_t::allocate_cu(unsigned port_num) {
+void opndcoll_rfu_t::allocate_cu(unsigned port_num, 
+                                 bool* flag_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+                                 bool* flag_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated,
+                                 bool* flag_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated,
+                                 bool* flag_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+                                 trace_parser* tracer) {
   input_port_t &inp = m_in_ports[port_num];
   if (_DEBUG_LOG_)
     std::cout << "    for allocate_cu port_num: " << port_num << std::endl;
@@ -131,16 +138,18 @@ void opndcoll_rfu_t::allocate_cu(unsigned port_num) {
       /*//*/ if (_DEBUG_LOG_)
         std::cout << "      has_ready_pipeline_reg_idx: " << i << std::endl;
       // find a free cu
+      bool have_found_free_cu = false;
       for (unsigned j = 0; j < inp.m_cu_sets.size(); j++) {
         std::vector<collector_unit_t> &cu_set = m_cus[inp.m_cu_sets[j]];
         bool allocated = false;
         unsigned cuLowerBound = 0;
         unsigned cuUpperBound = cu_set.size();
         unsigned schd_id;
+        unsigned reg_id;
         if (sub_core_model) {
           // Sub core model only allocates on the subset of CUs assigned to the
           // scheduler that issued
-          unsigned reg_id = (*inp.m_in[i]).get_ready_reg_id();
+          reg_id = (*inp.m_in[i]).get_ready_reg_id();
           if (_DEBUG_LOG_)
             std::cout << "      get_ready_regset_slot: " << reg_id << std::endl;
           schd_id = (*inp.m_in[i]).get_schd_id(reg_id);
@@ -158,6 +167,7 @@ void opndcoll_rfu_t::allocate_cu(unsigned port_num) {
         }
         for (unsigned k = cuLowerBound; k < cuUpperBound; k++) {
           if (cu_set[k].is_free()) {
+            have_found_free_cu = true;
             /*//*/ if (_DEBUG_LOG_)
               std::cout << "      cu_set[" << k << "] is free" << std::endl;
             collector_unit_t *cu = &cu_set[k];
@@ -172,6 +182,21 @@ void opndcoll_rfu_t::allocate_cu(unsigned port_num) {
           }
         }
         if (allocated) break;  // cu has been allocated, no need to search more.
+        else {
+          if (j == inp.m_cu_sets.size()-1 && !have_found_free_cu) {
+            unsigned kid = (*inp.m_in[i]).get_kid(reg_id);
+            unsigned wid = (*inp.m_in[i]).get_wid(reg_id);
+            unsigned uid = (*inp.m_in[i]).get_uid(reg_id);
+            auto _compute_instn = tracer->get_one_kernel_one_warp_one_instn(kid, wid, uid);
+            _inst_trace_t* tmp_inst_trace = _compute_instn->inst_trace;
+            auto fu = tmp_inst_trace->get_func_unit();
+            if (fu == LDST_UNIT) {
+              *flag_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu = true;
+            } else {
+              *flag_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu = true;
+            }
+          }
+        }
       }
       // break;  // can only service a single input, if it failed it will fail
       // for
@@ -181,9 +206,18 @@ void opndcoll_rfu_t::allocate_cu(unsigned port_num) {
 }
 
 
-void opndcoll_rfu_t::allocate_reads() {
+void opndcoll_rfu_t::allocate_reads(bool* flag_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+                                    bool* flag_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated,
+                                    bool* flag_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated,
+                                    bool* flag_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+                                    trace_parser* tracer) {
   // process read requests that do not have conflicts
-  std::list<op_t> allocated = m_arbiter.allocate_reads();
+  std::list<op_t> allocated = m_arbiter.allocate_reads(
+            flag_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+            flag_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated,
+            flag_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated,
+            flag_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+            tracer);
   std::map<unsigned, op_t> read_ops;
   for (std::list<op_t>::iterator r = allocated.begin(); r != allocated.end();
        r++) {
@@ -316,9 +350,12 @@ bool opndcoll_rfu_t::collector_unit_t::allocate(register_set *pipeline_reg_set,
         prev_regs.push_back(reg_num);
         // get schd_id 
         auto sched_id = (unsigned)(m_warp_id % m_hw_cfg->get_num_sched_per_sm());
+        // m_src_op[op] = op_t(this, op, reg_num, m_num_banks, m_bank_warp_shift,
+        //                     m_sub_core_model, m_num_banks_per_sched,
+        //                     sched_id, m_tracer);
         m_src_op[op] = op_t(this, op, reg_num, m_num_banks, m_bank_warp_shift,
                             m_sub_core_model, m_num_banks_per_sched,
-                            sched_id, m_tracer);
+                            sched_id, m_tracer, (*pipeline_reg)->kid, (*pipeline_reg)->wid, (*pipeline_reg)->uid);
         m_not_ready.set(op);
       } else 
         m_src_op[op] = op_t();
@@ -344,7 +381,9 @@ bool opndcoll_rfu_t::collector_unit_t::allocate(register_set *pipeline_reg_set,
   return false;
 }
 
-void opndcoll_rfu_t::collector_unit_t::dispatch() {
+void opndcoll_rfu_t::collector_unit_t::dispatch(std::map<std::tuple<unsigned, unsigned, unsigned>, 
+                                                  std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>>* clk_record,
+                                                unsigned cycle) {
   assert(m_not_ready.none());
   if (_DEBUG_LOG_) {
     std::cout << "    dispatch: " << std::endl;
@@ -365,6 +404,7 @@ void opndcoll_rfu_t::collector_unit_t::dispatch() {
               << m_warp->pc << ")" << std::endl;
   }
   
+  set_clk_record<3>(clk_record, m_warp->kid, m_warp->wid, m_warp->uid, cycle);
   m_output_register->move_in(m_sub_core_model, m_reg_id, m_warp);
   // std::cout << "    after readop "; m_output_register->print();
   m_warp->m_valid = false;
@@ -380,7 +420,12 @@ void opndcoll_rfu_t::collector_unit_t::dispatch() {
   for (unsigned i = 0; i < MAX_REG_OPERANDS * 2; i++) m_src_op[i].reset();
 }
 
-std::list<opndcoll_rfu_t::op_t> opndcoll_rfu_t::arbiter_t::allocate_reads() {
+std::list<opndcoll_rfu_t::op_t> opndcoll_rfu_t::arbiter_t::allocate_reads(
+            bool* flag_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+            bool* flag_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated,
+            bool* flag_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated,
+            bool* flag_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+            trace_parser* tracer) {
   std::list<op_t>
       result;  // a list of registers that (a) are in different register banks,
                // (b) do not go to the same operand collector
@@ -469,6 +514,28 @@ std::list<opndcoll_rfu_t::op_t> opndcoll_rfu_t::arbiter_t::allocate_reads() {
       }
     }
   }
+
+    for (unsigned bank = 0; bank < m_num_banks; bank++) {
+      std::list<op_t>::iterator iter;
+      for (iter = m_queue[bank].begin(); iter != m_queue[bank].end(); iter++) {
+        if (iter->valid()) {
+            unsigned kid = iter->get_instn_kid();
+            unsigned wid = iter->get_instn_wid();
+            unsigned uid = iter->get_instn_uid();
+            if (kid == 65536 || wid == 65536 || uid == 65536) continue;
+            else {
+              auto _compute_instn = tracer->get_one_kernel_one_warp_one_instn(kid, wid, uid);
+              _inst_trace_t* tmp_inst_trace = _compute_instn->inst_trace;
+              auto fu = tmp_inst_trace->get_func_unit();
+              if (fu == LDST_UNIT) {
+                *flag_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated = true;
+              } else {
+                *flag_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated = true;
+              }
+            }
+        }
+      }
+    }
 
   // print result
   /*//*/ if (_DEBUG_LOG_) {
