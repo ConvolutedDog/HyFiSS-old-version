@@ -38,15 +38,18 @@ void app_config::init(std::string config_path, bool PRINT_LOG) {
     int comma_count;
     while (inputFile.good()) {
       getline(inputFile, line);
+      // std::cout << "line: " << line << std::endl;
       commentStart = line.find_first_of("#");
       if (commentStart != line.npos) continue;
       found = line.find(target_app_kernels_id);
+      // std::cout << "found: " << (found == std::string::npos) << std::endl;
       if (found != std::string::npos) {
         result = line.substr(found + target_app_kernels_id.length());
         comma_count = std::count(result.begin(), result.end(), ',');
         kernels_num = comma_count + 1;
         // std::cout << ">>>" << result << "<<<" << std::endl;
         app_kernels_id_string = line.substr(found + target_app_kernels_id.length() + 1);
+        // std::cout << "#$#$ " << app_kernels_id_string << std::endl;
       }
       found = line.find(target_concurrentKernels);
       if (found != std::string::npos) {
@@ -204,6 +207,7 @@ void app_config::init(std::string config_path, bool PRINT_LOG) {
     char *toks = new char[2048];
     char *tokd = toks;
     strcpy(toks, app_kernels_id_string.c_str());
+    // std::cout << "app_kernels_id_string: " << app_kernels_id_string.c_str() << std::endl;
 
     app_kernels_id.resize(kernels_num);
 
@@ -591,7 +595,7 @@ void trace_parser::process_configs_file(const std::string config_path, int confi
   fs.open(abs_config_path);
 
   if (PRINT_LOG) std::cout << std::endl;
-  std::cout << "Processing configs file : " << abs_config_path << std::endl;
+  // std::cout << "Processing configs file : " << abs_config_path << std::endl;
   if (PRINT_LOG) std::cout << std::endl;
   
   if (!fs.is_open()) {
@@ -931,6 +935,7 @@ void trace_parser::process_mem_instns(const std::string mem_instns_dir, bool PRI
             }
             */
             // if (_opcode.find("LD") != std::string::npos)
+            
             mem_instns[kernel_id-1][block_id].push_back(mem_instn(_pc, 
                                                                   _addr_start1, 
                                                                   _time_stamp, 
@@ -960,12 +965,14 @@ void trace_parser::read_mem_instns(bool PRINT_LOG, std::vector<std::pair<int, in
   }
 
   if (PRINT_LOG) std::cout << std::endl;
-  std::cout << "Memory traces dir: " << mem_instns_dir << std::endl;
+  // std::cout << "Memory traces dir: " << mem_instns_dir << std::endl;
   if (PRINT_LOG) std::cout << std::endl;
 
   mem_instns.resize(appcfg.get_kernels_num());
-  for (int kid = 0; kid < appcfg.get_kernels_num(); ++kid)
+  for (int kid = 0; kid < appcfg.get_kernels_num(); ++kid) {
     mem_instns[kid].resize(appcfg.get_kernel_grid_size(kid));
+    // std::cout << "appcfg.get_kernel_grid_size(kid): " << kid << " " << appcfg.get_kernel_grid_size(kid) << std::endl;
+  }
 
   // DIR *dir;
   // if ((dir = opendir(mem_instns_dir.c_str())) == nullptr) {
@@ -1102,6 +1109,7 @@ void trace_parser::process_compute_instns_fast(std::string compute_instns_dir, b
       
       if (std::regex_search(search, match, pattern)) {
         int kernel_id = std::stoi(match[1]);
+        // std::cout << "kernel_id: " << kernel_id << std::endl;
         int gwarp_id = std::stoi(match[2]);
         
         int num_warps_per_block = get_appcfg()->get_num_warp_per_block(kernel_id - 1);
@@ -1194,7 +1202,7 @@ void trace_parser::read_compute_instns(bool PRINT_LOG, std::vector<std::pair<int
   }
 
   if (PRINT_LOG) std::cout << std::endl;
-  std::cout << "Compute traces dir: " << compute_instns_dir << std::endl;
+  // std::cout << "Compute traces dir: " << compute_instns_dir << std::endl;
   if (PRINT_LOG) std::cout << std::endl;
 
   /* kernel_id -> warp_id -> compute_instn */
