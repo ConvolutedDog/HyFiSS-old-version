@@ -37,7 +37,18 @@ bool pipelined_simd_unit::can_issue(unsigned latency) const {
   return !m_dispatch_reg->m_valid && !occupied.test(latency);
 }
 
-std::vector<unsigned> pipelined_simd_unit::cycle() {
+std::vector<unsigned> pipelined_simd_unit::cycle(trace_parser* tracer, 
+                                                 Scoreboard* m_scoreboard, app_config* appcfg,
+                                                 std::vector<std::pair<int, int>>* kernel_block_pair,
+                                                 std::vector<unsigned>* m_num_warps_per_sm,
+                                                 unsigned KERNEL_EVALUATION,
+                                                 unsigned num_scheds,
+                                                 RegisterBankAllocator* m_reg_bank_allocator,
+                                                 bool* flag_Writeback_Memory_Structural_bank_of_reg_is_not_idle,
+                                                 std::map<std::tuple<unsigned, unsigned, unsigned>, 
+                                                   std::tuple<unsigned, unsigned, unsigned, unsigned, 
+                                                              unsigned, unsigned>>* clk_record,
+                                                 unsigned m_cycle) {
 
   std::vector<unsigned> need_to_return_wids;
 
@@ -64,6 +75,7 @@ std::vector<unsigned> pipelined_simd_unit::cycle() {
                 << m_pipeline_reg[0]->uid << ", "
                 << m_pipeline_reg[0]->pc << ")" << std::endl;
     }
+    set_clk_record<4>(clk_record, m_pipeline_reg[0]->kid, m_pipeline_reg[0]->wid, m_pipeline_reg[0]->uid, m_cycle);
 
     // std::cout << "@" << (m_result_port->get_free() != NULL) << std::endl;
     if (m_result_port->get_free() != NULL) {
@@ -213,6 +225,8 @@ std::vector<unsigned> pipelined_simd_unit::cycle() {
     //           << " dec_counter: " << m_dispatch_reg->initial_interval_dec_counter << std::endl;
     if (m_dispatch_reg->initial_interval_dec_counter == 1) {
       int start_stage = m_dispatch_reg->latency - m_dispatch_reg->initial_interval /*+ 1*/;
+      if (start_stage < 0) start_stage = 0;
+      if (start_stage >= m_pipeline_depth) start_stage = m_pipeline_depth - 1;
       
       // std::cout << "    start_stage: " << start_stage 
       //           << " m_pipeline_depth: " << m_pipeline_depth 
@@ -221,6 +235,7 @@ std::vector<unsigned> pipelined_simd_unit::cycle() {
       //           << " latency: " << m_dispatch_reg->latency
       //           << " initial_interval: " << m_dispatch_reg->initial_interval
       //           << std::endl;
+      // std::cout << "start_stage: " << start_stage << " " << "m_pipeline_depth: " << m_pipeline_depth << std::endl;
       assert(start_stage >= 0 && start_stage < m_pipeline_depth);
       // m_pipeline_reg[start_stage]->move_in(m_dispatch_reg);
       if (m_pipeline_reg[start_stage]->m_valid == false) {
@@ -566,4 +581,212 @@ void mem_unit::issue(register_set &source_reg) {
 
 void mem_unit::issue(register_set &source_reg, unsigned reg_id) {
   pipelined_simd_unit::issue(source_reg, reg_id);
+}
+
+std::vector<unsigned> mem_unit::cycle(trace_parser* tracer, Scoreboard* m_scoreboard, app_config* appcfg,
+                                      std::vector<std::pair<int, int>>* kernel_block_pair,
+                                      std::vector<unsigned>* m_num_warps_per_sm,
+                                      unsigned KERNEL_EVALUATION,
+                                      unsigned num_scheds,
+                                      RegisterBankAllocator* m_reg_bank_allocator,
+                                      bool* flag_Writeback_Memory_Structural_bank_of_reg_is_not_idle,
+                                      std::map<std::tuple<unsigned, unsigned, unsigned>, 
+                                        std::tuple<unsigned, unsigned, unsigned, unsigned, 
+                                                   unsigned, unsigned>>* clk_record,
+                                      unsigned m_cycle) {
+  std::vector<unsigned> need_to_return_wids;
+  bool active_during_this_cycle = false;
+  
+  if (m_pipeline_reg[0]->m_valid) {
+    if (_CALIBRATION_LOG_) {
+      std::cout << "    Execute: ("
+                << m_pipeline_reg[0]->kid << ", "
+                << m_pipeline_reg[0]->wid << ", "
+                << m_pipeline_reg[0]->uid << ", "
+                << m_pipeline_reg[0]->pc << ")" << std::endl;
+    }
+    set_clk_record<4>(clk_record, m_pipeline_reg[0]->kid, m_pipeline_reg[0]->wid, m_pipeline_reg[0]->uid, m_cycle);
+    // m_pipeline_reg[0]->m_valid = false;
+    // active_insts_in_pipeline--;
+
+    auto _compute_instn = tracer->get_one_kernel_one_warp_one_instn(
+      m_pipeline_reg[0]->kid, 
+      m_pipeline_reg[0]->wid, 
+      m_pipeline_reg[0]->uid);
+    auto _trace_warp_inst = 
+        _compute_instn->trace_warp_inst;
+    std::vector<int> need_write_back_regs_num;
+
+      unsigned _warps_per_block = appcfg->get_num_warp_per_block(m_pipeline_reg[0]->kid);
+      unsigned dst_reg_num = _trace_warp_inst.get_outcount();
+      for (unsigned i = 0; i < dst_reg_num; i++){
+        int dst_reg_id = _trace_warp_inst.get_arch_reg_dst(i);
+        // std::cout << "    dst_reg_id[" << i << "]: " << dst_reg_id << std::endl;
+        // Calculate the scheduler id of the dst reg id
+        if (dst_reg_id >= 0) {
+          auto local_wid = (unsigned)(m_pipeline_reg[0]->wid % _warps_per_block);
+          auto sched_id = (unsigned)(local_wid % num_scheds);
+          // Calculate the bank id of the dst reg id
+          auto bank_id = m_reg_bank_allocator->register_bank(dst_reg_id, local_wid, sched_id);
+          
+          // Now we set the bank_id of the dst reg id to be on_write (for dst reg id, it is on_wite).
+          if (m_reg_bank_allocator->getBankState(bank_id) == FREE) {
+            // active_during_this_cycle = true;
+
+            m_reg_bank_allocator->setBankState(bank_id, ON_WRITING);
+            
+            _trace_warp_inst.set_arch_reg_dst(i, -1);
+            if (_DEBUG_LOG_)
+              std::cout << "    setBankState(" << bank_id 
+                        << ", WRITING)   dst_reg_id : " 
+                        << _trace_warp_inst.get_arch_reg_dst(i) 
+                        << std::endl;
+          } else {
+            if (_DEBUG_LOG_)
+              std::cout << "    cannot setBankState "
+                           "bank_id-" << bank_id << std::endl;
+            *flag_Writeback_Memory_Structural_bank_of_reg_is_not_idle = true;
+          }
+        }
+      }
+
+      bool all_write_back = true;
+      for (unsigned i = 0; i < dst_reg_num; i++){
+        if (_trace_warp_inst.get_arch_reg_dst(i) != -1) {
+          all_write_back = false;
+          break;
+        }
+      }
+
+    if (all_write_back) {
+      m_pipeline_reg[0]->m_valid = false;
+      active_insts_in_pipeline--;
+
+      _inst_trace_t* tmp_inst_trace = _compute_instn->inst_trace;
+      for (unsigned i = 0; i < tmp_inst_trace->reg_srcs_num; i++) {
+        need_write_back_regs_num.push_back(tmp_inst_trace->reg_src[i]);
+        // std::cout << "        R" << tmp_inst_trace->reg_src[i] << std::endl;
+      }
+      for (unsigned i = 0; i < tmp_inst_trace->reg_dsts_num; i++) {
+        if (tmp_inst_trace->reg_dest_is_pred[i]) {
+          need_write_back_regs_num.push_back(tmp_inst_trace->reg_dest[i] + PRED_NUM_OFFSET);
+        } else {
+          need_write_back_regs_num.push_back(tmp_inst_trace->reg_dest[i]);
+        }
+      }
+      auto pred = _trace_warp_inst.get_pred();
+      need_write_back_regs_num.push_back((pred < 0) ? pred : pred + PRED_NUM_OFFSET);
+
+      //m_num_warps_per_sm, KERNEL_EVALUATION, kernel_block_pair
+      // unsigned KERNEL_EVALUATION = 0;
+      unsigned _warps_per_block = appcfg->get_num_warp_per_block(m_pipeline_reg[0]->kid);
+
+      unsigned _block_id = (unsigned)(m_pipeline_reg[0]->wid / _warps_per_block);
+      unsigned _kid_block_id_count = 0;
+        for (auto _it_kernel_block_pair = kernel_block_pair->begin(); 
+                  _it_kernel_block_pair != kernel_block_pair->end();
+                  _it_kernel_block_pair++) {
+          if (_it_kernel_block_pair->first - 1 != KERNEL_EVALUATION) continue;
+          if (_it_kernel_block_pair->first - 1 == m_pipeline_reg[0]->kid) {
+            if (_it_kernel_block_pair->second < _block_id) {
+              _kid_block_id_count++;
+            }
+          }
+        }
+      // std::cout << " #_block_id: " << m_pipeline_reg[0]->kid << " " << _kid_block_id_count << std::endl;
+
+      /*
+      unsigned _kid_block_id_count = 0;
+            for (auto _it_kernel_block_pair = kernel_block_pair.begin(); 
+                      _it_kernel_block_pair != kernel_block_pair.end();
+                      _it_kernel_block_pair++) {
+              if (_it_kernel_block_pair->first - 1 != KERNEL_EVALUATION) continue;
+              if (_it_kernel_block_pair->first - 1 == _kid) {
+                if (_it_kernel_block_pair->second < _block_id) {
+                  _kid_block_id_count++;
+                }
+              }
+            }
+      
+      auto global_all_kernels_warp_id = 
+              (unsigned)(wid % _warps_per_block) + 
+              _kid_block_id_count * _warps_per_block +
+              std::accumulate(m_num_warps_per_sm.begin(), 
+                              m_num_warps_per_sm.begin() + _kid, 0);
+      */
+      auto global_all_kernels_warp_id = 
+          (unsigned)(m_pipeline_reg[0]->wid % _warps_per_block) + 
+          _kid_block_id_count * _warps_per_block +
+          std::accumulate(m_num_warps_per_sm->begin(), 
+                          m_num_warps_per_sm->begin() + m_pipeline_reg[0]->kid, 0);
+      
+      // std::cout << "global_all_kernels_warp_id: " << m_pipeline_reg[0]->wid << " " << global_all_kernels_warp_id << std::endl;
+
+      for (auto regnum : need_write_back_regs_num) {
+        // void Scoreboard::releaseRegisters(const unsigned wid, std::vector<int> regnums)
+        // m_scoreboard->releaseRegisters(_wid, regnum);
+        // std::cout << "    release register: " << regnum << std::endl;
+        // m_scoreboard->printContents();
+        // std::cout << "  releaseRegisters: " << global_all_kernels_warp_id << " " << regnum << std::endl;
+        m_scoreboard->releaseRegisters(global_all_kernels_warp_id, regnum);
+        // m_scoreboard->printContents();
+      }
+    }
+  }
+
+  if (active_insts_in_pipeline) {
+    active_during_this_cycle = true;
+    for (unsigned stage = 0; stage < m_pipeline_depth - 1; stage++) {
+      if (!m_pipeline_reg[stage]->m_valid) {
+        m_pipeline_reg[stage]->m_valid = m_pipeline_reg[stage + 1]->m_valid;
+        m_pipeline_reg[stage]->pc = m_pipeline_reg[stage + 1]->pc;
+        m_pipeline_reg[stage]->wid = m_pipeline_reg[stage + 1]->wid;
+        m_pipeline_reg[stage]->kid = m_pipeline_reg[stage + 1]->kid;
+        m_pipeline_reg[stage]->uid = m_pipeline_reg[stage + 1]->uid;
+        m_pipeline_reg[stage]->latency = m_pipeline_reg[stage + 1]->latency;
+        m_pipeline_reg[stage]->initial_interval = m_pipeline_reg[stage + 1]->initial_interval;
+        m_pipeline_reg[stage + 1]->m_valid = false;
+      }
+    }
+  }
+
+  if (m_dispatch_reg->m_valid) {
+    // std::cout << "    m_dispatch_reg latency: " << m_dispatch_reg->latency 
+    //           << " initial_interval: " << m_dispatch_reg->initial_interval 
+    //           << " dec_counter: " << m_dispatch_reg->initial_interval_dec_counter << std::endl;
+    if (m_dispatch_reg->initial_interval_dec_counter == 1) {
+      int start_stage = m_dispatch_reg->latency - m_dispatch_reg->initial_interval /*+ 1*/;
+      if (start_stage < 0) start_stage = 0;
+      
+      // std::cout << "    start_stage: " << start_stage 
+      //           << " m_pipeline_depth: " << m_pipeline_depth 
+      //           << " ini_intval counter: " 
+      //           << m_dispatch_reg->initial_interval_dec_counter
+      //           << " latency: " << m_dispatch_reg->latency
+      //           << " initial_interval: " << m_dispatch_reg->initial_interval
+      //           << std::endl;
+      // std::cout << "start_stage: " << start_stage << " " << "m_pipeline_depth: " << m_pipeline_depth << std::endl;
+      assert(start_stage >= 0 && start_stage < m_pipeline_depth);
+      // m_pipeline_reg[start_stage]->move_in(m_dispatch_reg);
+      if (m_pipeline_reg[start_stage]->m_valid == false) {
+        active_during_this_cycle = true;
+
+        m_dispatch_reg->m_valid = false;
+        active_insts_in_pipeline++;
+        m_pipeline_reg[start_stage]->m_valid = true;
+        m_pipeline_reg[start_stage]->pc = m_dispatch_reg->pc;
+        m_pipeline_reg[start_stage]->wid = m_dispatch_reg->wid;
+        m_pipeline_reg[start_stage]->kid = m_dispatch_reg->kid;
+        m_pipeline_reg[start_stage]->uid = m_dispatch_reg->uid;
+        m_pipeline_reg[start_stage]->latency = m_dispatch_reg->latency;
+        m_pipeline_reg[start_stage]->initial_interval = m_dispatch_reg->initial_interval;
+      }
+    } else {
+      m_dispatch_reg->initial_interval_dec_counter--;
+    }
+  }
+
+  occupied >>= 1;
+
+  return need_to_return_wids;
 }
