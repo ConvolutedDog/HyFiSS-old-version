@@ -201,10 +201,18 @@ extern int kernel_info_m_next_uid;
 #define PRINT_2_MEMORY_TRACE_FILE_0x() \
   outfile << "0x";
 
+
+
 #define START_TIMER(no) auto start##no = std::chrono::system_clock::now();
 
 #define STOP_AND_REPORT_TIMER_pass(pass, no) \
-    if (pass != -1) std::cout << "    pass-" << pass << " "; \
+    // if (pass != -1) std::cout << "    pass-" << pass << " "; \
+    auto end##no = std::chrono::system_clock::now(); \
+    auto duration##no = std::chrono::duration_cast<std::chrono::microseconds>(end##no - start##no); \
+    auto cost##no = double(duration##no.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den; \
+    // std::cout << "Cost " << no << "-" << cost##no << " seconds." << std::endl;
+
+#define STOP_AND_REPORT_TIMER_rank(no) \
     auto end##no = std::chrono::system_clock::now(); \
     auto duration##no = std::chrono::duration_cast<std::chrono::microseconds>(end##no - start##no); \
     auto cost##no = double(duration##no.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den; \
@@ -212,11 +220,11 @@ extern int kernel_info_m_next_uid;
 
 
 #define STOP_AND_REPORT_TIMER_rank(rank, no) \
-    std::cout << "    L1 rank-" << rank << " "; \
+    // std::cout << "    L1 rank-" << rank << " "; \
     auto end##no = std::chrono::system_clock::now(); \
     auto duration##no = std::chrono::duration_cast<std::chrono::microseconds>(end##no - start##no); \
     auto cost##no = double(duration##no.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den; \
-    std::cout << "Cost " << no << "-" << cost##no << " seconds." << std::endl;
+    // std::cout << "Cost " << no << "-" << cost##no << " seconds." << std::endl;
 
 /* If the memory instruction does not specify a state space, the operation is performed using generic addressing. 
  * Spaces states: .const, .const, .param, .local and .shared. We models as a window within a generic address space. 
