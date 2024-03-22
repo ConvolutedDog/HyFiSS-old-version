@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SEARCH_ROOT="/home/yangjianchao/Github/memory_model/simulator-apps/OursTracesCollection"
+SEARCH_ROOT="/home/yangjianchao/Github/memory_model/apps/OursTracesCollection"
 
 CMD="./process_sass_dir --dir"
 
