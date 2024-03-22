@@ -107,6 +107,17 @@ SPEC_UNIT_2_execute_clks_sum = [None for _ in range(SMs_num)]
 SPEC_UNIT_3_execute_clks_sum = [None for _ in range(SMs_num)]
 Other_UNIT_execute_clks_sum = [None for _ in range(SMs_num)]
 
+SP_UNIT_Instns_num = [None for _ in range(SMs_num)]
+SFU_UNIT_Instns_num = [None for _ in range(SMs_num)]
+INT_UNIT_Instns_num = [None for _ in range(SMs_num)]
+DP_UNIT_Instns_num = [None for _ in range(SMs_num)]
+TENSOR_CORE_UNIT_Instns_num = [None for _ in range(SMs_num)]
+LDST_UNIT_Instns_num = [None for _ in range(SMs_num)]
+SPEC_UNIT_1_Instns_num = [None for _ in range(SMs_num)]
+SPEC_UNIT_2_Instns_num = [None for _ in range(SMs_num)]
+SPEC_UNIT_3_Instns_num = [None for _ in range(SMs_num)]
+Other_UNIT_Instns_num = [None for _ in range(SMs_num)]
+
 # ========================================================
 parser = argparse.ArgumentParser(description='Merge rank reports.')
 
@@ -1835,6 +1846,246 @@ for file in files:
         if DEBUG:
             print("Other_UNIT_execute_clks_sum: ", Other_UNIT_execute_clks_sum)
         # ========================================================
+        pattern = r"SP_UNIT_Instns_num\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for SP_UNIT_Instns_num[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if SP_UNIT_Instns_num[curr_process_idx] is not None:
+                    print(f"Error: SP_UNIT_Instns_num[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    SP_UNIT_Instns_num[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("SP_UNIT_Instns_num: ", SP_UNIT_Instns_num)
+        # ========================================================
+        pattern = r"SFU_UNIT_Instns_num\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for SFU_UNIT_Instns_num[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if SFU_UNIT_Instns_num[curr_process_idx] is not None:
+                    print(f"Error: SFU_UNIT_Instns_num[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    SFU_UNIT_Instns_num[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("SFU_UNIT_Instns_num: ", SFU_UNIT_Instns_num)
+        # ========================================================
+        pattern = r"INT_UNIT_Instns_num\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for INT_UNIT_Instns_num[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if INT_UNIT_Instns_num[curr_process_idx] is not None:
+                    print(f"Error: INT_UNIT_Instns_num[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    INT_UNIT_Instns_num[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("INT_UNIT_Instns_num: ", INT_UNIT_Instns_num)
+        # ========================================================
+        pattern = r"DP_UNIT_Instns_num\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for DP_UNIT_Instns_num[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if DP_UNIT_Instns_num[curr_process_idx] is not None:
+                    print(f"Error: DP_UNIT_Instns_num[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    DP_UNIT_Instns_num[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("DP_UNIT_Instns_num: ", DP_UNIT_Instns_num)
+        # ========================================================
+        pattern = r"TENSOR_CORE_UNIT_Instns_num\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for TENSOR_CORE_UNIT_Instns_num[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if TENSOR_CORE_UNIT_Instns_num[curr_process_idx] is not None:
+                    print(f"Error: TENSOR_CORE_UNIT_Instns_num[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    TENSOR_CORE_UNIT_Instns_num[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("TENSOR_CORE_UNIT_Instns_num: ", TENSOR_CORE_UNIT_Instns_num)
+        # ========================================================
+        pattern = r"LDST_UNIT_Instns_num\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for LDST_UNIT_Instns_num[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if LDST_UNIT_Instns_num[curr_process_idx] is not None:
+                    print(f"Error: LDST_UNIT_Instns_num[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    LDST_UNIT_Instns_num[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("LDST_UNIT_Instns_num: ", LDST_UNIT_Instns_num)
+        # ========================================================
+        pattern = r"SPEC_UNIT_1_Instns_num\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for SPEC_UNIT_1_Instns_num[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if SPEC_UNIT_1_Instns_num[curr_process_idx] is not None:
+                    print(f"Error: SPEC_UNIT_1_Instns_num[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    SPEC_UNIT_1_Instns_num[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("SPEC_UNIT_1_Instns_num: ", SPEC_UNIT_1_Instns_num)
+        # ========================================================
+        pattern = r"SPEC_UNIT_2_Instns_num\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for SPEC_UNIT_2_Instns_num[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if SPEC_UNIT_2_Instns_num[curr_process_idx] is not None:
+                    print(f"Error: SPEC_UNIT_2_Instns_num[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    SPEC_UNIT_2_Instns_num[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("SPEC_UNIT_2_Instns_num: ", SPEC_UNIT_2_Instns_num)
+        # ========================================================
+        pattern = r"SPEC_UNIT_3_Instns_num\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for SPEC_UNIT_3_Instns_num[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if SPEC_UNIT_3_Instns_num[curr_process_idx] is not None:
+                    print(f"Error: SPEC_UNIT_3_Instns_num[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    SPEC_UNIT_3_Instns_num[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("SPEC_UNIT_3_Instns_num: ", SPEC_UNIT_3_Instns_num)
+        # ========================================================
+        pattern = r"Other_UNIT_Instns_num\[\]: ((?:[\d.-]+(?:e-)?\d*\s*)+)"
+        match = re.search(pattern, content)
+
+        if match:
+            numbers_str = match.group(1).strip()
+            numbers = [float(n) for n in numbers_str.split()]
+            # print(numbers)
+        else:
+            # print("No match found for Other_UNIT_Instns_num[]")
+            exit(0)
+        
+        # process_idx calculates the index corresponding to the current file/process..
+        for pass_num in range(int((SMs_num + all_ranks_num - 1) / all_ranks_num)):
+            curr_process_idx = rank_num + pass_num * all_ranks_num
+            if curr_process_idx < SMs_num:
+                if Other_UNIT_Instns_num[curr_process_idx] is not None:
+                    print(f"Error: Other_UNIT_Instns_num[{curr_process_idx}] is already set")
+                    exit(0)
+                else:
+                    # print("numbers[{curr_process_idx}]: ", curr_process_idx, numbers[curr_process_idx])
+                    Other_UNIT_Instns_num[curr_process_idx] = numbers[curr_process_idx]
+        if DEBUG:
+            print("Other_UNIT_Instns_num: ", Other_UNIT_Instns_num)
+        # ========================================================
         
     except:
         pass
@@ -2012,6 +2263,18 @@ SPEC_UNIT_2_execute_clks_sum_summary = 0
 SPEC_UNIT_3_execute_clks_sum_summary = 0
 Other_UNIT_execute_clks_sum_summary = 0
 
+SP_UNIT_Instns_num_summary = 0
+SFU_UNIT_Instns_num_summary = 0
+INT_UNIT_Instns_num_summary = 0
+DP_UNIT_Instns_num_summary = 0
+TENSOR_CORE_UNIT_Instns_num_summary = 0
+LDST_UNIT_Instns_num_summary = 0
+SPEC_UNIT_1_Instns_num_summary = 0
+SPEC_UNIT_2_Instns_num_summary = 0
+SPEC_UNIT_3_Instns_num_summary = 0
+Other_UNIT_Instns_num_summary = 0
+
+
 for i in range(SMs_num):
     if Compute_Structural_Stall[i] is not None:
         Compute_Structural_Stall_summary += Compute_Structural_Stall[i]
@@ -2108,7 +2371,26 @@ for i in range(SMs_num):
     if Other_UNIT_execute_clks_sum[i] is not None:
         Other_UNIT_execute_clks_sum_summary += Other_UNIT_execute_clks_sum[i]
     
-    
+    if SP_UNIT_Instns_num[i] is not None:
+        SP_UNIT_Instns_num_summary += SP_UNIT_Instns_num[i]
+    if SFU_UNIT_Instns_num[i] is not None:
+        SFU_UNIT_Instns_num_summary += SFU_UNIT_Instns_num[i]
+    if INT_UNIT_Instns_num[i] is not None:
+        INT_UNIT_Instns_num_summary += INT_UNIT_Instns_num[i]
+    if DP_UNIT_Instns_num[i] is not None:
+        DP_UNIT_Instns_num_summary += DP_UNIT_Instns_num[i]
+    if TENSOR_CORE_UNIT_Instns_num[i] is not None:
+        TENSOR_CORE_UNIT_Instns_num_summary += TENSOR_CORE_UNIT_Instns_num[i]
+    if LDST_UNIT_Instns_num[i] is not None:
+        LDST_UNIT_Instns_num_summary += LDST_UNIT_Instns_num[i]
+    if SPEC_UNIT_1_Instns_num[i] is not None:
+        SPEC_UNIT_1_Instns_num_summary += SPEC_UNIT_1_Instns_num[i]
+    if SPEC_UNIT_2_Instns_num[i] is not None:
+        SPEC_UNIT_2_Instns_num_summary += SPEC_UNIT_2_Instns_num[i]
+    if SPEC_UNIT_3_Instns_num[i] is not None:
+        SPEC_UNIT_3_Instns_num_summary += SPEC_UNIT_3_Instns_num[i]
+    if Other_UNIT_Instns_num[i] is not None:
+        Other_UNIT_Instns_num_summary += Other_UNIT_Instns_num[i]
     
 
 total_num_stalls = Compute_Structural_Stall_summary + Compute_Data_Stall_summary + \
@@ -2117,6 +2399,17 @@ total_num_stalls = Compute_Structural_Stall_summary + Compute_Data_Stall_summary
                    Idle_Stall_summary + No_Stall_summary + Other_Stall_summary
 
 if total_num_stalls != 0:
+    Compute_Structural_Stall_ratio = float(Compute_Structural_Stall_summary) / float(total_num_stalls)
+    Compute_Data_Stall_ratio = float(Compute_Data_Stall_summary) / float(total_num_stalls)
+    Memory_Structural_Stall_ratio = float(Memory_Structural_Stall_summary) / float(total_num_stalls)
+    Memory_Data_Stall_ratio = float(Memory_Data_Stall_summary) / float(total_num_stalls)
+    Synchronization_Stall_ratio = float(Synchronization_Stall_summary) / float(total_num_stalls)
+    Control_Stall_ratio = float(Control_Stall_summary) / float(total_num_stalls)
+    Idle_Stall_ratio = float(Idle_Stall_summary) / float(total_num_stalls)
+    No_Stall_ratio = float(No_Stall_summary) / float(total_num_stalls)
+    Other_Stall_ratio = float(Other_Stall_summary) / float(total_num_stalls)
+else:
+    total_num_stalls = 1
     Compute_Structural_Stall_ratio = float(Compute_Structural_Stall_summary) / float(total_num_stalls)
     Compute_Data_Stall_ratio = float(Compute_Data_Stall_summary) / float(total_num_stalls)
     Memory_Structural_Stall_ratio = float(Memory_Structural_Stall_summary) / float(total_num_stalls)
@@ -2273,6 +2566,10 @@ with open(reports_dir + '/' + f'kernel-{kernel_id}-summary.txt', 'w') as f:
                                    num_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated_summary + \
                                    num_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu_summary + \
                                    num_Execute_Memory_Structural_icnt_injection_buffer_is_full_summary
+    
+    if all_Memory_Structural_cycles == 0:
+        all_Memory_Structural_cycles = 1
+    
     f.write(" - Memory Structural Stall Cycles Breakdown Distribution: "+"\n")
     f.write("       * Issue_out_has_no_free_slot: "+\
         str(format(num_Issue_Memory_Structural_out_has_no_free_slot_summary / all_Memory_Structural_cycles, '.6f'))+"\n")
@@ -2314,6 +2611,10 @@ with open(reports_dir + '/' + f'kernel-{kernel_id}-summary.txt', 'w') as f:
                                     num_Writeback_Compute_Structural_bank_of_reg_is_not_idle_summary + \
                                     num_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated_summary + \
                                     num_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu_summary
+    
+    if all_Compute_Structural_cycles == 0:
+        all_Compute_Structural_cycles = 1
+    
     f.write(" - Compute Structural Stall Cycles Breakdown Distribution: "+"\n")
     f.write("       * Issue_out_has_no_free_slot: "+\
         str(format(num_Issue_Compute_Structural_out_has_no_free_slot_summary / all_Compute_Structural_cycles, '.6f'))+"\n")
@@ -2340,6 +2641,10 @@ with open(reports_dir + '/' + f'kernel-{kernel_id}-summary.txt', 'w') as f:
                              num_Execute_Memory_Data_L1_summary + \
                              num_Execute_Memory_Data_L2_summary + \
                              num_Execute_Memory_Data_Main_Memory_summary
+    
+    if all_Memory_Data_cycles == 0:
+        all_Memory_Data_cycles = 1
+    
     f.write(" - Memory Data Stall Cycles Breakdown Distribution: "+"\n")
     f.write("       * Issue_scoreboard: "+str(format(num_Issue_Memory_Data_scoreboard_summary / all_Memory_Data_cycles, '.6f'))+"\n")
     f.write("       * Execute_L1: "+str(format(num_Execute_Memory_Data_L1_summary / all_Memory_Data_cycles, '.6f'))+"\n")
@@ -2376,6 +2681,10 @@ with open(reports_dir + '/' + f'kernel-{kernel_id}-summary.txt', 'w') as f:
                            SPEC_UNIT_2_execute_clks_sum_summary + \
                            SPEC_UNIT_3_execute_clks_sum_summary + \
                            Other_UNIT_execute_clks_sum_summary
+    
+    if all_Execution_Cycles == 0:
+        all_Execution_Cycles = 1
+    
     f.write(" - Function Unit Execution Cycles Breakdown Distribution: "+"\n")
     f.write("       * SP_UNIT_execute_clks: "+str(format(SP_UNIT_execute_clks_sum_summary / all_Execution_Cycles, '.6f'))+"\n")
     f.write("       * SFU_UNIT_execute_clks: "+str(format(SFU_UNIT_execute_clks_sum_summary / all_Execution_Cycles, '.6f'))+"\n")
@@ -2387,6 +2696,99 @@ with open(reports_dir + '/' + f'kernel-{kernel_id}-summary.txt', 'w') as f:
     f.write("       * SPEC_UNIT_2_execute_clks: "+str(format(SPEC_UNIT_2_execute_clks_sum_summary / all_Execution_Cycles, '.6f'))+"\n")
     f.write("       * SPEC_UNIT_3_execute_clks: "+str(format(SPEC_UNIT_3_execute_clks_sum_summary / all_Execution_Cycles, '.6f'))+"\n")
     f.write("       * Other_UNIT_execute_clks: "+str(format(Other_UNIT_execute_clks_sum_summary / all_Execution_Cycles, '.6f'))+"\n")
+    f.write("\n")
+    
+    f.write(" - Function Unit Execution Instns Number: "+"\n")
+    f.write("       * SP_UNIT_Instns_num: "+str(SP_UNIT_Instns_num_summary)+"\n")
+    f.write("       * SFU_UNIT_Instns_num: "+str(SFU_UNIT_Instns_num_summary)+"\n")
+    f.write("       * INT_UNIT_Instns_num: "+str(INT_UNIT_Instns_num_summary)+"\n")
+    f.write("       * DP_UNIT_Instns_num: "+str(DP_UNIT_Instns_num_summary)+"\n")
+    f.write("       * TENSOR_CORE_UNIT_Instns_num: "+str(TENSOR_CORE_UNIT_Instns_num_summary)+"\n")
+    f.write("       * LDST_UNIT_Instns_num: "+str(LDST_UNIT_Instns_num_summary)+"\n")
+    f.write("       * SPEC_UNIT_1_Instns_num: "+str(SPEC_UNIT_1_Instns_num_summary)+"\n")
+    f.write("       * SPEC_UNIT_2_Instns_num: "+str(SPEC_UNIT_2_Instns_num_summary)+"\n")
+    f.write("       * SPEC_UNIT_3_Instns_num: "+str(SPEC_UNIT_3_Instns_num_summary)+"\n")
+    f.write("       * Other_UNIT_Instns_num: "+str(Other_UNIT_Instns_num_summary)+"\n")
+    f.write("\n")
+    
+    all_Instns_num = SP_UNIT_Instns_num_summary + \
+                     SFU_UNIT_Instns_num_summary + \
+                     INT_UNIT_Instns_num_summary + \
+                     DP_UNIT_Instns_num_summary + \
+                     TENSOR_CORE_UNIT_Instns_num_summary + \
+                     LDST_UNIT_Instns_num_summary + \
+                     SPEC_UNIT_1_Instns_num_summary + \
+                     SPEC_UNIT_2_Instns_num_summary + \
+                     SPEC_UNIT_3_Instns_num_summary + \
+                     Other_UNIT_Instns_num_summary
+    
+    if all_Instns_num == 0:
+        all_Instns_num = 1
+    
+    f.write(" - Function Unit Execution Instns Number Distribution: "+"\n")
+    f.write("       * SP_UNIT_Instns_num: "+str(format(SP_UNIT_Instns_num_summary / all_Instns_num, '.6f'))+"\n")
+    f.write("       * SFU_UNIT_Instns_num: "+str(format(SFU_UNIT_Instns_num_summary / all_Instns_num, '.6f'))+"\n")
+    f.write("       * INT_UNIT_Instns_num: "+str(format(INT_UNIT_Instns_num_summary / all_Instns_num, '.6f'))+"\n")
+    f.write("       * DP_UNIT_Instns_num: "+str(format(DP_UNIT_Instns_num_summary / all_Instns_num, '.6f'))+"\n")
+    f.write("       * TENSOR_CORE_UNIT_Instns_num: "+str(format(TENSOR_CORE_UNIT_Instns_num_summary / all_Instns_num, '.6f'))+"\n")
+    f.write("       * LDST_UNIT_Instns_num: "+str(format(LDST_UNIT_Instns_num_summary / all_Instns_num, '.6f'))+"\n")
+    f.write("       * SPEC_UNIT_1_Instns_num: "+str(format(SPEC_UNIT_1_Instns_num_summary / all_Instns_num, '.6f'))+"\n")
+    f.write("       * SPEC_UNIT_2_Instns_num: "+str(format(SPEC_UNIT_2_Instns_num_summary / all_Instns_num, '.6f'))+"\n")
+    f.write("       * SPEC_UNIT_3_Instns_num: "+str(format(SPEC_UNIT_3_Instns_num_summary / all_Instns_num, '.6f'))+"\n")
+    f.write("       * Other_UNIT_Instns_num: "+str(format(Other_UNIT_Instns_num_summary / all_Instns_num, '.6f'))+"\n")
+    f.write("\n")
+    
+    f.write(" - Function Unit Execution Average Cycles Per Instn : "+"\n")
+    if SP_UNIT_Instns_num_summary > 0:
+        f.write("       * SP_UNIT_average_cycles_per_instn: "+\
+            str(format(SP_UNIT_execute_clks_sum_summary / SP_UNIT_Instns_num_summary, '.6f'))+"\n")
+    else:
+        f.write("       * SP_UNIT_average_cycles_per_instn: "+str(format(0, '.6f'))+"\n")
+    if SFU_UNIT_Instns_num_summary > 0:
+        f.write("       * SFU_UNIT_average_cycles_per_instn: "+\
+            str(format(SFU_UNIT_execute_clks_sum_summary / SFU_UNIT_Instns_num_summary, '.6f'))+"\n")
+    else:
+        f.write("       * SFU_UNIT_average_cycles_per_instn: "+str(format(0, '.6f'))+"\n")
+    if INT_UNIT_Instns_num_summary > 0:
+        f.write("       * INT_UNIT_average_cycles_per_instn: "+\
+            str(format(INT_UNIT_execute_clks_sum_summary / INT_UNIT_Instns_num_summary, '.6f'))+"\n")
+    else:
+        f.write("       * INT_UNIT_average_cycles_per_instn: "+str(format(0, '.6f'))+"\n")
+    if DP_UNIT_Instns_num_summary > 0:
+        f.write("       * DP_UNIT_average_cycles_per_instn: "+\
+            str(format(DP_UNIT_execute_clks_sum_summary / DP_UNIT_Instns_num_summary, '.6f'))+"\n")
+    else:
+        f.write("       * DP_UNIT_average_cycles_per_instn: "+str(format(0, '.6f'))+"\n")
+    if TENSOR_CORE_UNIT_Instns_num_summary > 0:
+        f.write("       * TENSOR_CORE_UNIT_average_cycles_per_instn: "+\
+            str(format(TENSOR_CORE_UNIT_execute_clks_sum_summary / TENSOR_CORE_UNIT_Instns_num_summary, '.6f'))+"\n")
+    else:
+        f.write("       * TENSOR_CORE_UNIT_average_cycles_per_instn: "+str(format(0, '.6f'))+"\n")
+    if LDST_UNIT_Instns_num_summary > 0:
+        f.write("       * LDST_UNIT_average_cycles_per_instn: "+\
+            str(format(LDST_UNIT_execute_clks_sum_summary / LDST_UNIT_Instns_num_summary, '.6f'))+"\n")
+    else:
+        f.write("       * LDST_UNIT_average_cycles_per_instn: "+str(format(0, '.6f'))+"\n")
+    if SPEC_UNIT_1_Instns_num_summary > 0:
+        f.write("       * SPEC_UNIT_1_average_cycles_per_instn: "+\
+            str(format(SPEC_UNIT_1_execute_clks_sum_summary / SPEC_UNIT_1_Instns_num_summary, '.6f'))+"\n")
+    else:
+        f.write("       * SPEC_UNIT_1_average_cycles_per_instn: "+str(format(0, '.6f'))+"\n")
+    if SPEC_UNIT_2_Instns_num_summary > 0:
+        f.write("       * SPEC_UNIT_2_average_cycles_per_instn: "+\
+            str(format(SPEC_UNIT_2_execute_clks_sum_summary / SPEC_UNIT_2_Instns_num_summary, '.6f'))+"\n")
+    else:
+        f.write("       * SPEC_UNIT_2_average_cycles_per_instn: "+str(format(0, '.6f'))+"\n")
+    if SPEC_UNIT_3_Instns_num_summary > 0:
+        f.write("       * SPEC_UNIT_3_average_cycles_per_instn: "+\
+            str(format(SPEC_UNIT_3_execute_clks_sum_summary / SPEC_UNIT_3_Instns_num_summary, '.6f'))+"\n")
+    else:
+        f.write("       * SPEC_UNIT_3_average_cycles_per_instn: "+str(format(0, '.6f'))+"\n")
+    if Other_UNIT_Instns_num_summary > 0:
+        f.write("       * Other_UNIT_average_cycles_per_instn: "+\
+            str(format(Other_UNIT_execute_clks_sum_summary / Other_UNIT_Instns_num_summary, '.6f'))+"\n")
+    else:
+        f.write("       * Other_UNIT_average_cycles_per_instn: "+str(format(0, '.6f'))+"\n")
     f.write("\n")
     
     import datetime
