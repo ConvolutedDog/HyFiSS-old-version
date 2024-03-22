@@ -587,10 +587,10 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
 
   unsigned l1_cache_access_latency = l1_cache_access;
   unsigned l2_cache_access_latency = l2_cache_access;
-  unsigned l2_cache_from_l1_access_latency = l2_cache_access_latency + l1_cache_access_latency;
+  unsigned l2_cache_from_l1_access_latency = l2_cache_access_latency - l1_cache_access_latency;
   unsigned dram_mem_access_latency = dram_mem_access;
   unsigned l2_cache_from_dram_access_latency = 
-    dram_mem_access_latency + l2_cache_access_latency + l1_cache_access_latency;
+    dram_mem_access_latency - l2_cache_access_latency - l1_cache_access_latency;
 
   // unsigned l1_cycles_no_contention = stat_coll->get_GEMM_total_transactions(0) * l1_cache_access_latency;
   
@@ -1541,6 +1541,17 @@ int main(int argc, char **argv) {
             void increment_SPEC_UNIT_2_execute_clks_sum(unsigned smid, unsigned long long value) { SPEC_UNIT_2_execute_clks_sum[smid] += value; }
             void increment_SPEC_UNIT_3_execute_clks_sum(unsigned smid, unsigned long long value) { SPEC_UNIT_3_execute_clks_sum[smid] += value; }
             void increment_Other_UNIT_execute_clks_sum(unsigned smid, unsigned long long value) { Other_UNIT_execute_clks_sum[smid] += value; }
+
+            void increment_SP_UNIT_Instns_num(unsigned smid) { SP_UNIT_Instns_num[smid]++; }
+            void increment_SFU_UNIT_Instns_num(unsigned smid) { SFU_UNIT_Instns_num[smid]++; }
+            void increment_INT_UNIT_Instns_num(unsigned smid) { INT_UNIT_Instns_num[smid]++; }
+            void increment_DP_UNIT_Instns_num(unsigned smid) { DP_UNIT_Instns_num[smid]++; }
+            void increment_TENSOR_CORE_UNIT_Instns_num(unsigned smid) { TENSOR_CORE_UNIT_Instns_num[smid]++; }
+            void increment_LDST_UNIT_Instns_num(unsigned smid) { LDST_UNIT_Instns_num[smid]++; }
+            void increment_SPEC_UNIT_1_Instns_num(unsigned smid) { SPEC_UNIT_1_Instns_num[smid]++; }
+            void increment_SPEC_UNIT_2_Instns_num(unsigned smid) { SPEC_UNIT_2_Instns_num[smid]++; }
+            void increment_SPEC_UNIT_3_Instns_num(unsigned smid) { SPEC_UNIT_3_Instns_num[smid]++; }
+            void increment_Other_UNIT_Instns_num(unsigned smid) { Other_UNIT_Instns_num[smid]++; }
             */
 
             unsigned latency_from_issue_to_writeback = 0;
@@ -1560,36 +1571,47 @@ int main(int argc, char **argv) {
             {
               case NON_UNIT:
                 stat_coll.increment_Other_UNIT_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                stat_coll.increment_Other_UNIT_Instns_num(smid);
                 break;
               case SP_UNIT:
                 stat_coll.increment_SP_UNIT_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                stat_coll.increment_SP_UNIT_Instns_num(smid);
                 break;
               case SFU_UNIT:
                 stat_coll.increment_SFU_UNIT_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                stat_coll.increment_SFU_UNIT_Instns_num(smid);
                 break;
               case INT_UNIT:
                 stat_coll.increment_INT_UNIT_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                stat_coll.increment_INT_UNIT_Instns_num(smid);
                 break;
               case DP_UNIT:
                 stat_coll.increment_DP_UNIT_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                stat_coll.increment_DP_UNIT_Instns_num(smid);
                 break;
               case TENSOR_CORE_UNIT:
                 stat_coll.increment_TENSOR_CORE_UNIT_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                stat_coll.increment_TENSOR_CORE_UNIT_Instns_num(smid);
                 break;
               case LDST_UNIT:
                 stat_coll.increment_LDST_UNIT_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                stat_coll.increment_LDST_UNIT_Instns_num(smid);
                 break;
               case SPEC_UNIT_1:
                 stat_coll.increment_SPEC_UNIT_1_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                stat_coll.increment_SPEC_UNIT_1_Instns_num(smid);
                 break;
               case SPEC_UNIT_2:
                 stat_coll.increment_SPEC_UNIT_2_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                stat_coll.increment_SPEC_UNIT_2_Instns_num(smid);
                 break;
               case SPEC_UNIT_3:
                 stat_coll.increment_SPEC_UNIT_3_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                stat_coll.increment_SPEC_UNIT_3_Instns_num(smid);
                 break;
               default:
                 stat_coll.increment_Other_UNIT_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                stat_coll.increment_Other_UNIT_Instns_num(smid);
                 break;
             }
           }
