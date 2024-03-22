@@ -66,10 +66,26 @@ class opndcoll_rfu_t {  // operand collector based register file unit
   // modifiers
   // bool writeback(warp_inst_t &warp); // TODO
 
-  void step() {
-    dispatch_ready_cu();
-    allocate_reads();
-    for (unsigned p = 0; p < m_in_ports.size(); p++) allocate_cu(p);
+  void step(bool* flag_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+            bool* flag_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated,
+            bool* flag_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated,
+            bool* flag_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+            trace_parser* tracer,
+            std::map<std::tuple<unsigned, unsigned, unsigned>, 
+                                  std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>>* clk_record,
+            unsigned cycle) {
+    dispatch_ready_cu(clk_record, cycle);
+    allocate_reads(flag_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+                   flag_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated,
+                   flag_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated,
+                   flag_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+                   tracer);
+    for (unsigned p = 0; p < m_in_ports.size(); p++) 
+      allocate_cu(p, flag_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+                     flag_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated,
+                     flag_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated,
+                     flag_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+                     tracer);
     process_banks();
   }
 
@@ -90,9 +106,20 @@ class opndcoll_rfu_t {  // operand collector based register file unit
  private:
   void process_banks() { m_arbiter.reset_alloction(); }
 
-  void dispatch_ready_cu();
-  void allocate_cu(unsigned port);
-  void allocate_reads();
+  void dispatch_ready_cu(std::map<std::tuple<unsigned, unsigned, unsigned>, 
+                                  std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>>* clk_record,
+                         unsigned cycle);
+  void allocate_cu(unsigned port, 
+                   bool* flag_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+                   bool* flag_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated,
+                   bool* flag_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated,
+                   bool* flag_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+                   trace_parser* tracer);
+  void allocate_reads(bool* flag_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+                      bool* flag_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated,
+                      bool* flag_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated,
+                      bool* flag_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+                      trace_parser* tracer);
 
   // types
 
@@ -114,6 +141,23 @@ class opndcoll_rfu_t {  // operand collector based register file unit
       m_tracer = tracer;
       m_bank = register_bank_opcoll(reg, cu->get_warp_id(), num_banks, bank_warp_shift,
                              sub_core_model, banks_per_sched, sched_id);
+    }
+    op_t(collector_unit_t *cu, unsigned op, unsigned reg, unsigned num_banks,
+         unsigned bank_warp_shift, bool sub_core_model,
+         unsigned banks_per_sched, unsigned sched_id,
+         trace_parser* tracer, unsigned kid, unsigned wid, unsigned uid) {
+      m_valid = true;
+      m_warp = NULL;
+      m_cu = cu;
+      m_operand = op;
+      m_register = reg;
+      m_shced_id = sched_id;
+      m_tracer = tracer;
+      m_bank = register_bank_opcoll(reg, cu->get_warp_id(), num_banks, bank_warp_shift,
+                             sub_core_model, banks_per_sched, sched_id);
+      m_kid = kid;
+      m_wid = wid;
+      m_uid = uid;
     }
     op_t(const inst_fetch_buffer_entry *warp, unsigned reg, unsigned num_banks,
          unsigned bank_warp_shift, bool sub_core_model,
@@ -144,6 +188,24 @@ class opndcoll_rfu_t {  // operand collector based register file unit
       else
         abort();
     }
+    unsigned get_kid() const {
+      if (m_warp)
+        return m_warp->kid;
+      else 
+        abort();
+    }
+    unsigned get_uid() const {
+      if (m_warp)
+        return m_warp->kid;
+      else 
+        abort();
+    }
+
+    unsigned get_instn_kid() { return m_kid; }
+    unsigned get_instn_wid() { return m_wid; }
+    unsigned get_instn_uid() { return m_uid; }
+
+
     unsigned get_sid() const { return m_shced_id; }
     unsigned get_active_count() const {
       if (m_warp) {
@@ -224,6 +286,10 @@ class opndcoll_rfu_t {  // operand collector based register file unit
     unsigned m_shced_id;  // scheduler id that has issued this inst
 
     trace_parser* m_tracer;
+
+    unsigned m_kid = 65536;
+    unsigned m_wid = 65536;
+    unsigned m_uid = 65536;
   };
 
   // enum register_bank_opcoll_State {
@@ -378,7 +444,11 @@ class opndcoll_rfu_t {  // operand collector based register file unit
     }
 
     // modifiers
-    std::list<op_t> allocate_reads();
+    std::list<op_t> allocate_reads(bool* flag_ReadOperands_Compute_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+                                   bool* flag_ReadOperands_Compute_Structural_bank_reg_belonged_to_was_allocated,
+                                   bool* flag_ReadOperands_Memory_Structural_bank_reg_belonged_to_was_allocated,
+                                   bool* flag_ReadOperands_Memory_Structural_port_num_m_in_ports_m_in_fails_as_not_found_free_cu,
+                                   trace_parser* tracer);
 
     void add_read_requests(collector_unit_t *cu) {
       const op_t *src = cu->get_operands();
@@ -592,8 +662,26 @@ class opndcoll_rfu_t {  // operand collector based register file unit
       else
         abort();
     }
-    void dispatch();
+    void dispatch(std::map<std::tuple<unsigned, unsigned, unsigned>, 
+                    std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>>* clk_record,
+                  unsigned cycle);
     bool is_free() { return m_free; }
+
+    template <unsigned pos>
+    void set_clk_record(std::map<std::tuple<unsigned, unsigned, unsigned>, 
+                          std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>>* clk_record, 
+                        unsigned kid, unsigned wid, unsigned uid, unsigned value) {
+      const std::tuple<unsigned, unsigned, unsigned> key(kid, wid, uid);
+      auto it = clk_record->find(key);
+
+      if (it == clk_record->end()) {
+        std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned> new_value(0, 0, 0, 0, 0, 0);
+        std::get<pos>(new_value) = value;
+        (*clk_record)[key] = new_value;
+      } else {
+        std::get<pos>(it->second) = value;
+      }
+    }
 
    private:
     bool m_free;
