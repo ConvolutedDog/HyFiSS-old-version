@@ -30,6 +30,7 @@ class Scoreboard {
   bool pendingWrites(const unsigned wid) const;
   //打印记分牌的内容。
   void printContents() const;
+  void printContents(unsigned i) const;
   
   const bool islongop(const unsigned wid, const int regnum);
 
