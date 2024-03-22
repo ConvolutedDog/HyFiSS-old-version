@@ -5,11 +5,14 @@
 #include "../trace-driven/register-set.h"
 #include "../hw-parser/hw-parser.h"
 #include "../trace-parser/trace-parser.h"
+#include "../hw-component/Scoreboard.h"
+#include "../hw-component/RegisterBankAllocator.h"
 
 #ifndef PIPELINEUNIT_H
 #define PIPELINEUNIT_H
 
-#define MAX_ALU_LATENCY 512
+#define MAX_ALU_LATENCY 1024
+#define PRED_NUM_OFFSET 65536
 
 // #define NUM_CYCLE_MEM_ACCESS_LATENCY 5
 
@@ -86,11 +89,37 @@ class pipelined_simd_unit {
     }
   }
 
-  std::vector<unsigned> cycle();
+  virtual std::vector<unsigned> cycle(trace_parser* tracer, Scoreboard* m_scoreboard, app_config* appcfg,
+                                      std::vector<std::pair<int, int>>* kernel_block_pair,
+                                      std::vector<unsigned>* m_num_warps_per_sm,
+                                      unsigned KERNEL_EVALUATION,
+                                      unsigned num_scheds,
+                                      RegisterBankAllocator* m_reg_bank_allocator,
+                                      bool* flag_Writeback_Memory_Structural_bank_of_reg_is_not_idle,
+                                      std::map<std::tuple<unsigned, unsigned, unsigned>, 
+                                        std::tuple<unsigned, unsigned, unsigned, unsigned, 
+                                                   unsigned, unsigned>>* clk_record,
+                                      unsigned cycle);
 
   virtual unsigned clock_multiplier() const { return 1; };
   //获取SIMD单元的名称。
   const char *get_name() { return m_name.c_str(); }
+
+  template <unsigned pos>
+    void set_clk_record(std::map<std::tuple<unsigned, unsigned, unsigned>, 
+                          std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>>* clk_record, 
+                        unsigned kid, unsigned wid, unsigned uid, unsigned value) {
+      const std::tuple<unsigned, unsigned, unsigned> key(kid, wid, uid);
+      auto it = clk_record->find(key);
+
+      if (it == clk_record->end()) {
+        std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned> new_value(0, 0, 0, 0, 0, 0);
+        std::get<pos>(new_value) = value;
+        (*clk_record)[key] = new_value;
+      } else {
+        std::get<pos>(it->second) = value;
+      }
+    }
 
  protected:
   //流水线的深度。
@@ -258,8 +287,32 @@ class mem_unit : public pipelined_simd_unit {
                                  MAX_ALU_LATENCY,
                                  issue_reg_id,
                                  hw_cfg, tracer) {
+    m_pipeline_reg_mem_unit.reserve(hw_cfg->get_num_mem_units());
+    for (unsigned i = 0; i < hw_cfg->get_num_mem_units(); i++) {
+      m_pipeline_reg_mem_unit.push_back(std::vector<inst_fetch_buffer_entry*>());
+    }
+    for (unsigned i = 0; i < hw_cfg->get_num_mem_units(); i++) {
+      for (unsigned j = 0; j < m_pipeline_depth; j++) {
+        m_pipeline_reg_mem_unit[i].push_back(new inst_fetch_buffer_entry());
+      }
+    }
+
+    m_pipeline_reg.reserve(m_pipeline_depth);
+    for (unsigned i = 0; i < m_pipeline_depth; i++) {
+      m_pipeline_reg.push_back(new inst_fetch_buffer_entry());
+    }
     m_name = "MEM";
   }
+
+  ~mem_unit(){
+    for (unsigned i = 0; i < m_hw_cfg->get_num_mem_units(); i++) {
+      for (unsigned j = 0; j < m_pipeline_depth; j++) {
+        delete m_pipeline_reg_mem_unit[i][j];
+      }
+    }
+  }
+
+  std::vector<std::vector<inst_fetch_buffer_entry*>> m_pipeline_reg_mem_unit;
 
   virtual bool can_issue(const inst_fetch_buffer_entry &inst) const;
   virtual unsigned clock_multiplier() const { return 1; }
@@ -267,6 +320,17 @@ class mem_unit : public pipelined_simd_unit {
   virtual void issue(register_set &source_reg, unsigned reg_id);
   bool is_issue_partitioned() { return true; }
   virtual bool stallable() const { return true; }
+  virtual std::vector<unsigned int> cycle(trace_parser* tracer, Scoreboard* m_scoreboard, app_config* appcfg,
+                                      std::vector<std::pair<int, int>>* kernel_block_pair,
+                                      std::vector<unsigned>* m_num_warps_per_sm,
+                                      unsigned KERNEL_EVALUATION,
+                                      unsigned num_scheds,
+                                      RegisterBankAllocator* m_reg_bank_allocator,
+                                      bool* flag_Writeback_Memory_Structural_bank_of_reg_is_not_idle,
+                                      std::map<std::tuple<unsigned, unsigned, unsigned>, 
+                                        std::tuple<unsigned, unsigned, unsigned, unsigned, 
+                                                   unsigned, unsigned>>* clk_record,
+                                      unsigned cycle);
 };
 
 #endif
