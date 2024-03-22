@@ -64,7 +64,7 @@ void hw_config::init(const std::string config_file) {
     exit(1);
   }
 
-  std::cout << "Processing configs file : " << config_file << std::endl;
+  // std::cout << "Processing configs file : " << config_file << std::endl;
 
   while (inputFile.good()) {
     std::string line;
@@ -160,6 +160,8 @@ void hw_config::init(const std::string config_file) {
       num_int_units = std::stoi(value);
     } else if (entry == "-gpgpu_num_tensor_core_units") {
       num_tensor_core_units = std::stoi(value);
+    } else if (entry == "-gpgpu_num_mem_units") {
+      num_mem_units = std::stoi(value);
     } else if (entry == "-gpgpu_opcode_latency_int") { //
       opcode_latency_int = parse_value(value);
     } else if (entry == "-gpgpu_opcode_latency_fp") { //
