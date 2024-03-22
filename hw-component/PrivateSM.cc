@@ -153,6 +153,30 @@ stat_collector::stat_collector(unsigned num_sm, unsigned kernel_id) {
   SPEC_UNIT_2_execute_clks_sum.resize(m_num_sm, 0);
   SPEC_UNIT_3_execute_clks_sum.resize(m_num_sm, 0);
   Other_UNIT_execute_clks_sum.resize(m_num_sm, 0);
+
+  /*
+  std::vector<unsigned long long> SP_UNIT_Instns_num;
+  std::vector<unsigned long long> SFU_UNIT_Instns_num;
+  std::vector<unsigned long long> INT_UNIT_Instns_num;
+  std::vector<unsigned long long> DP_UNIT_Instns_num;
+  std::vector<unsigned long long> TENSOR_CORE_UNIT_Instns_num;
+  std::vector<unsigned long long> LDST_UNIT_Instns_num;
+  std::vector<unsigned long long> SPEC_UNIT_1_Instns_num;
+  std::vector<unsigned long long> SPEC_UNIT_2_Instns_num;
+  std::vector<unsigned long long> SPEC_UNIT_3_Instns_num;
+  std::vector<unsigned long long> Other_UNIT_Instns_num;
+  */
+  SP_UNIT_Instns_num.resize(m_num_sm, 0);
+  SFU_UNIT_Instns_num.resize(m_num_sm, 0);
+  INT_UNIT_Instns_num.resize(m_num_sm, 0);
+  DP_UNIT_Instns_num.resize(m_num_sm, 0);
+  TENSOR_CORE_UNIT_Instns_num.resize(m_num_sm, 0);
+  LDST_UNIT_Instns_num.resize(m_num_sm, 0);
+  SPEC_UNIT_1_Instns_num.resize(m_num_sm, 0);
+  SPEC_UNIT_2_Instns_num.resize(m_num_sm, 0);
+  SPEC_UNIT_3_Instns_num.resize(m_num_sm, 0);
+  Other_UNIT_Instns_num.resize(m_num_sm, 0);
+
 }
 
 bool create_directory_if_not_exists(const std::string& dir) {
@@ -567,6 +591,70 @@ void stat_collector::dump_output(const std::string& path, unsigned rank) {
     }
     file << std::endl;
     file << std::endl;
+    /*
+    std::vector<unsigned long long> SP_UNIT_Instns_num;
+    std::vector<unsigned long long> SFU_UNIT_Instns_num;
+    std::vector<unsigned long long> INT_UNIT_Instns_num;
+    std::vector<unsigned long long> DP_UNIT_Instns_num;
+    std::vector<unsigned long long> TENSOR_CORE_UNIT_Instns_num;
+    std::vector<unsigned long long> LDST_UNIT_Instns_num;
+    std::vector<unsigned long long> SPEC_UNIT_1_Instns_num;
+    std::vector<unsigned long long> SPEC_UNIT_2_Instns_num;
+    std::vector<unsigned long long> SPEC_UNIT_3_Instns_num;
+    std::vector<unsigned long long> Other_UNIT_Instns_num;
+    */
+    file << "SP_UNIT_Instns_num[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << SP_UNIT_Instns_num[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "SFU_UNIT_Instns_num[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << SFU_UNIT_Instns_num[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "INT_UNIT_Instns_num[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << INT_UNIT_Instns_num[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "DP_UNIT_Instns_num[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << DP_UNIT_Instns_num[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "TENSOR_CORE_UNIT_Instns_num[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << TENSOR_CORE_UNIT_Instns_num[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "LDST_UNIT_Instns_num[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << LDST_UNIT_Instns_num[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "SPEC_UNIT_1_Instns_num[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << SPEC_UNIT_1_Instns_num[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "SPEC_UNIT_2_Instns_num[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << SPEC_UNIT_2_Instns_num[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "SPEC_UNIT_3_Instns_num[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << SPEC_UNIT_3_Instns_num[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << "Other_UNIT_Instns_num[]: ";
+    for (unsigned sm_id = 0; sm_id < m_num_sm; sm_id++) {
+      file << Other_UNIT_Instns_num[sm_id] << " ";;
+    }
+    file << std::endl;
+    file << std::endl;
+    
 
 
     file.close();
