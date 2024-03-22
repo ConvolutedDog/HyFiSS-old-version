@@ -38,7 +38,7 @@
 #include "../hw-component/PrivateSM.h"
 
 #include <chrono>
-
+#include <ctime>
 #include <cmath>
 
 float ceil(float x, float s) {
@@ -73,6 +73,32 @@ void print_SM_traces(std::vector<mem_instn>* traces) {
   }
 }
 
+std::string func_unit_name_to_string(FUNC_UNITS_NAME unit) {
+  switch (unit) {
+    case NON_UNIT:
+      return "NON_UNIT";
+    case SP_UNIT:
+      return "SP";
+    case SFU_UNIT:
+      return "SFU";
+    case INT_UNIT:
+      return "INT";
+    case DP_UNIT:
+      return "DP";
+    case TENSOR_CORE_UNIT:
+      return "TENSOR_CORE";
+    case LDST_UNIT:
+      return "LDST";
+    case SPEC_UNIT_1:
+      return "SPEC_1";
+    case SPEC_UNIT_2:
+      return "SPEC_2";
+    case SPEC_UNIT_3:
+      return "SPEC_3";
+    default:
+      return "Others";
+  }
+}
 
 #ifdef USE_BOOST
 void simple_print_test(int argc, char **argv, std::map<int, std::vector<mem_instn>>* SM_traces_ptr, int pass_issue) {
@@ -145,16 +171,22 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
   // unsigned l2_cache_associativity = 24; // BUG: need configure
   // unsigned l2_cache_blocks = l2_cache_size / l2_cache_line_size; // BUG: need configure
   
-  unsigned l1_cache_line_size = 128; // BUG: need configure
+  // unsigned l1_cache_line_size = 128; // BUG: need configure
+  // unsigned l1_cache_size = 32 * 1024; // BUG: need configure
+  // unsigned l1_cache_associativity = 64; // BUG: need configure
+  // "l1_cache_size"                     :  32 * 1024,
+  // "l1_cache_line_size"                :  32,                
+  // "l1_cache_associativity"            :  64, 
+  unsigned l1_cache_line_size = 32; // BUG: need configure
   unsigned l1_cache_size = 32 * 1024; // BUG: need configure
-  unsigned l1_cache_associativity = 64; // BUG: need configure
+  unsigned l1_cache_associativity = 128; // BUG: need configure
   unsigned l1_cache_blocks = l1_cache_size / l1_cache_line_size; // BUG: need configure
-  unsigned l2_cache_line_size = 128; // BUG: need configure
+  unsigned l2_cache_line_size = 64; // BUG: need configure
   unsigned l2_cache_size = 96 * 1024 * 64; // BUG: need configure
   unsigned l2_cache_associativity = 24; // BUG: need configure
   unsigned l2_cache_blocks = l2_cache_size / l2_cache_line_size; // BUG: need configure
 
-  std::cout << std::endl;
+  // std::cout << std::endl;
 
   float L1_hit_rate = 0.0;
 
@@ -204,7 +236,7 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
       unsigned L2_write_transactions = 0;
       unsigned L2_total_transactions = 0;
       
-
+      // std::cout << "size: " << curr_process_idx << " " << (*SM_traces_all_passes)[kid][curr_process_idx].size() << std::endl;
       for (auto mem_ins : (*SM_traces_all_passes)[kid][curr_process_idx]) { 
         /*
           SM_traces_all_passes:  kid=0  curr_process_idx=0  mem_instn0, 
@@ -370,8 +402,9 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
           
         file = fopen(parda_histogram_filepath.c_str(), "w");
         
+        // std::cout << file << std::endl;
         if (file != NULL) {
-          L1_hit_rate = parda_fprintf_histogram_r(pdt->histogram, file, false);
+          L1_hit_rate = parda_fprintf_histogram_r(pdt->histogram, file, true);
           fclose(file);
         } else {
           L1_hit_rate = parda_fprintf_histogram_r(pdt->histogram, NULL, false);
@@ -440,10 +473,12 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
       if ((unsigned)KERNEL_EVALUATION != kid) continue;
       unsigned max_instn_size = 0;
       for (unsigned sm_id = 0; sm_id < gpu_config[V100].num_sm; sm_id++) {
+        
         if ((*SM_traces_all_passes)[kid][sm_id].size() > max_instn_size) {
           max_instn_size = (*SM_traces_all_passes)[kid][sm_id].size();
         }
       }
+      // std::cout << "max_instn_size: " << " " << max_instn_size << std::endl;
 
       HKEY input;
       long tim;
@@ -461,7 +496,7 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
           
           if (instn_index < (*SM_traces_all_passes)[kid][sm_id].size()) {
             auto mem_ins = (*SM_traces_all_passes)[kid][sm_id][instn_index];
-
+            // std::cout << std::hex << mem_ins.addr[0] << " ";
             if (!((*SM_traces_all_passes)[kid][sm_id][instn_index].has_mem_instn_type() == LDG || 
                 (*SM_traces_all_passes)[kid][sm_id][instn_index].has_mem_instn_type() == STG)) continue;
 
@@ -502,9 +537,10 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
                 } else {
                   sprintf(input, "0x%llx", cache_line_addr);
                   mem_ins.distance_L2[j] = process_one_access_and_get_distance(input, &pdt_c, tim);
+                  // std::cout << std::hex << mem_ins.addr[j] << " " << mem_ins.distance_L2[j] << std::endl;
                   if (mem_ins.distance_L2[j] > (int)l2_cache_blocks) {
                     l2_miss_num_all_acc++;
-                    if (mem_ins.has_mem_instn_type() == LDG) {
+                    if (mem_ins.has_mem_instn_type() == LDG || mem_ins.has_mem_instn_type() == STG) {
                       DRAM_total_transactions++;
                     }
                   }
@@ -512,7 +548,7 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
                   tim++;
                   have_got_line_addr.push_back(cache_line_addr);
                 }
-                L1_have_got_line_addr.push_back(L1_cache_line_addr);
+                // L1_have_got_line_addr.push_back(L1_cache_line_addr);
               }
             }
           }
@@ -521,16 +557,16 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
 
       
 
-      std::cout << "L2_hit_rate: " << l2_num_all_acc << " " << l2_miss_num_all_acc << " " 
-                << (float)(((float)l2_num_all_acc-(float)l2_miss_num_all_acc)/(float)l2_num_all_acc) << std::endl;
+      // std::cout << "1 L2_hit_rate: " << l2_num_all_acc << " " << l2_miss_num_all_acc << " " 
+      //           << (float)(((float)l2_num_all_acc-(float)l2_miss_num_all_acc)/(float)l2_num_all_acc) << std::endl;
 
       L2_hit_rate = (float)(((float)l2_num_all_acc-(float)l2_miss_num_all_acc)/(float)l2_num_all_acc);
 
-      
       program_data_t* pdt = &pdt_c;
       pdt->histogram[B_INF] += narray_get_len(pdt->ga);
       L2_hit_rate = parda_fprintf_histogram_r(pdt->histogram, NULL, false);
-
+      
+      // std::cout << "2 L2_hit_rate: " << L2_hit_rate << std::endl;
       stat_coll->set_L2_cache_hit_rate(L2_hit_rate);
       stat_coll->set_L2_cache_requests(l2_num_all_acc);
 
@@ -551,10 +587,10 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
 
   unsigned l1_cache_access_latency = l1_cache_access;
   unsigned l2_cache_access_latency = l2_cache_access;
-  unsigned l2_cache_from_l1_access_latency = l2_cache_access_latency - l1_cache_access_latency;
+  unsigned l2_cache_from_l1_access_latency = l2_cache_access_latency + l1_cache_access_latency;
   unsigned dram_mem_access_latency = dram_mem_access;
   unsigned l2_cache_from_dram_access_latency = 
-    dram_mem_access_latency - l2_cache_access_latency - l1_cache_access_latency;
+    dram_mem_access_latency + l2_cache_access_latency + l1_cache_access_latency;
 
   // unsigned l1_cycles_no_contention = stat_coll->get_GEMM_total_transactions(0) * l1_cache_access_latency;
   
@@ -570,11 +606,11 @@ void private_L1_cache_stack_distance_evaluate_boost_no_concurrent(int argc,
     float _L1_hit_rate = stat_coll->get_Unified_L1_cache_hit_rate(curr_process_idx);
 
     (*MEM_ACCESS_LATENCY)[curr_process_idx] = _L1_hit_rate * l1_cache_access_latency + 
-                                           (1 - _L1_hit_rate) * (
+                                             (1 - _L1_hit_rate) * (
                                              L2_hit_rate * l2_cache_from_l1_access_latency + 
                                              (1 - L2_hit_rate) * l2_cache_from_dram_access_latency);
 
-    std::cout << "MEM_ACCESS_LATENCY[" << curr_process_idx << "]: " << (*MEM_ACCESS_LATENCY)[curr_process_idx] << std::endl; 
+    // std::cout << "MEM_ACCESS_LATENCY[" << curr_process_idx << "]: " << (*MEM_ACCESS_LATENCY)[curr_process_idx] << std::endl; 
 
   }
 
@@ -597,7 +633,7 @@ void private_L1_cache_stack_distance_evaluate_no_boost_no_concurrent(int argc,
   unsigned l1_cache_associativity = 64; // BUG: need configure
   unsigned l1_cache_blocks = l1_cache_size / l1_cache_line_size; // BUG: need configure
 
-  std::cout << std::endl;
+  // std::cout << std::endl;
 
   for (int pass = 0; pass < pass_num; pass++) {
     int curr_process_idx_rank = pass;
@@ -679,7 +715,7 @@ void private_L1_cache_stack_distance_evaluate_no_boost_no_concurrent(int argc,
 
 int main(int argc, char **argv) {
 
-START_TIMER(0);
+// START_TIMER(0);
 
 #ifdef USE_BOOST
   boost::mpi::environment env(argc, argv);
@@ -725,7 +761,7 @@ START_TIMER(0);
   tracer.parse_configs_file(PRINT_LOG);
   
 
-START_TIMER(1);
+// START_TIMER(1);
 
   std::vector<int> need_to_read_mem_instns_sms;
 
@@ -745,11 +781,38 @@ START_TIMER(1);
   std::vector<std::pair<int, int>> need_to_read_mem_instns_kernel_block_pair;
   /* Get pair<kernel_id, block_id> from tracer.get_issuecfg(), using need_to_read_mem_instns_sms. */
   for (auto sm_id : need_to_read_mem_instns_sms) {
-    auto result = tracer.get_issuecfg()->get_kernel_block_by_smid(sm_id);
+    // auto result = tracer.get_issuecfg()->get_kernel_block_by_smid(sm_id);
+    std::vector<std::pair<int, int>> result;
+    if (world.rank() == 0) result = tracer.get_issuecfg()->get_kernel_block_by_smid_0(sm_id);
+    else result = tracer.get_issuecfg()->get_kernel_block_by_smid(sm_id);
     for (auto pair : result) {
-      need_to_read_mem_instns_kernel_block_pair.push_back(pair);
+      // std::cout << "### " << world.rank() << " " << pair.first << " " << pair.second << std::endl;
+      // judge if pair is in need_to_read_mem_instns_kernel_block_pair
+      bool flag = false;
+      for (auto x : need_to_read_mem_instns_kernel_block_pair) {
+        if ((x.first == pair.first && x.second == pair.second)) {
+          flag = true;
+          break;
+        }
+      }
+      // std::cout << " pair.first: " << pair.first << std::endl;
+      // std::cout << " KERNEL_EVALUATION: " << KERNEL_EVALUATION << std::endl;
+      if (pair.first != (KERNEL_EVALUATION + 1))
+        flag = true;
+
+      // if (!flag) std::cout << " Add." << std::endl;
+      // else std::cout << " No Add." << std::endl;
+
+      if (!flag)
+        need_to_read_mem_instns_kernel_block_pair.push_back(pair);
     }
   }
+
+  // print need_to_read_mem_instns_kernel_block_pair
+  // if (world.rank() == 0) 
+  // std::cout << "#### " << world.rank() << " " << need_to_read_mem_instns_kernel_block_pair.size() << std::endl;
+  // for (auto x : need_to_read_mem_instns_kernel_block_pair) 
+  //   std::cout << "@@@ " << world.rank() << " " << x.first << " " << x.second << std::endl;
 
   tracer.read_mem_instns(PRINT_LOG, &need_to_read_mem_instns_kernel_block_pair);
 
@@ -758,9 +821,9 @@ START_TIMER(1);
   // std::cout << "@@@ 000" << std::endl;
 
   app_config* appcfg = tracer.get_appcfg();
-  assert(appcfg->get_kernel_block_size((int)KERNEL_EVALUATION) <= stat_coll.get_max_block_size());
-  assert(appcfg->get_kernel_num_registers((int)KERNEL_EVALUATION) <= stat_coll.get_max_registers_per_thread());
-  assert(appcfg->get_kernel_shared_mem_bytes((int)KERNEL_EVALUATION) <= stat_coll.get_shared_mem_size());
+  // assert(appcfg->get_kernel_block_size((int)KERNEL_EVALUATION) <= stat_coll.get_max_block_size());
+  // assert(appcfg->get_kernel_num_registers((int)KERNEL_EVALUATION) <= stat_coll.get_max_registers_per_thread());
+  // assert(appcfg->get_kernel_shared_mem_bytes((int)KERNEL_EVALUATION) <= stat_coll.get_shared_mem_size());
 
   stat_coll.set_total_num_workloads(appcfg->get_kernel_grid_dim_x((int)KERNEL_EVALUATION) * 
                                     appcfg->get_kernel_grid_dim_y((int)KERNEL_EVALUATION) * 
@@ -835,6 +898,7 @@ START_TIMER(1);
                                                                   stat_coll.get_Thread_block_limit_registers()),
                                                          stat_coll.get_Thread_block_limit_shared_memory()) );
   unsigned th_active_blocks = stat_coll.get_allocated_active_blocks_per_SM();
+  
   stat_coll.set_Theoretical_max_active_warps_per_SM(th_active_blocks * stat_coll.get_allocated_active_warps_per_block());
   // std::cout << "#Theoretical_max_active_warps_per_SM: " << stat_coll.get_Theoretical_max_active_warps_per_SM() << std::endl;
   // std::cout << "#max_active_threads_per_SM: " << stat_coll.get_max_active_threads_per_SM() << std::endl;
@@ -849,7 +913,7 @@ START_TIMER(1);
 
 
 
-STOP_AND_REPORT_TIMER_pass(-1, 1);
+// STOP_AND_REPORT_TIMER_pass(-1, 1);
     
   /* V100 schedules 128 kernels for concurrent execution at a time, thus requiring (all_kernels_num + 127)/128 schedules. */
   passnum_concurrent_issue_to_sm = int((tracer.get_appcfg()->get_kernels_num() + 
@@ -868,7 +932,7 @@ STOP_AND_REPORT_TIMER_pass(-1, 1);
 
   // std::cout << "@@@ 777" << std::endl;
 
-START_TIMER(3);
+// START_TIMER(3);
 
     /* When gpgpu_concurrent_kernel_sm is configured to false, 
      * passnum_concurrent_issue_to_sm is just the number of kernels.
@@ -937,7 +1001,7 @@ START_TIMER(3);
       std::map<int, std::vector<mem_instn>>* SM_traces = &SM_traces_all_passes[pass];
 
       /* pass_num is the SMs that the current rank should process. */
-      const int pass_num = int((gpu_config[V100].num_sm + world.size() - 1)/world.size());
+      int pass_num = int((gpu_config[V100].num_sm + world.size() - 1)/world.size());
       /* _pass is the index of SMs that the current rank should process. 
        * If we have 4 ranks, and 8 SMs:
        *          _pass-0  1
@@ -946,14 +1010,16 @@ START_TIMER(3);
        *   rank-2 => SM-2, 6,
        *   rank-3 => SM-3, 7.
        */
+      if (world.rank() == 0) pass_num = gpu_config[V100].num_sm;
 
       // pass_num is the total number of SMs that are calculated by the current rank.
       // _pass is the index of SMs that are calculated by the current rank.
-      for (int _pass = 0; _pass < /*pass_num*/1; _pass++) {
+      for (int _pass = 0; _pass < pass_num; _pass++) {
         /* curr_process_idx_rank is the SM id that should be processed. */
         int curr_process_idx_rank = world.rank() + _pass * world.size();
         /* curr_process_idx is the SM id that should be processed. */
         int curr_process_idx = curr_process_idx_rank;
+        if (world.rank() == 0) curr_process_idx = _pass;
         if (curr_process_idx < gpu_config[V100].num_sm)
         for (auto k : single_pass_kernels_info) {
           // k is only single_pass_kernels_info[0]
@@ -989,15 +1055,17 @@ START_TIMER(3);
             /* Calculate the allocated SM index of current thread block i. */
             
             int sm_id = issuecfg->get_sm_id_of_one_block_fast(unsigned(kernel_id + 1), unsigned(i));
-            // if (sm_id == curr_process_idx) { // yangjianchao16 20240306
+            if (sm_id == curr_process_idx) { // yangjianchao16 20240306
               /* The threadblock_traces[i] stores the memory traces that belong to k->get_trace_info()->kernel_id 
                * and thread block i. */
+              
               threadblock_traces[i] = k->get_one_kernel_one_threadblock_traces(k->get_trace_info()->kernel_id - 1, i);
-
+              // std::cout << "rank:" << world.rank() << " sm_id: " << sm_id << " threadblock_traces[i].size(): " << threadblock_traces[i].size() << std::endl;
               // SM_traces[sm_id].insert(SM_traces[sm_id].end(), threadblock_traces[i].begin(), threadblock_traces[i].end()); // old
               (*SM_traces)[sm_id].insert((*SM_traces)[sm_id].end(), threadblock_traces[i].begin(), threadblock_traces[i].end());
+              // if (world.rank() == 0) std::cout << "SM_id: " << sm_id << " " << threadblock_traces[i].size() << std::endl;
               // std::cout << "sm_id-" << sm_id << " " << threadblock_traces[i].size() << std::endl;
-            // } // yangjianchao16 20240306
+            } // yangjianchao16 20240306
           }
           /* Next we will interleave the threadblock_traces[...] to the whole traces belong to kernel_id. */
         }
@@ -1053,7 +1121,7 @@ START_TIMER(3);
 
     }
 
-STOP_AND_REPORT_TIMER_pass(-1, 3);
+// STOP_AND_REPORT_TIMER_pass(-1, 3);
 
 #ifdef USE_BOOST
   /* Set a barrier here to ensure all processes have received the data before proceeding. */
@@ -1150,7 +1218,7 @@ STOP_AND_REPORT_TIMER_pass(-1, 3);
      * memory addrs from SM-curr_process_idx. We should sort the addrs by the time_stamp to simulator 
      * the order they are issued to L1 Cache. */
 
-START_TIMER(4);
+// START_TIMER(4);
 
   /**********************************************************************************************/
   /***                                                                                        ***/
@@ -1190,7 +1258,7 @@ START_TIMER(4);
 
   // std::cout << "@@@ 999" << std::endl;
 
-  stat_coll.print_Unified_L1_cache_hit_rate();
+  // stat_coll.print_Unified_L1_cache_hit_rate();
 
   
   // abort();
@@ -1218,7 +1286,7 @@ START_TIMER(4);
   std::cout << "mem_instn_distance_overflow_flag END." << std::endl;
   */
 
-STOP_AND_REPORT_TIMER_rank(world.rank(), 4);
+// STOP_AND_REPORT_TIMER_rank(world.rank(), 4);
 
   // }
 
@@ -1234,7 +1302,7 @@ STOP_AND_REPORT_TIMER_rank(world.rank(), 4);
   // world.barrier();
 #endif
 
-START_TIMER(5);
+// START_TIMER(5);
 
   /**********************************************************************************************/
   /***                                                                                        ***/
@@ -1247,7 +1315,8 @@ START_TIMER(5);
    * that the rank corresponds to. For computation simulation, we also need to transfer the simple 
    * traces to trace_warp_inst_t objects, for the reason that in real conputation simulation, the 
    * class trace_warp_inst_t will provide more instruction details that are what we need. */
-  tracer.read_compute_instns(PRINT_COMPUTE_LOG, &need_to_read_mem_instns_kernel_block_pair);
+  if ((unsigned)(tracer.get_the_least_sm_id_of_all_blocks() % world.size()) == world.rank())
+    tracer.read_compute_instns(PRINT_COMPUTE_LOG, &need_to_read_mem_instns_kernel_block_pair);
   
   if (world.rank() == 0) {
     if (_DEBUG_LOG_)
@@ -1298,9 +1367,9 @@ START_TIMER(5);
       std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" << std::endl;
   }
 
-STOP_AND_REPORT_TIMER_rank(world.rank(), 5);
+// STOP_AND_REPORT_TIMER_rank(world.rank(), 5);
 
-START_TIMER(6);
+// START_TIMER(6);
   /**********************************************************************************************/
   /***                                                                                        ***/
   /***                              The computation simulation.                               ***/
@@ -1348,6 +1417,34 @@ START_TIMER(6);
   38     ReadOperands: port_num-\d+/m_in_ports\[\d+\].m_in\[\d+\] fails as not found free cu
   39     Writeback: bank-\d+ of reg-\d+ is not idle
   **********************************************************************************************/
+  /**********************************************************************************************
+  The following events that may cause stalls:
+    
+  Compute_Structural_Stall:
+      1      Issue: m_[compute]_out has no free slot
+      2      Issue: previous_issued_inst_exec_type is [compute]
+      3      Execute: [compute] result_bus has no slot for latency-\d+
+      4      Execute: [compute] m_dispatch_reg of fu\[\d+\]-\w+\s is not empty
+      5      Writeback: bank-\d+ of reg-\d+ is not idle
+      6      ReadOperands: bank\[\d+\] reg-\d+ \(order:\d+\) belonged to was allocated
+      7      ReadOperands: port_num-\d+/m_in_ports\[\d+\].m_in\[\d+\] fails as not found free cu
+  Compute_Data_Stall:
+      9      Issue: [compute] scoreboard
+  Memory_Structural_Stall:
+      1      Issue: m_[memory]_out has no free slot
+      2      Issue: previous_issued_inst_exec_type is [memory]
+      3      Execute: [memory] result_bus has no slot for latency-\d+
+      4      Execute: [memory] m_dispatch_reg of fu\[\d+\]-\w+\s is not empty
+      5      Writeback: bank-\d+ of reg-\d+ is not idle
+      6      ReadOperands: bank\[\d+\] reg-\d+ \(order:\d+\) belonged to was allocated
+      7      ReadOperands: port_num-\d+/m_in_ports\[\d+\].m_in\[\d+\] fails as not found free cu
+      8      Execute: icnt_injection_buffer is full
+  Memory_Data_Stall:
+      9      Issue: [memory] scoreboard
+      10     L1 // first calculate 9, and then allocate the remaining stalls to 10,11,12
+      11     L2
+      12     Main Memory
+  **********************************************************************************************/
 
   auto start_compute_timer = std::chrono::system_clock::now();
   
@@ -1359,14 +1456,21 @@ START_TIMER(6);
     // std::cout << "### Rank-" << world.rank() << ", processing SM-" << smid << std::endl;
     // if (smid < gpu_config[V100].num_sm) {
     
-    if (smid == 0) {
-      std::cout << "### Rank-" << world.rank() 
+    // if (smid == 0) {
+    if (smid == tracer.get_the_least_sm_id_of_all_blocks()) {
+      std::time_t now = time(0);
+      char* dt = ctime(&now);
+      std::cout << "\nCurrent Time: " << dt << std::endl;
+
+      std::cout << "Simulator # Rank-" << world.rank() 
                 << ", processing SM-" << smid << std::endl;
       PrivateSM private_sm = PrivateSM(smid, &tracer, &hw_cfg);
       if (_DEBUG_LOG_)
         std::cout << "private_sm.get_cycle(): " 
                   << private_sm.get_cycle() << std::endl;
       // traverse blocks_per_kernel
+      unsigned thread_blocks_num_in_this_sm = 0;
+
       for (auto pair : *(private_sm.get_blocks_per_kernel())) {
         unsigned kid = pair.first;
         std::vector<unsigned> block_ids = pair.second;
@@ -1374,31 +1478,147 @@ START_TIMER(6);
           for (unsigned block_id : block_ids) {
             std::cout << "kid: " << kid << ", block_id: " << block_id << std::endl;
           }
+
+        if (kid - 1 == (unsigned)KERNEL_EVALUATION) {
+          for (unsigned block_id : block_ids) {
+            thread_blocks_num_in_this_sm++;
+          }
+        }
       }
       std::cout << " ...run START... " << std::endl;
 
-      std::cout << "@@@@ " << MEM_ACCESS_LATENCY[smid] << std::endl;
-      while (private_sm.get_active()) {
-        private_sm.run(KERNEL_EVALUATION, MEM_ACCESS_LATENCY[smid]);
-      }
-      
-      
-      std::cout << "private_sm.get_active_cycles(): " << private_sm.get_active_cycles() << std::endl;
-      //active_warps_id_size_sum
-      std::cout << "private_sm.get_active_warps_id_size_sum(): " << private_sm.get_active_warps_id_size_sum() << std::endl;
 
+
+      // std::cout << "@@@@ " << MEM_ACCESS_LATENCY[smid] << std::endl;
+      while (private_sm.get_active()) {
+        private_sm.run(KERNEL_EVALUATION, MEM_ACCESS_LATENCY[smid], &stat_coll);
+      }
+
+      
+      // std::cout << " private_sm.get_cycle(): " << thread_blocks_num_in_this_sm << " " 
+      //           << thread_block_launch_cycles << " " << private_sm.get_cycle() << " " 
+      //           << thread_blocks_num_in_this_sm * thread_block_launch_cycles / th_active_blocks << std::endl;
+      
+      // std::cout << "private_sm.get_active_cycles(): " << private_sm.get_active_cycles() << std::endl;
+      //active_warps_id_size_sum
+      // std::cout << "private_sm.get_active_warps_id_size_sum(): " << private_sm.get_active_warps_id_size_sum() << std::endl;
+      
+      std::vector<std::pair<int, int>>* kernel_block_pair = private_sm.get_kernel_block_pair();
+      for (auto it_kernel_block_pair = kernel_block_pair->begin(); 
+                it_kernel_block_pair != kernel_block_pair->end();
+                it_kernel_block_pair++) {
+        if (it_kernel_block_pair->first - 1 != KERNEL_EVALUATION) continue;
+        unsigned _kid = it_kernel_block_pair->first - 1;
+        unsigned _block_id = it_kernel_block_pair->second;
+        unsigned _warps_per_block = appcfg->get_num_warp_per_block(_kid);
+        unsigned _gwarp_id_start = _warps_per_block * _block_id;
+        unsigned _gwarp_id_end = _gwarp_id_start + _warps_per_block - 1;
+        for (auto gwid = _gwarp_id_start; gwid <= _gwarp_id_end; gwid++) {
+          unsigned one_warp_instn_size = tracer.get_one_kernel_one_warp_instn_size(_kid, gwid);
+          for (auto i = 0; i < one_warp_instn_size; i++) {
+
+            compute_instn* tmp = tracer.get_one_kernel_one_warp_one_instn(_kid, gwid, i);
+            _inst_trace_t* tmp_inst_trace = tmp->inst_trace;
+            auto fu = tmp_inst_trace->get_func_unit();
+
+            // std::cout << " kid,wid,uid(" << _kid << "," << gwid << "," << i << "): " 
+            //           << private_sm.get_clk_record<0>(_kid, gwid, i) << " "
+            //           << private_sm.get_clk_record<1>(_kid, gwid, i) << " "
+            //           << private_sm.get_clk_record<2>(_kid, gwid, i) << " "
+            //           << private_sm.get_clk_record<3>(_kid, gwid, i) << " "
+            //           << private_sm.get_clk_record<4>(_kid, gwid, i) << " "
+            //           << private_sm.get_clk_record<5>(_kid, gwid, i) << " ["
+            //           << func_unit_name_to_string(fu)  << "]" << std::endl;
+
+            /*
+            void increment_SP_UNIT_execute_clks_sum(unsigned smid, unsigned long long value) { SP_UNIT_execute_clks_sum[smid] += value; }
+            void increment_SFU_UNIT_execute_clks_sum(unsigned smid, unsigned long long value) { SFU_UNIT_execute_clks_sum[smid] += value; }
+            void increment_INT_UNIT_execute_clks_sum(unsigned smid, unsigned long long value) { INT_UNIT_execute_clks_sum[smid] += value; }
+            void increment_DP_UNIT_execute_clks_sum(unsigned smid, unsigned long long value) { DP_UNIT_execute_clks_sum[smid] += value; }
+            void increment_TENSOR_CORE_UNIT_execute_clks_sum(unsigned smid, unsigned long long value) { TENSOR_CORE_UNIT_execute_clks_sum[smid] += value; }
+            void increment_LDST_UNIT_execute_clks_sum(unsigned smid, unsigned long long value) { LDST_UNIT_execute_clks_sum[smid] += value; }
+            void increment_SPEC_UNIT_1_execute_clks_sum(unsigned smid, unsigned long long value) { SPEC_UNIT_1_execute_clks_sum[smid] += value; }
+            void increment_SPEC_UNIT_2_execute_clks_sum(unsigned smid, unsigned long long value) { SPEC_UNIT_2_execute_clks_sum[smid] += value; }
+            void increment_SPEC_UNIT_3_execute_clks_sum(unsigned smid, unsigned long long value) { SPEC_UNIT_3_execute_clks_sum[smid] += value; }
+            void increment_Other_UNIT_execute_clks_sum(unsigned smid, unsigned long long value) { Other_UNIT_execute_clks_sum[smid] += value; }
+            */
+
+            unsigned latency_from_issue_to_writeback = 0;
+            if (private_sm.get_clk_record<4>(_kid, gwid, i) == 0 && private_sm.get_clk_record<5>(_kid, gwid, i) == 0) continue;
+            else {
+              if (private_sm.get_clk_record<5>(_kid, gwid, i) == 0) {
+                latency_from_issue_to_writeback = private_sm.get_clk_record<4>(_kid, gwid, i) - private_sm.get_clk_record<0>(_kid, gwid, i);
+              } else {
+                latency_from_issue_to_writeback = private_sm.get_clk_record<5>(_kid, gwid, i) - private_sm.get_clk_record<0>(_kid, gwid, i);
+              }
+              // Checking if unsigned expression 'latency_from_issue_to_writeback' is less than zero.
+              if (latency_from_issue_to_writeback <= 0) {
+                latency_from_issue_to_writeback = private_sm.get_clk_record<3>(_kid, gwid, i) - private_sm.get_clk_record<0>(_kid, gwid, i);
+              }
+            }
+            switch (fu)
+            {
+              case NON_UNIT:
+                stat_coll.increment_Other_UNIT_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                break;
+              case SP_UNIT:
+                stat_coll.increment_SP_UNIT_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                break;
+              case SFU_UNIT:
+                stat_coll.increment_SFU_UNIT_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                break;
+              case INT_UNIT:
+                stat_coll.increment_INT_UNIT_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                break;
+              case DP_UNIT:
+                stat_coll.increment_DP_UNIT_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                break;
+              case TENSOR_CORE_UNIT:
+                stat_coll.increment_TENSOR_CORE_UNIT_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                break;
+              case LDST_UNIT:
+                stat_coll.increment_LDST_UNIT_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                break;
+              case SPEC_UNIT_1:
+                stat_coll.increment_SPEC_UNIT_1_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                break;
+              case SPEC_UNIT_2:
+                stat_coll.increment_SPEC_UNIT_2_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                break;
+              case SPEC_UNIT_3:
+                stat_coll.increment_SPEC_UNIT_3_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                break;
+              default:
+                stat_coll.increment_Other_UNIT_execute_clks_sum(smid, latency_from_issue_to_writeback);
+                break;
+            }
+          }
+        }
+      }
+      // std::cout << private_sm.get_clk_record(unsigned kid, unsigned wid, unsigned uid);
       /*
       unsigned get_active_warps() { return m_active_warps; }
       unsigned get_max_warps_init() { return max_warps_init; }
       */
+      
+
       float achieved_occupancy = (float)private_sm.get_active_warps_id_size_sum() / 
-                                 (float)private_sm.get_active_cycles() / 
-                                 (float)private_sm.get_max_warps_init();
-      stat_coll.set_Achieved_occupancy(achieved_occupancy, smid);
+                                 (float)private_sm.get_cycle() / (float)stat_coll.get_Theoretical_occupancy();
+      // std::cout << "(float)private_sm.get_active_warps_id_size_sum(): " << (float)private_sm.get_active_warps_id_size_sum() << std::endl;
+      // std::cout << "(float)private_sm.get_cycle(): " << (float)private_sm.get_cycle() << std::endl;
+      // std::cout << "(float)stat_coll.get_Theoretical_occupancy(): " << (float)stat_coll.get_Theoretical_occupancy() << std::endl;
       // std::cout << "achieved_occupancy: " << achieved_occupancy << std::endl;
-      float achieved_active_warps_per_SM = achieved_occupancy * (float)stat_coll.get_Theoretical_max_active_warps_per_SM();
+      stat_coll.set_Achieved_occupancy(achieved_occupancy, smid); 
+      // std::cout << "achieved_occupancy: " << achieved_occupancy << std::endl;
+      float achieved_active_warps_per_SM = (float)((float)achieved_occupancy) * (float)stat_coll.get_Theoretical_max_active_warps_per_SM();
       // std::cout << "achieved_active_warps_per_SM: " << achieved_active_warps_per_SM << std::endl;
       stat_coll.set_Achieved_active_warps_per_SM(achieved_active_warps_per_SM, smid);
+
+      unsigned thread_block_launch_cycles = 700; // SM70
+      unsigned kernel_launch_cycles = 3500; // SM70
+      private_sm.set_cycle(private_sm.get_cycle() + 
+                           thread_blocks_num_in_this_sm * thread_block_launch_cycles / th_active_blocks);
+      private_sm.set_cycle(private_sm.get_cycle() + kernel_launch_cycles);
 
 
       std::cout << " ...run EXIT... " << std::endl;
@@ -1412,6 +1632,19 @@ START_TIMER(6);
         (float)( (float)private_sm.get_cycle() / (float)hw_cfg.get_core_clock_mhz() ), smid);
       stat_coll.set_Kernel_execution_time( // ns
         (float)((float)private_sm.get_cycle() / (float)hw_cfg.get_core_clock_mhz() * 1e9), smid);
+
+      
+      unsigned dram_mem_access = 302;
+      unsigned l1_cache_access = 33;
+      unsigned l2_cache_access = 213;
+
+      stat_coll.increment_num_Execute_Memory_Data_L1(
+        stat_coll.get_GEMM_total_requests(smid) * stat_coll.get_Unified_L1_cache_hit_rate(smid) * l1_cache_access, smid);
+      stat_coll.increment_num_Execute_Memory_Data_L2(
+        stat_coll.get_GEMM_total_requests(smid) * (1.0 - stat_coll.get_Unified_L1_cache_hit_rate(smid)) * l2_cache_access, smid);
+      stat_coll.increment_num_Execute_Memory_Data_Main_Memory(
+        stat_coll.get_GEMM_total_requests(smid) * (1.0 - stat_coll.get_Unified_L1_cache_hit_rate(smid)) * 
+        (1.0 - stat_coll.get_L2_cache_hit_rate()) * dram_mem_access, smid);      
     }
   }
 
@@ -1426,11 +1659,11 @@ START_TIMER(6);
 
   stat_coll.dump_output(configs, world.rank());
 
-STOP_AND_REPORT_TIMER_rank(world.rank(), 6);
+// STOP_AND_REPORT_TIMER_rank(world.rank(), 6);
 
   fflush(stdout);
 
-STOP_AND_REPORT_TIMER_pass(-1, 0);
+// STOP_AND_REPORT_TIMER_pass(-1, 0);
 
   return 0;
 }
